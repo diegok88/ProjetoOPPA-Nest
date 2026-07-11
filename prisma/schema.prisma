@@ -1,0 +1,103 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Auditoria {
+  id               String   @id @default(uuid())
+  entidade         String
+  registroId       String
+  acao             Acao
+  dadosRegistrados Json
+  dataHora         DateTime @default(now())
+}
+
+enum Acao {
+  CREATE
+  UPDATE
+  DEACTIVATE
+  DELETE
+}
+
+enum Entidade {
+  USUARIO
+  PERFIL
+}
+
+model Usuario {
+  id               String     @id @default(uuid())
+  cracha           Int        @default(autoincrement())
+  nome             String
+  dataNascimento   DateTime
+  dataAdmissao     DateTime
+  dataDesligamento DateTime?
+  senha            String
+  pin              Int
+  perfilId         String
+  perfil           Perfil     @relation(fields: [perfilId], references: [id])
+  turno            TipoTurno
+  escala           TipoEscala
+  empresaId        String
+  empresa          Empresa    @relation(fields: [empresaId], references: [id])
+  status           Boolean    @default(true)
+
+  usuario Gestor?  @relation("usuarioVinculo")
+  gestor  Gestor[] @relation("gestorVinculo")
+}
+
+enum TipoEscala {
+  A
+  B
+  C
+  D
+}
+
+enum TipoTurno {
+  MANHA
+  TARDE
+  NOITE
+}
+
+model Perfil {
+  id        String    @id @default(uuid())
+  codigo    Int       @default(autoincrement())
+  descricao String
+  status    Boolean   @default(true)
+  usuarios  Usuario[]
+}
+
+model Gestor {
+  id        String  @id @default(uuid())
+  usuarioId String
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], name: "usuarioVinculo")
+  gestorId  String?
+  gestor    Usuario @relation(fields: [gestorId, usuarioId], references: [id], name: "gestorVinculo")
+  status    Boolean @default(true)
+
+  @@index([gestorId])
+  @@index([usuarioId])
+  @@map("gestor")
+}
+
+model Empresa {
+  id           String    @id @default(uuid())
+  codigo       Int       @default(autoincrement())
+  cnpj         String    @unique
+  razaoSocial  String
+  nomeFantasia String
+  contato      String
+  email        String    @unique
+  rua          String
+  numero       String
+  bairro       String
+  cidade       String
+  estado       String
+  cep          String
+  status       Boolean   @default(true)
+  usuarios     Usuario[]
+}
