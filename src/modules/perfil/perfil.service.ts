@@ -1,11 +1,27 @@
-import { Injectable } from '@nestjs/common';
+import { PrismaService } from '@/prisma/prisma.service';
+import { Injectable, Logger } from '@nestjs/common';
+import { plainToClass } from 'class-transformer';
 import { CreatePerfilDto } from './dto/create-perfil.dto';
+import { ResponsePerfilDto } from './dto/response-perfil.dto';
 import { UpdatePerfilDto } from './dto/update-perfil.dto';
 
 @Injectable()
 export class PerfilService {
-  create(createPerfilDto: CreatePerfilDto) {
-    return 'This action adds a new perfil';
+  private logger = new Logger(PerfilService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+  // CRIAR PERFIL
+  async create(createPerfilDto: CreatePerfilDto): Promise<ResponsePerfilDto> {
+    try {
+      const criarPerfil = await this.prisma.perfil.create({
+        data: createPerfilDto,
+      });
+      this.logger.log(`Perfil id ${criarPerfil.id} criado com sucesso.`);
+      return plainToClass(ResponsePerfilDto, criarPerfil);
+    } catch (error) {
+      this.logger.log(`Falha na criação do perfil.`);
+      throw error;
+    }
   }
 
   findAll() {

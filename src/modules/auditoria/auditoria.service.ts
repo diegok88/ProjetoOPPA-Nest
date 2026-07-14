@@ -1,7 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
-import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
 import { PrismaService } from '@/prisma/prisma.service';
+import { Injectable, Logger } from '@nestjs/common';
+import { plainToClass } from 'class-transformer';
+import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
+import { ResponseAuditoriaDto } from './dto/response-auditoria.dto';
+import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
 
 @Injectable()
 export class AuditoriaService {
@@ -10,11 +12,11 @@ export class AuditoriaService {
   constructor(private readonly prisma: PrismaService) {}
 
   // SERVIÇO DE CALCULAR DIFERENÇAS ENTRE DOIS DADOS
-  private calculateDifference<T extends Record<string, unknown>>(
+  private calculateDifference<T extends Record<string, any>>(
     antes: T,
     depois: T,
-  ): Record<string, { antes: unknown; depois: unknown }> {
-    const mudancas: Record<string, { antes: unknown; depois: unknown }> = {};
+  ): Record<string, { antes: any; depois: any }> {
+    const mudancas: Record<string, { antes: any; depois: any }> = {};
     const todasChaves = new Set([
       ...Object.keys(antes || {}),
       ...Object.keys(depois || {}),
@@ -38,9 +40,19 @@ export class AuditoriaService {
     }
     return mudancas;
   }
-
-  create(createAuditoriaDto: CreateAuditoriaDto) {
-    return 'This action adds a new auditoria';
+  // SERVIÇO DE CRIAÇÃO DO OBJETO AUDITORIA
+  async create(
+    createAuditoriaDto: CreateAuditoriaDto,
+  ): Promise<ResponseAuditoriaDto> {
+    try {
+      const criarAuditoria = await this.prisma.auditoria.create({
+        data: createAuditoriaDto,
+      });
+      return plainToClass(ResponseAuditoriaDto, criarAuditoria);
+    } catch (error) {
+      this.logger.error(`Erro ao registrar criação: $(error.message)`);
+      throw error;
+    }
   }
 
   findAll() {

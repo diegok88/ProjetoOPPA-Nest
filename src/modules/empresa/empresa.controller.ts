@@ -1,34 +1,53 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { EmpresaService } from './empresa.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
+import { ResponseEmpresaDto } from './dto/response-empresa.dto';
 import { UpdateEmpresaDto } from './dto/update-empresa.dto';
+import { EmpresaService } from './empresa.service';
 
 @Controller('empresa')
 export class EmpresaController {
   constructor(private readonly empresaService: EmpresaService) {}
-
+  // CONTROLLER CRIAR EMPRESA
   @Post()
-  create(@Body() createEmpresaDto: CreateEmpresaDto) {
+  async create(
+    @Body() createEmpresaDto: CreateEmpresaDto,
+  ): Promise<ResponseEmpresaDto> {
     return this.empresaService.create(createEmpresaDto);
   }
-
+  // CONTROLLER LISTAR EMPRESAS
   @Get()
-  findAll() {
+  async findAll(): Promise<ResponseEmpresaDto[]> {
     return this.empresaService.findAll();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.empresaService.findOne(+id);
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseEmpresaDto> {
+    return this.empresaService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateEmpresaDto: UpdateEmpresaDto) {
-    return this.empresaService.update(+id, updateEmpresaDto);
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateEmpresaDto: UpdateEmpresaDto,
+  ): Promise<ResponseEmpresaDto> {
+    return this.empresaService.update(id, updateEmpresaDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.empresaService.remove(+id);
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseEmpresaDto> {
+    return this.empresaService.remove(id);
   }
 }
