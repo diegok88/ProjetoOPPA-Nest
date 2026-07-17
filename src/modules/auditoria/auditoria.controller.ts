@@ -1,12 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { AuditoriaService } from './auditoria.service';
 import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
 import { ResponseAuditoriaDto } from './dto/response-auditoria.dto';
@@ -23,6 +15,13 @@ export class AuditoriaController {
     return this.auditoriaService.create(createAuditoriaDto);
   }
 
+  @Post()
+  async update(
+    @Body() updateAuditoriaDto: UpdateAuditoriaDto,
+  ): Promise<ResponseAuditoriaDto> {
+    return this.auditoriaService.update(updateAuditoriaDto);
+  }
+
   @Get()
   async findAll(): Promise<ResponseAuditoriaDto[]> {
     return this.auditoriaService.findAll();
@@ -31,14 +30,6 @@ export class AuditoriaController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.auditoriaService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updateAuditoriaDto: UpdateAuditoriaDto,
-  ) {
-    return this.auditoriaService.update(+id, updateAuditoriaDto);
   }
 
   @Delete(':id')

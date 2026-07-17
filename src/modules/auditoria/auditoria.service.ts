@@ -5,6 +5,12 @@ import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
 import { ResponseAuditoriaDto } from './dto/response-auditoria.dto';
 import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
 
+type DadosAtualizadosAuditoria = {
+  mudancas: Record<string, { antes: any; depois: any }>;
+  camposAlterados: string[];
+  totalMudancas: number;
+};
+
 @Injectable()
 export class AuditoriaService {
   private logger = new Logger(AuditoriaService.name);
@@ -40,7 +46,7 @@ export class AuditoriaService {
     }
     return mudancas;
   }
-  // SERVIÇO DE CRIAÇÃO DO OBJETO AUDITORIA
+  // SERVIÇO DE CRIAÇÃO DO OBJETO AUDITORIA PARA DADOS DA AÇÃO CREATE
   async create(
     createAuditoriaDto: CreateAuditoriaDto,
   ): Promise<ResponseAuditoriaDto> {
@@ -51,21 +57,51 @@ export class AuditoriaService {
       this.logger.log('Registro de auditoria gerada com sucesso.');
       return plainToClass(ResponseAuditoriaDto, criarAuditoria);
     } catch (error) {
-      this.logger.error(`Erro ao registrar criação: $(error.message)`);
+      this.logger.error('Falha na criação do registro de auditoria - CREATE.');
       throw error;
     }
   }
 
+  // SERVIÇO DE CRIAÇÃO DO OBJETO AUDITORIA PARA DADOS DA AÇÃO UPDATE
+  async update(
+    updateAuditoriaDto: UpdateAuditoriaDto,
+  ): Promise<ResponseAuditoriaDto> {
+    try {
+      const antes = updateAuditoriaDto.antes;
+      const depois = updateAuditoriaDto.depois;
+
+      const mudancas = this.calculateDifference(antes, depois);
+      const camposAlterados = Object.keys(mudancas);
+
+      const dadosAuditoria: DadosAtualizadosAuditoria = {
+        mudancas: mudancas,
+        camposAlterados: camposAlterados,
+        totalMudancas: camposAlterados.length,
+      };
+
+      const criarAuditoria = this.prisma.auditoria.create({
+        data: {
+          entidade: updateAuditoriaDto.entidade,
+          registroId: updateAuditoriaDto.registroId,
+          acao: updateAuditoriaDto.acao,
+          dadosRegistrados: dadosAuditoria,
+          registradoPorId: updateAuditoriaDto.registradoPorId,
+        },
+      });
+      return plainToClass(ResponseAuditoriaDto, criarAuditoria);
+    } catch (error) {
+      this.logger.error('Falha na criação do registro de auditoria - UPDATE.');
+      throw error;
+    }
+  }
+  // SERVIÇO DE LISTAGEM DE AUDITORIAS CADASTRADAS
   async findAll(): Promise<ResponseAuditoriaDto[]> {
     try {
-      const listarRegistros = await this.prisma.auditoria.findMany();
+      const listarRegistros = await this.prisma.auditoria.findMany({});
       this.logger.log('Lista de registros de auditoria gerada com sucesso.');
 
       return listarRegistros.map((lista) =>
-        plainToClass(ResponseAuditoriaDto, lista, {
-          excludeExtraneousValues: false,
-          enableImplicitConversion: true,
-        }),
+        plainToClass(ResponseAuditoriaDto, lista),
       );
     } catch (error) {
       this.logger.error('Falha ao listar registros de auditoria.');
@@ -75,10 +111,6 @@ export class AuditoriaService {
 
   findOne(id: number) {
     return `This action returns a #${id} auditoria`;
-  }
-
-  update(id: number, updateAuditoriaDto: UpdateAuditoriaDto) {
-    return `This action updates a #${id} auditoria`;
   }
 
   remove(id: number) {

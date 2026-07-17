@@ -1,4 +1,4 @@
-import { FormatDate } from '@/functions/dtos.function';
+import { FormatDate, transformRecordedData } from '@/functions/dtos.function';
 import { Expose, Transform } from 'class-transformer';
 
 export class ResponseAuditoriaDto {
@@ -15,12 +15,7 @@ export class ResponseAuditoriaDto {
   acao!: string;
 
   @Expose()
-  @Transform(({ value }) => {
-    let resultado: any = {};
-    resultado = value;
-    console.log('Transformando dadosRegistrados:', value); // DEBUG
-    return resultado ?? {};
-  })
+  @Transform(transformRecordedData)
   dadosRegistrados!: any;
 
   @Expose()

@@ -1,3 +1,4 @@
+import { PrismaService } from '@/prisma/prisma.service';
 import {
   BadRequestException,
   Injectable,
@@ -5,20 +6,19 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { CreateUsuarioDto } from './dto/create-usuario.dto';
-import { UpdateUsuarioDto } from './dto/update-usuario.dto';
-import { ResponseUsuarioDto } from './dto/response-usuario.dto';
-import { PrismaService } from '@/prisma/prisma.service';
-import { EmpresaService } from '../empresa/empresa.service';
-import { plainToClass } from 'class-transformer';
-import { PerfilService } from '../perfil/perfil.service';
 import * as bcrypt from 'bcrypt';
+import { plainToClass } from 'class-transformer';
+import { AuditoriaService } from '../auditoria/auditoria.service';
+import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
+import { EmpresaService } from '../empresa/empresa.service';
+import { PerfilService } from '../perfil/perfil.service';
+import { CreateUsuarioDto } from './dto/create-usuario.dto';
+import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
+import { ResponseUsuarioDto } from './dto/response-usuario.dto';
 import { UpdateDataUsuarioDto } from './dto/update-data-usuario.dto';
 import { UpdatePasswordUsuarioDto } from './dto/update-password-usuario.dto';
 import { UpdatePinUsuarioDto } from './dto/update-pin-usuario.dto';
-import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
-import { AuditoriaService } from '../auditoria/auditoria.service';
-import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
+import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 
 @Injectable()
 export class UsuarioService {
@@ -73,8 +73,8 @@ export class UsuarioService {
             dataNascimento: (await criarUsuario).dataNascimento,
             dataAdmissao: (await criarUsuario).dataAdmissao,
             perfil: (await criarUsuario).perfilId,
-            escala: (await criarUsuario).nome,
-            turno: (await criarUsuario).nome,
+            escala: (await criarUsuario).escala,
+            turno: (await criarUsuario).turno,
             empresa: (await criarUsuario).empresaId,
           },
           registradoPorId: registradoPorId,

@@ -1,11 +1,26 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { IsOptional } from 'class-validator';
-import { CreateAuditoriaDto } from './create-auditoria.dto';
+import { Acao } from '@/generated/prisma/enums';
+import { IsEnum, IsNotEmpty, IsString, IsUUID } from 'class-validator';
 
-export class UpdateAuditoriaDto extends PartialType(CreateAuditoriaDto) {
-  @IsOptional()
-  antes: any;
+export class UpdateAuditoriaDto {
+  @IsString()
+  @IsNotEmpty()
+  entidade!: string;
 
-  @IsOptional()
-  depois: any;
+  @IsUUID()
+  @IsNotEmpty()
+  registroId!: string;
+
+  @IsEnum(Acao)
+  @IsNotEmpty()
+  acao!: Acao;
+
+  @IsNotEmpty()
+  antes!: any;
+
+  @IsNotEmpty()
+  depois!: any;
+
+  @IsUUID()
+  @IsNotEmpty()
+  registradoPorId!: string;
 }

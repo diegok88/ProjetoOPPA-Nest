@@ -3,9 +3,7 @@ import { TipoEscala, TipoTurno } from '@/generated/prisma/enums';
 import {
   IsDate,
   IsEnum,
-  isEnum,
   IsNotEmpty,
-  IsNumber,
   IsString,
   IsUUID,
   Length,
