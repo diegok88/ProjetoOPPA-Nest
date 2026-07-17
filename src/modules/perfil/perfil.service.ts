@@ -23,20 +23,94 @@ export class PerfilService {
       throw error;
     }
   }
-
-  findAll() {
-    return `This action returns all perfil`;
+  // LISTAR PERFIS
+  async findAll(): Promise<ResponsePerfilDto[]> {
+    try {
+      const listarPerfis = await this.prisma.perfil.findMany();
+      this.logger.log(`Lista de perfis gerada com sucesso.`);
+      return listarPerfis.map((lista) =>
+        plainToClass(ResponsePerfilDto, lista),
+      );
+    } catch (error) {
+      this.logger.error(`Falha ao listar perfis.`);
+      throw error;
+    }
   }
-
-  findOne(id: number) {
-    return `This action returns a #${id} perfil`;
+  // BUSCAR PERFIL PELO ID
+  async findOne(id: string): Promise<ResponsePerfilDto> {
+    try {
+      const buscarPerfil = await this.prisma.perfil.findUnique({
+        where: { id: id },
+      });
+      if (!buscarPerfil) {
+        this.logger.warn(`Perfil id ${id} não encontrado.`);
+      } else {
+        this.logger.log(`Busca de perfil id ${id} gerada com sucesso.`);
+      }
+      return plainToClass(ResponsePerfilDto, buscarPerfil);
+    } catch (error) {
+      this.logger.error(`Falha ao buscar perfil.`);
+      throw error;
+    }
   }
-
-  update(id: number, updatePerfilDto: UpdatePerfilDto) {
-    return `This action updates a #${id} perfil`;
+  // ATUALIZAÇÃO DO PERFIL PELO ID
+  async update(
+    id: string,
+    updatePerfilDto: UpdatePerfilDto,
+  ): Promise<ResponsePerfilDto> {
+    try {
+      const atualizarPerfil = await this.prisma.perfil.update({
+        where: { id: id },
+        data: updatePerfilDto,
+      });
+      if (!atualizarPerfil) {
+        this.logger.warn(`Perfil id ${id} não encontrado.`);
+      } else {
+        this.logger.log(
+          `Perfil id ${atualizarPerfil.id} atualizado com sucesso.`,
+        );
+      }
+      return plainToClass(ResponsePerfilDto, atualizarPerfil);
+    } catch (error) {
+      this.logger.error(`Falha ao atualizar o perfil.`);
+      throw error;
+    }
   }
+  // INATIVAÇÃO DO PERFIL PELO ID
+  async deactive(id: string): Promise<ResponsePerfilDto> {
+    try {
+      const inativarPerfil = await this.prisma.perfil.update({
+        where: { id: id },
+        data: { status: false },
+      });
+      if (!inativarPerfil) {
+        this.logger.warn(`Perfil id ${id} não foi encontrado.`);
+      } else {
+        this.logger.log(
+          `Perfil id ${inativarPerfil.id} inativado com sucesso.`,
+        );
+      }
 
-  remove(id: number) {
-    return `This action removes a #${id} perfil`;
+      return plainToClass(ResponsePerfilDto, inativarPerfil);
+    } catch (error) {
+      this.logger.error(`Falha ao inativar o perfil`);
+      throw error;
+    }
+  }
+  // DELETE DO PERFIL PELO ID
+  async remove(id: string): Promise<ResponsePerfilDto> {
+    try {
+      const deletarPerfil = await this.prisma.perfil.delete({
+        where: { id: id },
+      });
+      if (!deletarPerfil) {
+        this.logger.warn(`Perfil id ${id} não encontrado.`);
+      } else {
+        this.logger.log(`Perfil id ${deletarPerfil.id} deletado com sucesso.`);
+      }
+      return plainToClass(ResponsePerfilDto, deletarPerfil);
+    } catch (error) {
+      throw error;
+    }
   }
 }

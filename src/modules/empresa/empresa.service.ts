@@ -45,7 +45,11 @@ export class EmpresaService {
       const buscarEmpresa = await this.prisma.empresa.findUnique({
         where: { id: id },
       });
-      this.logger.log(`Busca da empresa gerada com sucesso.`);
+      if (!buscarEmpresa) {
+        this.logger.warn(`Empresa id ${id} não encontrada.`);
+      } else {
+        this.logger.log(`Empresa id ${id} gerada com sucesso.`);
+      }
       return plainToClass(ResponseEmpresaDto, buscarEmpresa);
     } catch (error) {
       this.logger.error(`Falha ao buscar a empresa.`);
@@ -71,7 +75,23 @@ export class EmpresaService {
       throw error;
     }
   }
-
+  // INATIVAR EMPRESA PELO ID
+  async deactive(id: string): Promise<ResponseEmpresaDto> {
+    try {
+      const inativarEmpresa = await this.prisma.empresa.update({
+        where: { id: id },
+        data: { status: false },
+      });
+      this.logger.log(
+        `Inativação da empresa id ${inativarEmpresa.id} realizada com sucesso.`,
+      );
+      return plainToClass(ResponseEmpresaDto, inativarEmpresa);
+    } catch (error) {
+      this.logger.error(`Falha ao inativar a empresa.`);
+      throw error;
+    }
+  }
+  // DELETAR EMPRESA PELO ID
   async remove(id: string): Promise<ResponseEmpresaDto> {
     try {
       const deletarEmpresa = await this.prisma.empresa.delete({

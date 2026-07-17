@@ -1,13 +1,11 @@
 import {
   Body,
-  ClassSerializerInterceptor,
   Controller,
   Delete,
   Get,
   Param,
   Patch,
   Post,
-  UseInterceptors,
 } from '@nestjs/common';
 import { AuditoriaService } from './auditoria.service';
 import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
@@ -15,7 +13,6 @@ import { ResponseAuditoriaDto } from './dto/response-auditoria.dto';
 import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
 
 @Controller('auditoria')
-@UseInterceptors(ClassSerializerInterceptor)
 export class AuditoriaController {
   constructor(private readonly auditoriaService: AuditoriaService) {}
 
@@ -27,7 +24,7 @@ export class AuditoriaController {
   }
 
   @Get()
-  findAll() {
+  async findAll(): Promise<ResponseAuditoriaDto[]> {
     return this.auditoriaService.findAll();
   }
 

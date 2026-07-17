@@ -38,7 +38,7 @@ model Usuario {
   dataAdmissao         DateTime
   dataDesligamento     DateTime?
   senha                String
-  pin                  Int
+  pin                  String
   perfilId             String
   perfil               Perfil      @relation("perfil", fields: [perfilId], references: [id])
   turno                TipoTurno

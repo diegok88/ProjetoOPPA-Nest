@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "usuario" ALTER COLUMN "pin" SET DATA TYPE TEXT;

@@ -48,6 +48,7 @@ export class AuditoriaService {
       const criarAuditoria = await this.prisma.auditoria.create({
         data: createAuditoriaDto,
       });
+      this.logger.log('Registro de auditoria gerada com sucesso.');
       return plainToClass(ResponseAuditoriaDto, criarAuditoria);
     } catch (error) {
       this.logger.error(`Erro ao registrar criação: $(error.message)`);
@@ -55,8 +56,21 @@ export class AuditoriaService {
     }
   }
 
-  findAll() {
-    return `This action returns all auditoria`;
+  async findAll(): Promise<ResponseAuditoriaDto[]> {
+    try {
+      const listarRegistros = await this.prisma.auditoria.findMany();
+      this.logger.log('Lista de registros de auditoria gerada com sucesso.');
+
+      return listarRegistros.map((lista) =>
+        plainToClass(ResponseAuditoriaDto, lista, {
+          excludeExtraneousValues: false,
+          enableImplicitConversion: true,
+        }),
+      );
+    } catch (error) {
+      this.logger.error('Falha ao listar registros de auditoria.');
+      throw error;
+    }
   }
 
   findOne(id: number) {

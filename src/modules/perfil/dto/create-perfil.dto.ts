@@ -1,8 +1,13 @@
-import { IsNotEmpty, IsString, IsUppercase } from 'class-validator';
+import { formatUppercase } from '@/functions/dtos.function';
+import { IsNotEmpty, IsString, IsUppercase, Length } from 'class-validator';
 
 export class CreatePerfilDto {
-  @IsString()
-  @IsNotEmpty({ message: 'O campo está vazio' })
-  @IsUppercase({ message: 'A descrição deve ser em letra maiúscula.' })
+  @IsString({ message: 'A descrição deve ser do tipo string.' })
+  @IsNotEmpty({ message: 'A descrição não deve estar vazio.' })
+  @Length(5, 20, {
+    message:
+      'A descrição deve conter no minimo 5 caracteres e no maximo 20 caracteres.',
+  })
+  @formatUppercase()
   descricao!: string;
 }

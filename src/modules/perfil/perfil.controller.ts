@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
 } from '@nestjs/common';
@@ -15,31 +16,45 @@ import { PerfilService } from './perfil.service';
 @Controller('perfil')
 export class PerfilController {
   constructor(private readonly perfilService: PerfilService) {}
-
+  // CRIAR PERFIL
   @Post()
   async create(
     @Body() createPerfilDto: CreatePerfilDto,
   ): Promise<ResponsePerfilDto> {
     return this.perfilService.create(createPerfilDto);
   }
-
+  // LISTAR PERFIS
   @Get()
-  findAll() {
+  async findAll(): Promise<ResponsePerfilDto[]> {
     return this.perfilService.findAll();
   }
-
+  // BUSCAR PERFIL PELO ID
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.perfilService.findOne(+id);
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponsePerfilDto> {
+    return this.perfilService.findOne(id);
   }
-
+  // ATUALIZAÇÃO DO PERFIL PELO ID
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePerfilDto: UpdatePerfilDto) {
-    return this.perfilService.update(+id, updatePerfilDto);
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updatePerfilDto: UpdatePerfilDto,
+  ): Promise<ResponsePerfilDto> {
+    return this.perfilService.update(id, updatePerfilDto);
   }
-
+  // INATIVAÇÃO DO PERFIL PELO ID
+  @Patch('deactive/:id')
+  async deactive(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponsePerfilDto> {
+    return this.perfilService.deactive(id);
+  }
+  // DELETE DO PERFIL PELO ID
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.perfilService.remove(+id);
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponsePerfilDto> {
+    return this.perfilService.remove(id);
   }
 }
