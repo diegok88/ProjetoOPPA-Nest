@@ -1,4 +1,5 @@
-import { formatUppercase } from '@/functions/dtos.function';
+
+import { formatUppercase } from '@/utils/format-uppercase.util';
 import {
   IsEmail,
   IsNotEmpty,

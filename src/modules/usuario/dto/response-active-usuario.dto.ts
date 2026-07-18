@@ -1,4 +1,4 @@
-import { FormatDate } from '@/functions/dtos.function';
+import { FormatDate } from '@/utils/fromat-date.util';
 import { Expose } from 'class-transformer';
 
 export class ResponseActiveUsuario {

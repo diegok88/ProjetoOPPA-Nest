@@ -1,4 +1,7 @@
-import { FormatCep, FormatCNPJ, FormatFone } from '@/functions/dtos.function';
+
+import { FormatCep } from '@/utils/format-cep.util';
+import { FormatCNPJ } from '@/utils/format-cnpj.util';
+import { FormatFone } from '@/utils/format-fone.util';
 import { Expose, Transform } from 'class-transformer';
 
 export class ResponseEmpresaDto {

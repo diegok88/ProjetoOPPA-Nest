@@ -1,4 +1,5 @@
-import { FormatDate, transformRecordedData } from '@/functions/dtos.function';
+import { FormatDate } from '@/utils/fromat-date.util';
+import { transformRecordedData } from '@/utils/transform-recoded-data.util';
 import { Expose, Transform } from 'class-transformer';
 
 export class ResponseAuditoriaDto {

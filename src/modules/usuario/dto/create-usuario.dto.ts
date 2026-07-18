@@ -1,5 +1,5 @@
-import { formatUppercase } from '@/functions/dtos.function';
 import { TipoEscala, TipoTurno } from '@/generated/prisma/enums';
+import { formatUppercase } from '@/utils/format-uppercase.util';
 import {
   IsDate,
   IsEnum,

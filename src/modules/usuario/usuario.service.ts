@@ -19,6 +19,8 @@ import { UpdateDataUsuarioDto } from './dto/update-data-usuario.dto';
 import { UpdatePasswordUsuarioDto } from './dto/update-password-usuario.dto';
 import { UpdatePinUsuarioDto } from './dto/update-pin-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
+import { ResponseAuditoriaUsuarioCreateDto } from './dto/response-auditoria-usuario-create.dto';
+import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 
 @Injectable()
 export class UsuarioService {
@@ -54,6 +56,7 @@ export class UsuarioService {
         this.logger.warn(`Ids não encontrados: ${idsAusentes.join(', ')}`);
         throw new NotFoundException('Ids não encontrados.');
       }
+      // Transação do prisma para garantir a execução das requisições
       const novoUsuario = await this.prisma.$transaction(async (tx) => {
         // Criação do novo usuario
         const criarUsuario = tx.usuario.create({
@@ -63,20 +66,26 @@ export class UsuarioService {
             pin: pinHash,
           },
         });
+        // Dados registrados
+        const dadosResgistrados: ResponseAuditoriaUsuarioCreateDto = {
+          cracha: (await criarUsuario).cracha,
+          nome: (await criarUsuario).nome,
+          dataNascimento: (await criarUsuario).dataNascimento,
+          dataAdmissao: (await criarUsuario).dataAdmissao,
+          senha: (await criarUsuario).senha,
+          pin: (await criarUsuario).pin,
+          perfil: (await criarUsuario).perfilId,
+          escala: (await criarUsuario).escala,
+          turno: (await criarUsuario).turno,
+          empresa: (await criarUsuario).empresaId,
+          status: (await criarUsuario).status,
+        };
+        // Criação do registro na classe auditoria
         const auditoriaDados: CreateAuditoriaDto = {
           entidade: 'USUARIO',
           registroId: (await criarUsuario).id,
           acao: 'CREATE',
-          dadosRegistrados: {
-            cracha: (await criarUsuario).cracha,
-            nome: (await criarUsuario).nome,
-            dataNascimento: (await criarUsuario).dataNascimento,
-            dataAdmissao: (await criarUsuario).dataAdmissao,
-            perfil: (await criarUsuario).perfilId,
-            escala: (await criarUsuario).escala,
-            turno: (await criarUsuario).turno,
-            empresa: (await criarUsuario).empresaId,
-          },
+          dadosRegistrados: dadosResgistrados,
           registradoPorId: registradoPorId,
         };
         // Criação de registro de auditoria
@@ -159,12 +168,37 @@ export class UsuarioService {
     updateUsuarioDto: UpdateUsuarioDto,
   ): Promise<ResponseUsuarioDto> {
     try {
-      const atualizarUsuario = await this.prisma.usuario.update({
-        where: { id: id },
-        data: updateUsuarioDto,
+      const atualizar = await this.prisma.$transaction(async (tx) => {
+        const buscarUsuario = tx.usuario.findUnique({
+          where: { id: id! },
+          omit: { id: true },
+        });
+        if (!buscarUsuario) {
+          throw new NotFoundException();
+        }
+        const antes = buscarUsuario;
+        const atualizarUsuario = tx.usuario.update({
+          where: { id: id },
+          data: updateUsuarioDto,
+        });
+        const depois = atualizarUsuario;
+
+        const dadosAuditoria: UpdateAuditoriaDto = {
+          entidade: 'USUARIO',
+          registroId: id,
+          acao: 'UPDATE',
+          antes: antes,
+          depois: depois,
+          registradoPorId: updateUsuarioDto.registradoPorId,
+        };
+
+        await this.auditoria.update(dadosAuditoria);
+
+        return atualizarUsuario;
       });
+
       this.logger.log(`Usuário id ${id} atuaalizado com sucesso.`);
-      return plainToClass(ResponseUsuarioDto, atualizarUsuario);
+      return plainToClass(ResponseUsuarioDto, atualizar);
     } catch (error) {
       this.logger.error('Falha ao atualizar usuário.');
       throw error;

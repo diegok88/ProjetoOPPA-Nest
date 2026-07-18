@@ -4,6 +4,7 @@ import { plainToClass } from 'class-transformer';
 import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
 import { ResponseAuditoriaDto } from './dto/response-auditoria.dto';
 import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
+import { ResponseAuditoriaUsuarioUpdate } from '../usuario/dto/response-auditoria-usuario-update.dto';
 
 type DadosAtualizadosAuditoria = {
   mudancas: Record<string, { antes: any; depois: any }>;
@@ -73,13 +74,13 @@ export class AuditoriaService {
       const mudancas = this.calculateDifference(antes, depois);
       const camposAlterados = Object.keys(mudancas);
 
-      const dadosAuditoria: DadosAtualizadosAuditoria = {
+      const dadosAuditoria = {
         mudancas: mudancas,
         camposAlterados: camposAlterados,
         totalMudancas: camposAlterados.length,
       };
 
-      const criarAuditoria = this.prisma.auditoria.create({
+      const criarAuditoria = await this.prisma.auditoria.create({
         data: {
           entidade: updateAuditoriaDto.entidade,
           registroId: updateAuditoriaDto.registroId,

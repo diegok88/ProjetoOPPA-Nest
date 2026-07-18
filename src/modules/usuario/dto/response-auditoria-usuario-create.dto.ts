@@ -14,6 +14,12 @@ export class ResponseAuditoriaUsuarioCreateDto {
   dataAdmissao!: Date;
 
   @Expose()
+  senha!: string;
+
+  @Expose()
+  pin!: string;
+
+  @Expose()
   perfil!: string;
 
   @Expose()
@@ -24,4 +30,7 @@ export class ResponseAuditoriaUsuarioCreateDto {
 
   @Expose()
   empresa!: string;
+
+  @Expose()
+  status!: boolean;
 }

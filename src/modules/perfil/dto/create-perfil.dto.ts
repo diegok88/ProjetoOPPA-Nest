@@ -1,4 +1,5 @@
-import { formatUppercase } from '@/functions/dtos.function';
+
+import { formatUppercase } from '@/utils/format-uppercase.util';
 import { IsNotEmpty, IsString, IsUppercase, Length } from 'class-validator';
 
 export class CreatePerfilDto {

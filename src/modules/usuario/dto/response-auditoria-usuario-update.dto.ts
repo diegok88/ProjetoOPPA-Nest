@@ -8,5 +8,5 @@ export class ResponseAuditoriaUsuarioUpdate {
   camposAlterados!: string[];
 
   @Expose()
-  totalMudacas!: number;
+  totalMudancas!: number;
 }

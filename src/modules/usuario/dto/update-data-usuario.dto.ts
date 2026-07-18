@@ -1,5 +1,6 @@
-import { formatUppercase } from '@/functions/dtos.function';
+
 import { TipoEscala, TipoTurno } from '@/generated/prisma/enums';
+import { formatUppercase } from '@/utils/format-uppercase.util';
 import { IsEnum, IsNotEmpty, IsOptional, IsUUID } from 'class-validator';
 
 export class UpdateDataUsuarioDto {

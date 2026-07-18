@@ -1,10 +1,7 @@
-import {
-  FormatDate,
-  ReturnObjectEmpresa,
-  ReturnObjectPerfil,
-} from '@/functions/dtos.function';
 import { ResponseEmpresaDto } from '@/modules/empresa/dto/response-empresa.dto';
 import { ResponsePerfilDto } from '@/modules/perfil/dto/response-perfil.dto';
+import { FormatDate } from '@/utils/fromat-date.util';
+import { ReturnObjectPerfil, ReturnObjectEmpresa } from '@/utils/return-object.util';
 import { Expose, Type } from 'class-transformer';
 
 export class ResponseUsuarioDto {
