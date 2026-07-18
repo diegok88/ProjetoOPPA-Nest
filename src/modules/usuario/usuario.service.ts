@@ -1,4 +1,5 @@
 import { PrismaService } from '@/prisma/prisma.service';
+import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
 import {
   BadRequestException,
   Injectable,
@@ -10,6 +11,7 @@ import * as bcrypt from 'bcrypt';
 import { plainToClass } from 'class-transformer';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
+import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 import { EmpresaService } from '../empresa/empresa.service';
 import { PerfilService } from '../perfil/perfil.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
@@ -19,8 +21,6 @@ import { UpdateDataUsuarioDto } from './dto/update-data-usuario.dto';
 import { UpdatePasswordUsuarioDto } from './dto/update-password-usuario.dto';
 import { UpdatePinUsuarioDto } from './dto/update-pin-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
-import { ResponseAuditoriaUsuarioCreateDto } from './dto/response-auditoria-usuario-create.dto';
-import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 
 @Injectable()
 export class UsuarioService {
@@ -36,17 +36,16 @@ export class UsuarioService {
   async create(
     createUsuarioDto: CreateUsuarioDto,
   ): Promise<ResponseUsuarioDto> {
-    // Criptografia dos dados senha e pin
     const { senha, pin, registradoPorId, ...dadosUsuario } = createUsuarioDto;
     const senhaHash = await this.generateHash(senha);
     const pinHash = await this.generateHash(pin);
+
     try {
-      // Multipla consulta para identificar a existencia dos dados
       const [verificarPerfil, verificarEmpresa] = await Promise.all([
         this.perfil.findOne(createUsuarioDto.perfilId),
         this.empresa.findOne(createUsuarioDto.empresaId),
       ]);
-      // Condição para determinar se os dados não estão vazios
+
       if (!verificarPerfil || !verificarEmpresa) {
         const idsAusentes: string[] = [];
         if (!verificarPerfil)
@@ -56,39 +55,28 @@ export class UsuarioService {
         this.logger.warn(`Ids não encontrados: ${idsAusentes.join(', ')}`);
         throw new NotFoundException('Ids não encontrados.');
       }
-      // Transação do prisma para garantir a execução das requisições
+
       const novoUsuario = await this.prisma.$transaction(async (tx) => {
-        // Criação do novo usuario
-        const criarUsuario = tx.usuario.create({
+        const criarUsuario = await tx.usuario.create({
           data: {
             ...dadosUsuario,
             senha: senhaHash,
             pin: pinHash,
           },
         });
-        // Dados registrados
-        const dadosResgistrados: ResponseAuditoriaUsuarioCreateDto = {
-          cracha: (await criarUsuario).cracha,
-          nome: (await criarUsuario).nome,
-          dataNascimento: (await criarUsuario).dataNascimento,
-          dataAdmissao: (await criarUsuario).dataAdmissao,
-          senha: (await criarUsuario).senha,
-          pin: (await criarUsuario).pin,
-          perfil: (await criarUsuario).perfilId,
-          escala: (await criarUsuario).escala,
-          turno: (await criarUsuario).turno,
-          empresa: (await criarUsuario).empresaId,
-          status: (await criarUsuario).status,
-        };
+
+        const dadosRegistrados = plainToClass(ResponseUsuarioDto, criarUsuario);
+        const { id, ...dadosSemId } = dadosRegistrados;
+
         // Criação do registro na classe auditoria
         const auditoriaDados: CreateAuditoriaDto = {
           entidade: 'USUARIO',
-          registroId: (await criarUsuario).id,
+          registroId: criarUsuario.id,
           acao: 'CREATE',
-          dadosRegistrados: dadosResgistrados,
+          dadosRegistrados: dadosSemId,
           registradoPorId: registradoPorId,
         };
-        // Criação de registro de auditoria
+
         await this.auditoria.create(auditoriaDados);
         return criarUsuario;
       });
@@ -100,12 +88,7 @@ export class UsuarioService {
   // LISTA OS USUARIOS
   async findAll(): Promise<ResponseUsuarioDto[]> {
     try {
-      const listarUsuarios = await this.prisma.usuario.findMany({
-        include: {
-          perfil: true,
-          empresa: true,
-        },
-      });
+      const listarUsuarios = await this.prisma.usuario.findMany();
       this.logger.log('Lista de usuário gerada com sucesso.');
       return listarUsuarios.map((lista) =>
         plainToClass(ResponseUsuarioDto, lista),
@@ -143,10 +126,6 @@ export class UsuarioService {
     try {
       const buscaUsuario = await this.prisma.usuario.findUnique({
         where: { id: id },
-        include: {
-          perfil: true,
-          empresa: true,
-        },
       });
 
       if (!buscaUsuario) {
@@ -164,41 +143,42 @@ export class UsuarioService {
   }
   // ATUALIZA USUARIO PELO ID
   async update(
-    id: string,
+    idUser: string,
     updateUsuarioDto: UpdateUsuarioDto,
   ): Promise<ResponseUsuarioDto> {
+    const { registradoPorId, ...dados } = updateUsuarioDto;
     try {
-      const atualizar = await this.prisma.$transaction(async (tx) => {
-        const buscarUsuario = tx.usuario.findUnique({
-          where: { id: id! },
-          omit: { id: true },
+      const atualizarUsuario = await this.prisma.$transaction(async (tx) => {
+        const buscar = await tx.usuario.findUnique({
+          where: { id: idUser },
         });
-        if (!buscarUsuario) {
+        if (!buscar) {
           throw new NotFoundException();
         }
-        const antes = buscarUsuario;
-        const atualizarUsuario = tx.usuario.update({
-          where: { id: id },
-          data: updateUsuarioDto,
-        });
-        const depois = atualizarUsuario;
+        const buscaDados = plainToClass(ResponseUsuarioDto, buscar);
+        const antes = ExtractDataAuditoria(buscaDados);
 
+        const atualizar = await tx.usuario.update({
+          where: { id: idUser },
+          data: dados,
+        });
+        const dadosAtualizados = plainToClass(ResponseUsuarioDto, atualizar);
+        const depois = ExtractDataAuditoria(dadosAtualizados);
+
+        this.logger.log(`Registrado por: ${updateUsuarioDto.registradoPorId}`);
         const dadosAuditoria: UpdateAuditoriaDto = {
           entidade: 'USUARIO',
-          registroId: id,
+          registroId: atualizar.id,
           acao: 'UPDATE',
           antes: antes,
           depois: depois,
           registradoPorId: updateUsuarioDto.registradoPorId,
         };
-
         await this.auditoria.update(dadosAuditoria);
-
-        return atualizarUsuario;
+        return atualizar;
       });
-
-      this.logger.log(`Usuário id ${id} atuaalizado com sucesso.`);
-      return plainToClass(ResponseUsuarioDto, atualizar);
+      this.logger.log(`Usuário id ${idUser} atuaalizado com sucesso.`);
+      return plainToClass(ResponseUsuarioDto, atualizarUsuario);
     } catch (error) {
       this.logger.error('Falha ao atualizar usuário.');
       throw error;
@@ -210,9 +190,17 @@ export class UsuarioService {
     updateDataUsuarioDto: UpdateDataUsuarioDto,
   ): Promise<ResponseUsuarioDto> {
     try {
-      const atualizarUsuario = await this.prisma.usuario.update({
-        where: { id: id },
-        data: updateDataUsuarioDto,
+      const atualizarUsuario = await this.prisma.$transaction(async (tx) => {
+        const buscar = await this.findOne(id);
+
+        if (!buscar) {
+          this.logger.warn(`Usuário id ${id} não encontrado.`);
+          throw new NotFoundException();
+        }
+        const atualizar = await tx.usuario.update({
+          where: { id: id },
+          data: updateDataUsuarioDto,
+        });
       });
       this.logger.log(`Usuário id ${id} atualizado com sucesso.`);
       return plainToClass(ResponseUsuarioDto, atualizarUsuario);

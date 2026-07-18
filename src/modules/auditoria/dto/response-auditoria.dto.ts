@@ -1,6 +1,6 @@
+import { FormatDataAuditoria } from '@/utils/format-data-auditoria.util';
 import { FormatDate } from '@/utils/fromat-date.util';
-import { transformRecordedData } from '@/utils/transform-recoded-data.util';
-import { Expose, Transform } from 'class-transformer';
+import { Expose } from 'class-transformer';
 
 export class ResponseAuditoriaDto {
   @Expose()
@@ -16,8 +16,8 @@ export class ResponseAuditoriaDto {
   acao!: string;
 
   @Expose()
-  @Transform(transformRecordedData)
-  dadosRegistrados!: any;
+  @FormatDataAuditoria()
+  dadosRegistrados!: string;
 
   @Expose()
   @FormatDate()

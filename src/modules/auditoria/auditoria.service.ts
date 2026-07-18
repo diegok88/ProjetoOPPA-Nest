@@ -4,7 +4,6 @@ import { plainToClass } from 'class-transformer';
 import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
 import { ResponseAuditoriaDto } from './dto/response-auditoria.dto';
 import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
-import { ResponseAuditoriaUsuarioUpdate } from '../usuario/dto/response-auditoria-usuario-update.dto';
 
 type DadosAtualizadosAuditoria = {
   mudancas: Record<string, { antes: any; depois: any }>;
@@ -31,13 +30,7 @@ export class AuditoriaService {
     for (const chave of todasChaves) {
       const valorAntes = antes?.[chave];
       const valorDepois = depois?.[chave];
-      if (
-        chave === 'criadoEm' ||
-        chave === 'atualizadoEm' ||
-        chave === 'dataHora'
-      ) {
-        continue;
-      }
+
       if (JSON.stringify(valorAntes) !== JSON.stringify(valorDepois)) {
         mudancas[chave] = {
           antes: valorAntes,
@@ -52,8 +45,17 @@ export class AuditoriaService {
     createAuditoriaDto: CreateAuditoriaDto,
   ): Promise<ResponseAuditoriaDto> {
     try {
+      const dadosCriados = createAuditoriaDto.dadosRegistrados;
+      const formatString = JSON.stringify(dadosCriados);
+      const criarDados = {
+        entidade: createAuditoriaDto.entidade,
+        registroId: createAuditoriaDto.registroId,
+        acao: createAuditoriaDto.acao,
+        dadosRegistrados: formatString,
+        registradoPorId: createAuditoriaDto.registradoPorId,
+      };
       const criarAuditoria = await this.prisma.auditoria.create({
-        data: createAuditoriaDto,
+        data: criarDados,
       });
       this.logger.log('Registro de auditoria gerada com sucesso.');
       return plainToClass(ResponseAuditoriaDto, criarAuditoria);
@@ -80,12 +82,14 @@ export class AuditoriaService {
         totalMudancas: camposAlterados.length,
       };
 
+      const dadosAtualizados = JSON.stringify(dadosAuditoria);
+
       const criarAuditoria = await this.prisma.auditoria.create({
         data: {
           entidade: updateAuditoriaDto.entidade,
           registroId: updateAuditoriaDto.registroId,
           acao: updateAuditoriaDto.acao,
-          dadosRegistrados: dadosAuditoria,
+          dadosRegistrados: dadosAtualizados,
           registradoPorId: updateAuditoriaDto.registradoPorId,
         },
       });
@@ -98,7 +102,7 @@ export class AuditoriaService {
   // SERVIÇO DE LISTAGEM DE AUDITORIAS CADASTRADAS
   async findAll(): Promise<ResponseAuditoriaDto[]> {
     try {
-      const listarRegistros = await this.prisma.auditoria.findMany({});
+      const listarRegistros = await this.prisma.auditoria.findMany();
       this.logger.log('Lista de registros de auditoria gerada com sucesso.');
 
       return listarRegistros.map((lista) =>

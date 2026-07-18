@@ -13,7 +13,7 @@ model Auditoria {
   entidade         String
   registroId       String
   acao             Acao
-  dadosRegistrados Json
+  dadosRegistrados String
   dataHora         DateTime @default(now())
   registradoPorId  String
   registradoPor    Usuario  @relation("registradoPor", fields: [registradoPorId], references: [id])

@@ -1,8 +1,5 @@
-import { ResponseEmpresaDto } from '@/modules/empresa/dto/response-empresa.dto';
-import { ResponsePerfilDto } from '@/modules/perfil/dto/response-perfil.dto';
 import { FormatDate } from '@/utils/fromat-date.util';
-import { ReturnObjectPerfil, ReturnObjectEmpresa } from '@/utils/return-object.util';
-import { Expose, Type } from 'class-transformer';
+import { Expose } from 'class-transformer';
 
 export class ResponseUsuarioDto {
   @Expose()
@@ -46,20 +43,4 @@ export class ResponseUsuarioDto {
 
   @Expose()
   status!: boolean;
-
-  @Expose()
-  @Type(() => ResponsePerfilDto)
-  perfil?: ResponsePerfilDto;
-
-  @Expose()
-  @Type(() => ResponseEmpresaDto) // RETORNA O DADOS DA CLASSE RELACIONADA
-  empresa?: ResponseEmpresaDto;
-
-  @Expose()
-  @ReturnObjectPerfil()
-  descPerfil?: string;
-
-  @Expose()
-  @ReturnObjectEmpresa()
-  nomeEmpresa?: string;
 }
