@@ -1,21 +1,22 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
+  Get,
+  Param,
   ParseUUIDPipe,
+  Patch,
+  Post,
 } from '@nestjs/common';
-import { UsuarioService } from './usuario.service';
+import { CreateUsuarioMaster } from './dto/create-usuario-operacao.dto';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
-import { UpdateUsuarioDto } from './dto/update-usuario.dto';
+import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
 import { ResponseUsuarioDto } from './dto/response-usuario.dto';
 import { UpdateDataUsuarioDto } from './dto/update-data-usuario.dto';
-import { UpdatePinUsuarioDto } from './dto/update-pin-usuario.dto';
 import { UpdatePasswordUsuarioDto } from './dto/update-password-usuario.dto';
-import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
+import { UpdatePinUsuarioDto } from './dto/update-pin-usuario.dto';
+import { UpdateUsuarioDto } from './dto/update-usuario.dto';
+import { UsuarioService } from './usuario.service';
 
 @Controller('usuario')
 export class UsuarioController {
@@ -27,6 +28,15 @@ export class UsuarioController {
   ): Promise<ResponseUsuarioDto> {
     return this.usuarioService.create(createUsuarioDto);
   }
+  // CRIAR USUARIO MASTER
+  @Post('master')
+  async createMaster(
+    @Body() createUsuarioMaster: CreateUsuarioMaster,
+  ): Promise<ResponseUsuarioDto> {
+    return this.usuarioService.createMaster(createUsuarioMaster);
+  }
+  // CRIAR USUARIO ADMINISTRADOR
+
   // LISTA OS USUARIOS
   @Get()
   async findAll(): Promise<ResponseUsuarioDto[]> {

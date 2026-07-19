@@ -1,3 +1,4 @@
+import { PasswordPin } from '@/constants/password-pin.const';
 import { PrismaService } from '@/prisma/prisma.service';
 import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
 import {
@@ -14,6 +15,10 @@ import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 import { EmpresaService } from '../empresa/empresa.service';
 import { PerfilService } from '../perfil/perfil.service';
+import {
+  CreateUsuarioAdmin,
+  CreateUsuarioMaster,
+} from './dto/create-usuario-operacao.dto';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
 import { ResponseUsuarioDto } from './dto/response-usuario.dto';
@@ -82,6 +87,72 @@ export class UsuarioService {
       });
       return plainToClass(ResponseUsuarioDto, novoUsuario);
     } catch (error) {
+      throw error;
+    }
+  }
+  // CRIAR USUARIO MASTER
+  async createMaster(
+    createUsuarioMaster: CreateUsuarioMaster,
+  ): Promise<ResponseUsuarioDto> {
+    try {
+      // Separa os dados e cria o hash da senha e pin
+      const { senha, pin, ...dados } = createUsuarioMaster;
+      const senhaHash = await this.generateHash(senha);
+      const pinHash = await this.generateHash(pin);
+      // Cria o usuario
+      const criar = await this.prisma.usuario.create({
+        data: {
+          ...dados,
+          senha: senhaHash,
+          pin: pinHash,
+        },
+      });
+      // Retorno dos dados
+      this.logger.log('Usuário master criado com sucesso.');
+      return plainToClass(ResponseUsuarioDto, criar);
+    } catch (error) {
+      this.logger.error('Falha ao cadastrar usuário master');
+      throw error;
+    }
+  }
+  async createAdmin(
+    createUsuarioAdmin: CreateUsuarioAdmin,
+  ): Promise<ResponseUsuarioDto> {
+    try {
+      const { registradoPorId, ...dados } = createUsuarioAdmin;
+      const criarUsuario = await this.prisma.$transaction(async (tx) => {
+        // Cria o hash do usuario
+        const senhaHash = await this.generateHash(PasswordPin.password);
+        const pinHash = await this.generateHash(PasswordPin.pin);
+        // Busca o id da empresa cadastrada do usuario cadastrador
+        const buscar = await this.findOne(registradoPorId);
+        // Cria o usuario no banco de dados
+        const criar = await tx.usuario.create({
+          data: {
+            ...dados,
+            senha: senhaHash,
+            pin: pinHash,
+            empresaId: buscar.empresaId,
+          },
+        });
+        // Separar o id dos dados cadastrados
+        const { id, ...dadosSemId } = criar;
+        // Constante dos dados de auditoria
+        const dadosAuditoria: CreateAuditoriaDto = {
+          entidade: 'USUARIO',
+          registroId: id,
+          acao: 'CREATE',
+          dadosRegistrados: dadosSemId,
+          registradoPorId: registradoPorId,
+        };
+        // Cadastro da auditoria
+        await this.auditoria.create(dadosAuditoria);
+        return criar;
+      });
+      this.logger.log('Usuário cadastrado com sucesso.');
+      return plainToClass(ResponseUsuarioDto, criarUsuario);
+    } catch (error) {
+      this.logger.error('Falha ao cadastrar usuário.');
       throw error;
     }
   }

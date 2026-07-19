@@ -32,7 +32,7 @@ enum Acao {
 
 model Usuario {
   id                   String      @id @default(uuid())
-  cracha               Int         @default(autoincrement())
+  cracha               Int
   nome                 String
   dataNascimento       DateTime
   dataAdmissao         DateTime
@@ -51,6 +51,13 @@ model Usuario {
   auditoria            Auditoria[] @relation("registradoPor")
 
   @@map("usuario")
+}
+
+model ContadorDeCracha {
+  id        String  @id @default(uuid())
+  empresaId String  @unique
+  contador  Int
+  status    Boolean @default(true)
 }
 
 enum TipoEscala {
