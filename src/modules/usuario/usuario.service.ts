@@ -172,7 +172,7 @@ export class UsuarioService {
           acao: 'UPDATE',
           antes: antes,
           depois: depois,
-          registradoPorId: updateUsuarioDto.registradoPorId,
+          registradoPorId: registradoPorId,
         };
         await this.auditoria.update(dadosAuditoria);
         return atualizar;
