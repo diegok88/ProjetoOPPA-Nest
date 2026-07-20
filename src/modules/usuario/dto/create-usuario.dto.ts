@@ -4,14 +4,20 @@ import {
   IsDate,
   IsEnum,
   IsNotEmpty,
+  IsNumber,
   IsString,
   IsUUID,
   Length,
   Matches,
+  Min,
   MinLength,
 } from 'class-validator';
 
 export class CreateUsuarioDto {
+  @IsNumber({}, { message: 'Crachá não é do tipo Number' })
+  @Min(0, { message: 'Crachá não deve ser um valor negativo' })
+  cracha!: number;
+
   @IsString({ message: 'Nome não é do tipo String.' })
   @IsNotEmpty({ message: 'Nome é um campo obrigatório.' })
   @Length(10, 100, {

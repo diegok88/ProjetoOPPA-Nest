@@ -40,6 +40,7 @@ export class AuditoriaService {
     }
     return mudancas;
   }
+
   // SERVIÇO DE CRIAÇÃO DO OBJETO AUDITORIA PARA DADOS DA AÇÃO CREATE
   async create(
     createAuditoriaDto: CreateAuditoriaDto,
@@ -99,6 +100,7 @@ export class AuditoriaService {
       throw error;
     }
   }
+
   // SERVIÇO DE LISTAGEM DE AUDITORIAS CADASTRADAS
   async findAll(): Promise<ResponseAuditoriaDto[]> {
     try {

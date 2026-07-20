@@ -32,19 +32,19 @@ enum Acao {
 
 model Usuario {
   id                   String      @id @default(uuid())
-  cracha               Int
-  nome                 String
-  dataNascimento       DateTime
-  dataAdmissao         DateTime
+  cracha               Int?
+  nome                 String?
+  dataNascimento       DateTime?
+  dataAdmissao         DateTime?
   dataDesligamento     DateTime?
   senha                String
   pin                  String
-  perfilId             String
-  perfil               Perfil      @relation("perfil", fields: [perfilId], references: [id])
-  turno                TipoTurno
-  escala               TipoEscala
-  empresaId            String
-  empresa              Empresa     @relation("empresa", fields: [empresaId], references: [id])
+  perfilId             String?
+  perfil               Perfil?     @relation("perfil", fields: [perfilId], references: [id])
+  turno                TipoTurno?
+  escala               TipoEscala?
+  empresaId            String?
+  empresa              Empresa?    @relation("empresa", fields: [empresaId], references: [id])
   status               Boolean     @default(true)
   gestorComoOperador   Gestor[]    @relation("operador")
   gestorComoSupervisor Gestor[]    @relation("supervisor")
@@ -58,6 +58,8 @@ model ContadorDeCracha {
   empresaId String  @unique
   contador  Int
   status    Boolean @default(true)
+
+  @@map("contador_cracha")
 }
 
 enum TipoEscala {

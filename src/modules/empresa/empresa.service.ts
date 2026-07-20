@@ -1,6 +1,13 @@
 import { PrismaService } from '@/prisma/prisma.service';
+import {
+  ExtractDataAuditoria,
+  ExtractRegisteredById,
+} from '@/utils/extract-data-auditoria.util';
+import { StructureDataAuditoriaCreate } from '@/utils/structure-data-auditoria.util';
 import { Injectable, Logger } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
+import { AuditoriaService } from '../auditoria/auditoria.service';
+import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
 import { ResponseEmpresaDto } from './dto/response-empresa.dto';
 import { UpdateEmpresaDto } from './dto/update-empresa.dto';
@@ -9,15 +16,38 @@ import { UpdateEmpresaDto } from './dto/update-empresa.dto';
 export class EmpresaService {
   private logger = new Logger(EmpresaService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private auditoria: AuditoriaService,
+    private contadorCracha: ContadorCrachaService,
+  ) {}
 
   // SERVIÇO CRIAR EMPRESA
   async create(
     createEmpresaDto: CreateEmpresaDto,
   ): Promise<ResponseEmpresaDto> {
     try {
-      const criarEmpresa = await this.prisma.empresa.create({
-        data: createEmpresaDto,
+      const criarEmpresa = await this.prisma.$transaction(async (tx) => {
+        const dadosSemRegistradoPorId =
+          await ExtractRegisteredById(createEmpresaDto);
+        const criar = await this.prisma.empresa.create({
+          data: dadosSemRegistradoPorId,
+        });
+        const dadosSemId = await ExtractDataAuditoria(criar);
+        const dadosCriarContador = {
+          empresaId: criar.id,
+          contador: 0,
+          registradoPorId: createEmpresaDto.registradoPorId,
+        };
+        await this.contadorCracha.create(dadosCriarContador);
+        const dadosAuditoria = await StructureDataAuditoriaCreate(
+          'EMPRESA',
+          criar.id,
+          dadosSemId,
+          createEmpresaDto.registradoPorId,
+        );
+        await this.auditoria.create(dadosAuditoria);
+        return criar;
       });
       this.logger.log(`Empresa com id ${criarEmpresa.id} criado com sucesso.`);
       return plainToClass(ResponseEmpresaDto, criarEmpresa);

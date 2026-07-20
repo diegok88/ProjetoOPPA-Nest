@@ -1,6 +1,10 @@
 import { PasswordPin } from '@/constants/password-pin.const';
 import { PrismaService } from '@/prisma/prisma.service';
-import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
+import {
+  ExtractDataAuditoria,
+  ExtractRegisteredById,
+} from '@/utils/extract-data-auditoria.util';
+import { StructureDataAuditoriaCreate } from '@/utils/structure-data-auditoria.util';
 import {
   BadRequestException,
   Injectable,
@@ -90,7 +94,7 @@ export class UsuarioService {
       throw error;
     }
   }
-  // CRIAR USUARIO MASTER
+  // CRIAR USUARIO MASTER - acesso ao usuario principal
   async createMaster(
     createUsuarioMaster: CreateUsuarioMaster,
   ): Promise<ResponseUsuarioDto> {
@@ -119,32 +123,34 @@ export class UsuarioService {
     createUsuarioAdmin: CreateUsuarioAdmin,
   ): Promise<ResponseUsuarioDto> {
     try {
-      const { registradoPorId, ...dados } = createUsuarioAdmin;
+      // Extraindo o atributo registradoPorId
+      const dadosSemRegistradoPorId =
+        await ExtractRegisteredById(createUsuarioAdmin);
+      // Transação de criação e auditoria
       const criarUsuario = await this.prisma.$transaction(async (tx) => {
-        // Cria o hash do usuario
+        // Cria o hash do usuario usando
         const senhaHash = await this.generateHash(PasswordPin.password);
         const pinHash = await this.generateHash(PasswordPin.pin);
         // Busca o id da empresa cadastrada do usuario cadastrador
-        const buscar = await this.findOne(registradoPorId);
+        const buscar = await this.findOne(createUsuarioAdmin.registradoPorId);
         // Cria o usuario no banco de dados
         const criar = await tx.usuario.create({
           data: {
-            ...dados,
+            ...dadosSemRegistradoPorId,
             senha: senhaHash,
             pin: pinHash,
             empresaId: buscar.empresaId,
           },
         });
         // Separar o id dos dados cadastrados
-        const { id, ...dadosSemId } = criar;
-        // Constante dos dados de auditoria
-        const dadosAuditoria: CreateAuditoriaDto = {
-          entidade: 'USUARIO',
-          registroId: id,
-          acao: 'CREATE',
-          dadosRegistrados: dadosSemId,
-          registradoPorId: registradoPorId,
-        };
+        const dadosSemId = await ExtractDataAuditoria(criar);
+        // Função dos dados de auditoria
+        const dadosAuditoria = await StructureDataAuditoriaCreate(
+          'USUARIO',
+          criar.id,
+          dadosSemId,
+          createUsuarioAdmin.registradoPorId,
+        );
         // Cadastro da auditoria
         await this.auditoria.create(dadosAuditoria);
         return criar;

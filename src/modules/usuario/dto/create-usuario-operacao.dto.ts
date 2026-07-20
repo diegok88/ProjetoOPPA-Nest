@@ -2,6 +2,13 @@ import { OmitType } from '@nestjs/mapped-types';
 import { CreateUsuarioDto } from './create-usuario.dto';
 
 export class CreateUsuarioMaster extends OmitType(CreateUsuarioDto, [
+  'cracha',
+  'dataAdmissao',
+  'dataNascimento',
+  'escala',
+  'turno',
+  'perfilId',
+  'empresaId',
   'registradoPorId',
 ]) {}
 
