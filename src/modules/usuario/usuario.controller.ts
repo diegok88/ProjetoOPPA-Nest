@@ -8,7 +8,10 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { CreateUsuarioMaster } from './dto/create-usuario-operacao.dto';
+import {
+  CreateUsuarioAdmin,
+  CreateUsuarioMaster,
+} from './dto/create-usuario-operacao.dto';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
 import { ResponseUsuarioDto } from './dto/response-usuario.dto';
@@ -36,7 +39,12 @@ export class UsuarioController {
     return this.usuarioService.createMaster(createUsuarioMaster);
   }
   // CRIAR USUARIO ADMINISTRADOR
-
+  @Post('admin')
+  async createAdmin(
+    @Body() createUsuarioAdmin: CreateUsuarioAdmin,
+  ): Promise<ResponseUsuarioDto> {
+    return this.usuarioService.createAdmin(createUsuarioAdmin);
+  }
   // LISTA OS USUARIOS
   @Get()
   async findAll(): Promise<ResponseUsuarioDto[]> {

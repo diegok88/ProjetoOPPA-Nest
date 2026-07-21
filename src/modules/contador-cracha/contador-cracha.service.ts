@@ -4,12 +4,18 @@ import {
   ExtractRegisteredById,
 } from '@/utils/extract-data-auditoria.util';
 import { StructureDataAuditoriaCreate } from '@/utils/structure-data-auditoria.util';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateContadorCrachaDto } from './dto/create-contador-cracha.dto';
-import { ResponseContadorCrachaDto } from './dto/response-contador-cracha.dto';
+import {
+  ResponseContadorAdminDto,
+  ResponseContadorCrachaDto,
+  ResponseContadorEnterpriseDto,
+} from './dto/response-contador-cracha.dto';
 import { UpdateContadorCrachaDto } from './dto/update-contador-cracha.dto';
+import { toUSVString } from 'util';
+import { throws } from 'assert';
 
 @Injectable()
 export class ContadorCrachaService {
@@ -19,7 +25,7 @@ export class ContadorCrachaService {
     private readonly prisma: PrismaService,
     private auditoria: AuditoriaService,
   ) {}
-  //CRIA UM NOVO CONTADOR A CADA CRIAÇÃO DE EMPRESA
+  // CRIA UM NOVO CONTADOR A CADA CRIAÇÃO DE EMPRESA
   async create(
     createContadorCrachaDto: CreateContadorCrachaDto,
   ): Promise<ResponseContadorCrachaDto> {
@@ -48,23 +54,91 @@ export class ContadorCrachaService {
         // Retorno da criação do constador de cracha
         return criar;
       });
+      this.logger.log('Contador de crachá criada com sucesso.');
       return plainToClass(ResponseContadorCrachaDto, criarContador);
     } catch (error) {
       this.logger.error('Falha ao cadastrar o contador de crachás.');
       throw error;
     }
   }
-
-  findAll() {
-    return `This action returns all contadorCracha`;
+  // LISTAGEM DE CONTADORES DE CRACHAS
+  async findAll(): Promise<ResponseContadorAdminDto[]> {
+    try {
+      const listar = await this.prisma.contadorDeCracha.findMany({
+        include: {
+          empresa: {
+            select: { razaoSocial: true },
+          },
+        },
+      });
+      this.logger.log('Lista de contadores de crachás gerada com sucesso.');
+      return listar.map((item) =>
+        plainToClass(ResponseContadorAdminDto, {
+          ...item,
+          nomeEmpresa: item.empresa?.razaoSocial || '',
+        }),
+      );
+    } catch (error) {
+      this.logger.error('Falha ao listar os contadores de crachas');
+      throw error;
+    }
   }
-
-  findOne(id: number) {
-    return `This action returns a #${id} contadorCracha`;
+  // BUSCAR DE CONTADORES DE CRACHAS
+  async findOne(id: string): Promise<ResponseContadorAdminDto> {
+    try {
+      const buscar = await this.prisma.contadorDeCracha.findUnique({
+        where: { id: id },
+        include: {
+          empresa: {
+            select: { razaoSocial: true },
+          },
+        },
+      });
+      if (!buscar) {
+        this.logger.warn(`Contador de crachá id ${id} não encontrado.`);
+        throw new NotFoundException();
+      }
+      return plainToClass(ResponseContadorAdminDto, {
+        ...buscar,
+        nomeEmpresa: buscar.empresa?.razaoSocial || '',
+      });
+    } catch (error) {
+      this.logger.error('Falha na busca do contador de crachá.');
+      throw error;
+    }
   }
+  // BUSCAR CONTADOR DE CRACHA POR ID EMPRESA
+  async findEnterprise(id: string): Promise<ResponseContadorEnterpriseDto> {
+    try {
+      const buscar = await this.prisma.contadorDeCracha.findFirst({
+        where: { empresaId: id },
+        select: { id: true, contador: true },
+      });
 
-  update(id: number, updateContadorCrachaDto: UpdateContadorCrachaDto) {
-    return `This action updates a #${id} contadorCracha`;
+      return plainToClass(ResponseContadorEnterpriseDto, buscar);
+    } catch (error) {
+      this.logger.error('Falha na busca do contador de cracha.');
+      throw error;
+    }
+  }
+  // ATUALIZA O ATRIBUTO CONTADOR A CADA CADASTRO DE UM NOVO USUARIO DA EMPRESA CADASTRANTE
+  async updateAccountant(
+    empresaId: string,
+    updateContadorCrachaDto: UpdateContadorCrachaDto,
+  ): Promise<ResponseContadorAdminDto> {
+    try {
+      const atualizarContador = await this.prisma.$transaction(async (tx) => {
+        const buscar = await this.findEnterprise(empresaId);
+        const atualizar = await this.prisma.contadorDeCracha.update({
+          where: { id: buscar.id },
+          data: { contador: { increment: 1 } },
+        });
+      });
+      return plainToClass(ResponseContadorAdminDto, atualizarContador);
+    } catch (error) {
+      this.logger.error('Falha ao atualizar o contador de crachá.');
+      throw error;
+    }
   }
 
   remove(id: number) {

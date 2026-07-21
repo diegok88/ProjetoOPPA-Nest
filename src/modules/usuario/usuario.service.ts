@@ -132,14 +132,16 @@ export class UsuarioService {
         const senhaHash = await this.generateHash(PasswordPin.password);
         const pinHash = await this.generateHash(PasswordPin.pin);
         // Busca o id da empresa cadastrada do usuario cadastrador
-        const buscar = await this.findOne(createUsuarioAdmin.registradoPorId);
+        const buscarEmpresa = await this.findOne(
+          createUsuarioAdmin.registradoPorId,
+        );
         // Cria o usuario no banco de dados
         const criar = await tx.usuario.create({
           data: {
             ...dadosSemRegistradoPorId,
             senha: senhaHash,
             pin: pinHash,
-            empresaId: buscar.empresaId,
+            empresaId: buscarEmpresa.empresaId,
           },
         });
         // Separar o id dos dados cadastrados

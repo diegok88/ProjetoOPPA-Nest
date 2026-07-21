@@ -55,7 +55,8 @@ model Usuario {
 
 model ContadorDeCracha {
   id        String  @id @default(uuid())
-  empresaId String  @unique
+  empresaId String
+  empresa   Empresa @relation("empresa", fields: [empresaId], references: [id])
   contador  Int
   status    Boolean @default(true)
 
@@ -97,21 +98,22 @@ model Gestor {
 }
 
 model Empresa {
-  id           String    @id @default(uuid())
-  codigo       Int       @default(autoincrement())
-  cnpj         String    @unique
+  id           String             @id @default(uuid())
+  codigo       Int                @default(autoincrement())
+  cnpj         String             @unique
   razaoSocial  String
   nomeFantasia String
   contato      String
-  email        String    @unique
+  email        String             @unique
   rua          String
   numero       String
   bairro       String
   cidade       String
   estado       String
   cep          String
-  status       Boolean   @default(true)
-  usuarios     Usuario[] @relation("empresa")
+  status       Boolean            @default(true)
+  usuarios     Usuario[]          @relation("empresa")
+  contadores   ContadorDeCracha[] @relation("empresa")
 
   @@map("empresa")
 }

@@ -39,6 +39,10 @@ export class CreateUsuarioDto {
   @IsNotEmpty({ message: 'Data de admissão é um campo obrigatório.' })
   dataAdmissao!: Date;
 
+  @IsDate({ message: 'Data de desligamento não é do tipo Date.' })
+  @IsNotEmpty({ message: 'Data de desligamento é um campo obrigatório.' })
+  dataDesligamento!: Date;
+
   @IsString({ message: 'Nome não é do tipo String.' })
   @MinLength(6, { message: 'Senha deve conter no minimo 6 caracteres.' })
   @IsNotEmpty({ message: 'Senha é um campo obrigatório.' })

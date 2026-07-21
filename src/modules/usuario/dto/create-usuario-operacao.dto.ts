@@ -5,6 +5,7 @@ export class CreateUsuarioMaster extends OmitType(CreateUsuarioDto, [
   'cracha',
   'dataAdmissao',
   'dataNascimento',
+  'dataDesligamento',
   'escala',
   'turno',
   'perfilId',
@@ -15,10 +16,12 @@ export class CreateUsuarioMaster extends OmitType(CreateUsuarioDto, [
 export class CreateUsuarioAdmin extends OmitType(CreateUsuarioDto, [
   'senha',
   'pin',
+  'dataDesligamento',
   'empresaId',
 ]) {}
 
-export class CresteUsuarioGestor extends OmitType(CreateUsuarioDto, [
+export class CreateUsuarioGestor extends OmitType(CreateUsuarioDto, [
+  'dataDesligamento',
   'senha',
   'pin',
 ]) {}
