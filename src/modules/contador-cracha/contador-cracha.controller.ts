@@ -1,58 +1,55 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
+  Get,
+  Param,
   ParseUUIDPipe,
+  Patch,
+  Post,
 } from '@nestjs/common';
 import { ContadorCrachaService } from './contador-cracha.service';
 import { CreateContadorCrachaDto } from './dto/create-contador-cracha.dto';
-import { UpdateContadorCrachaDto } from './dto/update-contador-cracha.dto';
 import {
   ResponseContadorAdminDto,
   ResponseContadorCrachaDto,
   ResponseContadorEnterpriseDto,
 } from './dto/response-contador-cracha.dto';
+import { UpdateContadorCrachaDto } from './dto/update-contador-cracha.dto';
 
 @Controller('contador-cracha')
 export class ContadorCrachaController {
   constructor(private readonly contadorCrachaService: ContadorCrachaService) {}
 
   @Post()
-  async create(
+  async createAccountant(
     @Body() createContadorCrachaDto: CreateContadorCrachaDto,
   ): Promise<ResponseContadorCrachaDto> {
-    return this.contadorCrachaService.create(createContadorCrachaDto);
+    return this.contadorCrachaService.createAccountant(createContadorCrachaDto);
   }
 
   @Get()
-  async findAll(): Promise<ResponseContadorAdminDto[]> {
-    return this.contadorCrachaService.findAll();
+  async findAllAccountant(): Promise<ResponseContadorAdminDto[]> {
+    return this.contadorCrachaService.findAllAccountant();
   }
 
   @Get(':id')
-  async findOne(
+  async findOneAccountant(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseContadorAdminDto> {
-    return this.contadorCrachaService.findOne(id);
+    return this.contadorCrachaService.findOneAccountant(id);
   }
 
   @Get('enterprise/:id')
-  async findEnterprise(
+  async findEnterpriseAccountant(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseContadorEnterpriseDto> {
-    return this.contadorCrachaService.findEnterprise(id);
+    return this.contadorCrachaService.findEnterpriseAccountant(id);
   }
 
   @Patch('update-accountant/:id')
-  updateAccountant(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateContadorCrachaDto: UpdateContadorCrachaDto,
-  ) {
-    return this.contadorCrachaService.updateAccountant(id, updateContadorCrachaDto);
+  updateAccountant(@Body() updateContadorCrachaDto: UpdateContadorCrachaDto) {
+    return this.contadorCrachaService.updateAccountant(updateContadorCrachaDto);
   }
 
   @Delete(':id')

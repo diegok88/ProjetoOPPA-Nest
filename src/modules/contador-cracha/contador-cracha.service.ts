@@ -14,8 +14,6 @@ import {
   ResponseContadorEnterpriseDto,
 } from './dto/response-contador-cracha.dto';
 import { UpdateContadorCrachaDto } from './dto/update-contador-cracha.dto';
-import { toUSVString } from 'util';
-import { throws } from 'assert';
 
 @Injectable()
 export class ContadorCrachaService {
@@ -26,7 +24,7 @@ export class ContadorCrachaService {
     private auditoria: AuditoriaService,
   ) {}
   // CRIA UM NOVO CONTADOR A CADA CRIAÇÃO DE EMPRESA
-  async create(
+  async createAccountant(
     createContadorCrachaDto: CreateContadorCrachaDto,
   ): Promise<ResponseContadorCrachaDto> {
     try {
@@ -62,7 +60,7 @@ export class ContadorCrachaService {
     }
   }
   // LISTAGEM DE CONTADORES DE CRACHAS
-  async findAll(): Promise<ResponseContadorAdminDto[]> {
+  async findAllAccountant(): Promise<ResponseContadorAdminDto[]> {
     try {
       const listar = await this.prisma.contadorDeCracha.findMany({
         include: {
@@ -84,7 +82,7 @@ export class ContadorCrachaService {
     }
   }
   // BUSCAR DE CONTADORES DE CRACHAS
-  async findOne(id: string): Promise<ResponseContadorAdminDto> {
+  async findOneAccountant(id: string): Promise<ResponseContadorAdminDto> {
     try {
       const buscar = await this.prisma.contadorDeCracha.findUnique({
         where: { id: id },
@@ -108,7 +106,9 @@ export class ContadorCrachaService {
     }
   }
   // BUSCAR CONTADOR DE CRACHA POR ID EMPRESA
-  async findEnterprise(id: string): Promise<ResponseContadorEnterpriseDto> {
+  async findEnterpriseAccountant(
+    id: string,
+  ): Promise<ResponseContadorEnterpriseDto> {
     try {
       const buscar = await this.prisma.contadorDeCracha.findFirst({
         where: { empresaId: id },
@@ -123,16 +123,19 @@ export class ContadorCrachaService {
   }
   // ATUALIZA O ATRIBUTO CONTADOR A CADA CADASTRO DE UM NOVO USUARIO DA EMPRESA CADASTRANTE
   async updateAccountant(
-    empresaId: string,
     updateContadorCrachaDto: UpdateContadorCrachaDto,
   ): Promise<ResponseContadorAdminDto> {
     try {
       const atualizarContador = await this.prisma.$transaction(async (tx) => {
-        const buscar = await this.findEnterprise(empresaId);
+        const buscar = await this.findEnterpriseAccountant(
+          updateContadorCrachaDto.empresaId,
+        );
+        const dadosAntes = ExtractDataAuditoria(buscar);
         const atualizar = await this.prisma.contadorDeCracha.update({
           where: { id: buscar.id },
           data: { contador: { increment: 1 } },
         });
+        const dadosdepois = await ExtractDataAuditoria(atualizar);
       });
       return plainToClass(ResponseContadorAdminDto, atualizarContador);
     } catch (error) {

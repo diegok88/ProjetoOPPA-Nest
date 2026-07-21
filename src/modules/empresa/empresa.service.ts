@@ -39,7 +39,7 @@ export class EmpresaService {
           contador: 0,
           registradoPorId: createEmpresaDto.registradoPorId,
         };
-        await this.contadorCracha.create(dadosCriarContador);
+        await this.contadorCracha.createAccountant(dadosCriarContador);
         const dadosAuditoria = await StructureDataAuditoriaCreate(
           'EMPRESA',
           criar.id,

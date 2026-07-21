@@ -1,4 +1,6 @@
+import { Acao } from '@/generated/prisma/enums';
 import { CreateAuditoriaDto } from '@/modules/auditoria/dto/create-auditoria.dto';
+import { UpdateAuditoriaDto } from '@/modules/auditoria/dto/update-auditoria.dto';
 
 export function StructureDataAuditoriaCreate(
   entidade: string,
@@ -14,4 +16,21 @@ export function StructureDataAuditoriaCreate(
     registradoPorId: registradoPorId,
   };
   return dados;
+}
+export function StructureDataAuditoriaUpdate(
+  entidade: string,
+  registroId: string,
+  acao: Acao,
+  antes: any,
+  depois: any,
+  registradoPorId: string,
+) {
+  const dados: UpdateAuditoriaDto = {
+    entidade: entidade,
+    registroId: registroId,
+    acao: acao,
+    antes: antes,
+    depois: depois,
+    registradoPorId: registradoPorId,
+  };
 }
