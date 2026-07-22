@@ -3,7 +3,10 @@ import {
   ExtractDataAuditoria,
   ExtractRegisteredById,
 } from '@/utils/extract-data-auditoria.util';
-import { StructureDataAuditoriaCreate } from '@/utils/structure-data-auditoria.util';
+import {
+  StructureDataAuditoriaCreate,
+  StructureDataAuditoriaUpdate,
+} from '@/utils/structure-data-auditoria.util';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -136,6 +139,16 @@ export class ContadorCrachaService {
           data: { contador: { increment: 1 } },
         });
         const dadosdepois = await ExtractDataAuditoria(atualizar);
+        const dadosAuditoria = StructureDataAuditoriaUpdate(
+          'CONTADOR-CRACHA',
+          atualizar.id,
+          dadosAntes,
+          dadosdepois,
+          updateContadorCrachaDto.registradoPorId,
+        );
+        await this.auditoria.update(dadosAuditoria);
+
+        return atualizar;
       });
       return plainToClass(ResponseContadorAdminDto, atualizarContador);
     } catch (error) {
@@ -143,8 +156,29 @@ export class ContadorCrachaService {
       throw error;
     }
   }
-
-  remove(id: number) {
-    return `This action removes a #${id} contadorCracha`;
+  // REMOVER DADO DO BANCO PELO ID
+  async removeAccountant(
+    id: string,
+    registradoPorId: string,
+  ): Promise<ResponseContadorCrachaDto> {
+    try {
+      const removerContador = await this.prisma.$transaction(async (tx) => {
+        const remover = await tx.contadorDeCracha.delete({
+          where: { id: id },
+        });
+        const dadosSemId = await ExtractDataAuditoria(remover);
+        const dadosAuditoria = await StructureDataAuditoriaCreate(
+          'CONTADOR-CRACHA',
+          remover.id,
+          dadosSemId,
+          registradoPorId,
+        );
+        await this.auditoria.create(dadosAuditoria);
+      });
+      return plainToClass(ResponseContadorCrachaDto, removerContador);
+    } catch (error) {
+      this.logger.error('Falha ao remover o contador de crachá.');
+      throw error;
+    }
   }
 }

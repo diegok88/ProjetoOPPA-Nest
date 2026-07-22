@@ -10,9 +10,9 @@ import {
 } from '@nestjs/common';
 import {
   CreateUsuarioAdmin,
+  CreateUsuarioDto,
   CreateUsuarioMaster,
-} from './dto/create-usuario-operacao.dto';
-import { CreateUsuarioDto } from './dto/create-usuario.dto';
+} from './dto/create-usuario.dto';
 import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
 import { ResponseUsuarioDto } from './dto/response-usuario.dto';
 import { UpdateDataUsuarioDto } from './dto/update-data-usuario.dto';
@@ -24,13 +24,6 @@ import { UsuarioService } from './usuario.service';
 @Controller('usuario')
 export class UsuarioController {
   constructor(private readonly usuarioService: UsuarioService) {}
-  // CRIAR USUARIO
-  @Post()
-  async create(
-    @Body() createUsuarioDto: CreateUsuarioDto,
-  ): Promise<ResponseUsuarioDto> {
-    return this.usuarioService.create(createUsuarioDto);
-  }
   // CRIAR USUARIO MASTER
   @Post('master')
   async createMaster(

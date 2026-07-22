@@ -20,7 +20,6 @@ export function StructureDataAuditoriaCreate(
 export function StructureDataAuditoriaUpdate(
   entidade: string,
   registroId: string,
-  acao: Acao,
   antes: any,
   depois: any,
   registradoPorId: string,
@@ -28,9 +27,10 @@ export function StructureDataAuditoriaUpdate(
   const dados: UpdateAuditoriaDto = {
     entidade: entidade,
     registroId: registroId,
-    acao: acao,
+    acao: 'UPDATE',
     antes: antes,
     depois: depois,
     registradoPorId: registradoPorId,
   };
+  return dados;
 }

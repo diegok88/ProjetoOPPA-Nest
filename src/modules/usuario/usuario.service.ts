@@ -21,15 +21,17 @@ import { EmpresaService } from '../empresa/empresa.service';
 import { PerfilService } from '../perfil/perfil.service';
 import {
   CreateUsuarioAdmin,
+  CreateUsuarioDto,
   CreateUsuarioMaster,
-} from './dto/create-usuario-operacao.dto';
-import { CreateUsuarioDto } from './dto/create-usuario.dto';
+} from './dto/create-usuario.dto';
 import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
 import { ResponseUsuarioDto } from './dto/response-usuario.dto';
 import { UpdateDataUsuarioDto } from './dto/update-data-usuario.dto';
 import { UpdatePasswordUsuarioDto } from './dto/update-password-usuario.dto';
 import { UpdatePinUsuarioDto } from './dto/update-pin-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
+import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
+import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
 
 @Injectable()
 export class UsuarioService {
@@ -39,71 +41,18 @@ export class UsuarioService {
     private readonly prisma: PrismaService,
     private readonly perfil: PerfilService,
     private readonly empresa: EmpresaService,
+    private readonly contadorCracha: ContadorCrachaService,
     private readonly auditoria: AuditoriaService,
   ) {}
-  // CRIAR USUARIO
-  async create(
-    createUsuarioDto: CreateUsuarioDto,
-  ): Promise<ResponseUsuarioDto> {
-    const { senha, pin, registradoPorId, ...dadosUsuario } = createUsuarioDto;
-    const senhaHash = await this.generateHash(senha);
-    const pinHash = await this.generateHash(pin);
-
-    try {
-      const [verificarPerfil, verificarEmpresa] = await Promise.all([
-        this.perfil.findOne(createUsuarioDto.perfilId),
-        this.empresa.findOne(createUsuarioDto.empresaId),
-      ]);
-
-      if (!verificarPerfil || !verificarEmpresa) {
-        const idsAusentes: string[] = [];
-        if (!verificarPerfil)
-          idsAusentes.push(`Perfil: ${createUsuarioDto.perfilId}`);
-        if (!verificarEmpresa)
-          idsAusentes.push(`Empresa: ${createUsuarioDto.empresaId}`);
-        this.logger.warn(`Ids não encontrados: ${idsAusentes.join(', ')}`);
-        throw new NotFoundException('Ids não encontrados.');
-      }
-
-      const novoUsuario = await this.prisma.$transaction(async (tx) => {
-        const criarUsuario = await tx.usuario.create({
-          data: {
-            ...dadosUsuario,
-            senha: senhaHash,
-            pin: pinHash,
-          },
-        });
-
-        const dadosRegistrados = plainToClass(ResponseUsuarioDto, criarUsuario);
-        const { id, ...dadosSemId } = dadosRegistrados;
-
-        // Criação do registro na classe auditoria
-        const auditoriaDados: CreateAuditoriaDto = {
-          entidade: 'USUARIO',
-          registroId: criarUsuario.id,
-          acao: 'CREATE',
-          dadosRegistrados: dadosSemId,
-          registradoPorId: registradoPorId,
-        };
-
-        await this.auditoria.create(auditoriaDados);
-        return criarUsuario;
-      });
-      return plainToClass(ResponseUsuarioDto, novoUsuario);
-    } catch (error) {
-      throw error;
-    }
-  }
   // CRIAR USUARIO MASTER - acesso ao usuario principal
   async createMaster(
     createUsuarioMaster: CreateUsuarioMaster,
   ): Promise<ResponseUsuarioDto> {
     try {
-      // Separa os dados e cria o hash da senha e pin
       const { senha, pin, ...dados } = createUsuarioMaster;
       const senhaHash = await this.generateHash(senha);
       const pinHash = await this.generateHash(pin);
-      // Cria o usuario
+
       const criar = await this.prisma.usuario.create({
         data: {
           ...dados,
@@ -111,7 +60,7 @@ export class UsuarioService {
           pin: pinHash,
         },
       });
-      // Retorno dos dados
+
       this.logger.log('Usuário master criado com sucesso.');
       return plainToClass(ResponseUsuarioDto, criar);
     } catch (error) {
@@ -119,41 +68,44 @@ export class UsuarioService {
       throw error;
     }
   }
+  // CRIAR USUARIO ADMINISTRADOR DO SISTEMA - o mesmo é criado mediante empresa, contador de cracha e perfil criados
   async createAdmin(
     createUsuarioAdmin: CreateUsuarioAdmin,
   ): Promise<ResponseUsuarioDto> {
     try {
-      // Extraindo o atributo registradoPorId
       const dadosSemRegistradoPorId =
         await ExtractRegisteredById(createUsuarioAdmin);
-      // Transação de criação e auditoria
+
       const criarUsuario = await this.prisma.$transaction(async (tx) => {
-        // Cria o hash do usuario usando
         const senhaHash = await this.generateHash(PasswordPin.password);
         const pinHash = await this.generateHash(PasswordPin.pin);
-        // Busca o id da empresa cadastrada do usuario cadastrador
-        const buscarEmpresa = await this.findOne(
-          createUsuarioAdmin.registradoPorId,
-        );
-        // Cria o usuario no banco de dados
+
+        const dadosContador: UpdateContadorCrachaDto = {
+          empresaId: createUsuarioAdmin.empresaId,
+          registradoPorId: createUsuarioAdmin.registradoPorId,
+        };
+        const novoCracha =
+          await this.contadorCracha.updateAccountant(dadosContador);
+
         const criar = await tx.usuario.create({
           data: {
             ...dadosSemRegistradoPorId,
+            cracha: novoCracha.contador,
             senha: senhaHash,
             pin: pinHash,
-            empresaId: buscarEmpresa.empresaId,
+            empresaId: createUsuarioAdmin.empresaId,
           },
         });
-        // Separar o id dos dados cadastrados
+
         const dadosSemId = await ExtractDataAuditoria(criar);
-        // Função dos dados de auditoria
+
         const dadosAuditoria = await StructureDataAuditoriaCreate(
           'USUARIO',
           criar.id,
           dadosSemId,
           createUsuarioAdmin.registradoPorId,
         );
-        // Cadastro da auditoria
+
         await this.auditoria.create(dadosAuditoria);
         return criar;
       });

@@ -1,10 +1,12 @@
 import { TipoEscala, TipoTurno } from '@/generated/prisma/enums';
 import { formatUppercase } from '@/utils/format-uppercase.util';
+import { OmitType } from '@nestjs/mapped-types';
 import {
   IsDate,
   IsEnum,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsString,
   IsUUID,
   Length,
@@ -81,3 +83,28 @@ export class CreateUsuarioDto {
   @IsNotEmpty({ message: 'Usuário é um campo obrigatório.' })
   registradoPorId!: string;
 }
+
+export class CreateUsuarioMaster extends OmitType(CreateUsuarioDto, [
+  'cracha',
+  'dataAdmissao',
+  'dataNascimento',
+  'dataDesligamento',
+  'escala',
+  'turno',
+  'perfilId',
+  'empresaId',
+  'registradoPorId',
+]) {}
+
+export class CreateUsuarioAdmin extends OmitType(CreateUsuarioDto, [
+  'cracha',
+  'senha',
+  'pin',
+  'dataDesligamento',
+]) {}
+
+export class CreateUsuarioGestor extends OmitType(CreateUsuarioDto, [
+  'dataDesligamento',
+  'senha',
+  'pin',
+]) {}

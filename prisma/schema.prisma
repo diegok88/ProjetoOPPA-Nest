@@ -28,6 +28,8 @@ enum Acao {
   UPDATE
   DEACTIVATE
   DELETE
+  LOGIN
+  LOGOUT
 }
 
 model Usuario {
@@ -74,6 +76,7 @@ enum TipoTurno {
   MANHA
   TARDE
   NOITE
+  COMERCIAL
 }
 
 model Perfil {

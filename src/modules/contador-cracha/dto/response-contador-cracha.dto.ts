@@ -1,5 +1,6 @@
 import { OmitType } from '@nestjs/mapped-types';
-import { Expose } from 'class-transformer';
+import { Expose, Type } from 'class-transformer';
+import { native } from 'pg';
 
 export class ResponseContadorCrachaDto {
   @Expose()
@@ -9,7 +10,7 @@ export class ResponseContadorCrachaDto {
   empresaId!: string;
 
   @Expose()
-  contador!: string;
+  contador!: number;
 
   @Expose()
   status!: boolean;

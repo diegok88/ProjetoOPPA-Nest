@@ -53,7 +53,10 @@ export class ContadorCrachaController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.contadorCrachaService.remove(+id);
+  async removeAccountant(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() registradoPorId: string,
+  ): Promise<ResponseContadorCrachaDto> {
+    return this.contadorCrachaService.removeAccountant(id, registradoPorId);
   }
 }
