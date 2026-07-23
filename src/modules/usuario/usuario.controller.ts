@@ -18,7 +18,10 @@ import { ResponseUsuarioDto } from './dto/response-usuario.dto';
 import { UpdateDataUsuarioDto } from './dto/update-data-usuario.dto';
 import { UpdatePasswordUsuarioDto } from './dto/update-password-usuario.dto';
 import { UpdatePinUsuarioDto } from './dto/update-pin-usuario.dto';
-import { UpdateUsuarioDto } from './dto/update-usuario.dto';
+import {
+  UpdateUsuarioDeactiveDto,
+  UpdateUsuarioDto,
+} from './dto/update-usuario.dto';
 import { UsuarioService } from './usuario.service';
 
 @Controller('usuario')
@@ -90,8 +93,9 @@ export class UsuarioController {
   @Patch('deactive/:id')
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateUsuarioDeactiveDto: UpdateUsuarioDeactiveDto,
   ): Promise<ResponseUsuarioDto> {
-    return this.usuarioService.deactive(id);
+    return this.usuarioService.deactive(id, updateUsuarioDeactiveDto);
   }
   // DELETA O USUARIO
   @Delete(':id')

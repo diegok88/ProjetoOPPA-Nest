@@ -10,7 +10,10 @@ import {
 } from '@nestjs/common';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
 import { ResponseEmpresaDto } from './dto/response-empresa.dto';
-import { UpdateEmpresaDto } from './dto/update-empresa.dto';
+import {
+  UpdateEmpresaDeactiveDto,
+  UpdateEmpresaDto,
+} from './dto/update-empresa.dto';
 import { EmpresaService } from './empresa.service';
 
 @Controller('empresa')
@@ -22,13 +25,13 @@ export class EmpresaController {
   async create(
     @Body() createEmpresaDto: CreateEmpresaDto,
   ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.create(createEmpresaDto);
+    return this.empresaService.createEnterprise(createEmpresaDto);
   }
 
   // CONTROLLER LISTAR EMPRESAS
   @Get()
   async findAll(): Promise<ResponseEmpresaDto[]> {
-    return this.empresaService.findAll();
+    return this.empresaService.findAllEnterprise();
   }
 
   // CONTROLLER BUSCAR EMPRESA PELO ID
@@ -36,7 +39,7 @@ export class EmpresaController {
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.findOne(id);
+    return this.empresaService.findOneEnterprise(id);
   }
 
   // CONTROLLER ATUALIZAR EMPRESA PELO ID
@@ -45,15 +48,16 @@ export class EmpresaController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateEmpresaDto: UpdateEmpresaDto,
   ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.update(id, updateEmpresaDto);
+    return this.empresaService.updateEnterprise(id, updateEmpresaDto);
   }
 
   // CONTROLLER INATIVAR EMPRESA PELO ID
   @Patch('deactive/:id')
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateEmpresaDeactiveDto: UpdateEmpresaDeactiveDto,
   ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.deactive(id);
+    return this.empresaService.deactiveEnterprise(id, updateEmpresaDeactiveDto);
   }
 
   // CONTROLLER DELETAR EMPRESA PELO ID
@@ -61,6 +65,6 @@ export class EmpresaController {
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.remove(id);
+    return this.empresaService.removeEnterprise(id);
   }
 }

@@ -104,7 +104,8 @@ export class CreateUsuarioAdmin extends OmitType(CreateUsuarioDto, [
 ]) {}
 
 export class CreateUsuarioGestor extends OmitType(CreateUsuarioDto, [
-  'dataDesligamento',
+  'cracha',
   'senha',
   'pin',
+  'dataDesligamento',
 ]) {}

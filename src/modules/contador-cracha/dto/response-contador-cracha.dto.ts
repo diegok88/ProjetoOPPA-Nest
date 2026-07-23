@@ -26,5 +26,5 @@ export class ResponseContadorAdminDto extends OmitType(
 
 export class ResponseContadorEnterpriseDto extends OmitType(
   ResponseContadorCrachaDto,
-  ['empresaId', 'status'],
+  ['empresaId'],
 ) {}

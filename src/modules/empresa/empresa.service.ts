@@ -3,14 +3,23 @@ import {
   ExtractDataAuditoria,
   ExtractRegisteredById,
 } from '@/utils/extract-data-auditoria.util';
-import { StructureDataAuditoriaCreate } from '@/utils/structure-data-auditoria.util';
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  StructureDataAuditoriaCreate,
+  StructureDataAuditoriaUpdate,
+} from '@/utils/structure-data-auditoria.util';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
 import { ResponseEmpresaDto } from './dto/response-empresa.dto';
-import { UpdateEmpresaDto } from './dto/update-empresa.dto';
+import {
+  UpdateEmpresaDeactiveDto,
+  UpdateEmpresaDto,
+} from './dto/update-empresa.dto';
+import { UsuarioService } from '../usuario/usuario.service';
+import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
+import { UpdateUsuarioDeactiveDto } from '../usuario/dto/update-usuario.dto';
 
 @Injectable()
 export class EmpresaService {
@@ -18,12 +27,13 @@ export class EmpresaService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private auditoria: AuditoriaService,
-    private contadorCracha: ContadorCrachaService,
+    private readonly auditoria: AuditoriaService,
+    private readonly usuario: UsuarioService,
+    private readonly contadorCracha: ContadorCrachaService,
   ) {}
 
   // SERVIÇO CRIAR EMPRESA
-  async create(
+  async createEnterprise(
     createEmpresaDto: CreateEmpresaDto,
   ): Promise<ResponseEmpresaDto> {
     try {
@@ -57,7 +67,7 @@ export class EmpresaService {
     }
   }
   // SERVIÇO LISTAR EMPRESAS
-  async findAll(): Promise<ResponseEmpresaDto[]> {
+  async findAllEnterprise(): Promise<ResponseEmpresaDto[]> {
     try {
       const listarEmpresas = await this.prisma.empresa.findMany();
       this.logger.log(`Lista de empresas geradas com sucesso.`);
@@ -70,7 +80,7 @@ export class EmpresaService {
     }
   }
   // SERVIÇO DE BUSCA DE EMPRESA POR ID
-  async findOne(id: string): Promise<ResponseEmpresaDto> {
+  async findOneEnterprise(id: string): Promise<ResponseEmpresaDto> {
     try {
       const buscarEmpresa = await this.prisma.empresa.findUnique({
         where: { id: id },
@@ -87,15 +97,47 @@ export class EmpresaService {
     }
   }
   // SERVIÇO DE ATUALIZAÇÃO PELO ID
-  async update(
+  async updateEnterprise(
     id: string,
     updateEmpresaDto: UpdateEmpresaDto,
   ): Promise<ResponseEmpresaDto> {
     try {
-      const atualizarEmpresa = await this.prisma.empresa.update({
-        where: { id: id },
-        data: updateEmpresaDto,
+      const atualizarEmpresa = await this.prisma.$transaction(async (tx) => {
+        const buscarUsuario = await this.usuario.findOne(
+          updateEmpresaDto.registradoPorId,
+        );
+        if (id !== buscarUsuario.empresaId) {
+          this.logger.warn(
+            `Usuario id ${buscarUsuario.id} não pertence a está empresa.`,
+          );
+          throw new UnauthorizedException(
+            `Usuario id ${buscarUsuario.id} não pertence a está empresa.`,
+          );
+        }
+
+        const buscarEmpresa = await this.findOneEnterprise(id);
+        const antesSemId = await ExtractDataAuditoria(buscarEmpresa);
+
+        const dadosAtualizados = await ExtractRegisteredById(updateEmpresaDto);
+        const atualizarEmpresa = await tx.empresa.update({
+          where: { id: id },
+          data: dadosAtualizados,
+        });
+        const depoisSemId = await ExtractDataAuditoria(atualizarEmpresa);
+
+        const dadosAuditoria = await StructureDataAuditoriaUpdate(
+          'EMPRESA',
+          id,
+          antesSemId,
+          depoisSemId,
+          updateEmpresaDto.registradoPorId,
+        );
+
+        await this.auditoria.update(dadosAuditoria);
+
+        return atualizarEmpresa;
       });
+
       this.logger.log(
         `Atualização da empresa id ${atualizarEmpresa.id} realizada com sucesso.`,
       );
@@ -106,11 +148,41 @@ export class EmpresaService {
     }
   }
   // INATIVAR EMPRESA PELO ID
-  async deactive(id: string): Promise<ResponseEmpresaDto> {
+  async deactiveEnterprise(
+    id: string,
+    updateEmpresaDeactiveDto: UpdateEmpresaDeactiveDto,
+  ): Promise<ResponseEmpresaDto> {
     try {
-      const inativarEmpresa = await this.prisma.empresa.update({
-        where: { id: id },
-        data: { status: false },
+      const inativarEmpresa = await this.prisma.$transaction(async (tx) => {
+        const buscarEmpresa = await this.findOneEnterprise(id);
+        const antesSemId = await ExtractDataAuditoria(buscarEmpresa);
+
+        const inativarEmpresa = await this.prisma.empresa.update({
+          where: { id: id },
+          data: { status: false },
+        });
+        const depoisSemId = await ExtractDataAuditoria(inativarEmpresa);
+
+        const dadosAtualizados = await StructureDataAuditoriaUpdate(
+          'EMPRESA',
+          id,
+          antesSemId,
+          depoisSemId,
+          updateEmpresaDeactiveDto.registradoPorId,
+        );
+        const inativarContador: UpdateContadorCrachaDto = {
+          empresaId: id,
+          registradoPorId: updateEmpresaDeactiveDto.registradoPorId,
+        };
+        await this.contadorCracha.deactiveAccountant(inativarContador);
+        const inativarUsuario: UpdateUsuarioDeactiveDto = {
+          empresaId: id,
+          registradoPorId: updateEmpresaDeactiveDto.registradoPorId,
+        };
+        await this.usuario.deactiveAll(inativarUsuario);
+        await this.auditoria.update(dadosAtualizados);
+
+        return inativarEmpresa;
       });
       this.logger.log(
         `Inativação da empresa id ${inativarEmpresa.id} realizada com sucesso.`,
@@ -122,7 +194,7 @@ export class EmpresaService {
     }
   }
   // DELETAR EMPRESA PELO ID
-  async remove(id: string): Promise<ResponseEmpresaDto> {
+  async removeEnterprise(id: string): Promise<ResponseEmpresaDto> {
     try {
       const deletarEmpresa = await this.prisma.empresa.delete({
         where: { id: id },

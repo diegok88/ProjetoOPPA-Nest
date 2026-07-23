@@ -24,7 +24,7 @@ export class ContadorCrachaService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private auditoria: AuditoriaService,
+    private readonly auditoria: AuditoriaService,
   ) {}
   // CRIA UM NOVO CONTADOR A CADA CRIAÇÃO DE EMPRESA
   async createAccountant(
@@ -115,7 +115,6 @@ export class ContadorCrachaService {
     try {
       const buscar = await this.prisma.contadorDeCracha.findFirst({
         where: { empresaId: id },
-        select: { id: true, contador: true },
       });
 
       return plainToClass(ResponseContadorEnterpriseDto, buscar);
@@ -130,17 +129,17 @@ export class ContadorCrachaService {
   ): Promise<ResponseContadorAdminDto> {
     try {
       const atualizarContador = await this.prisma.$transaction(async (tx) => {
-        const buscar = await this.findEnterpriseAccountant(
+        const buscarContador = await this.findEnterpriseAccountant(
           updateContadorCrachaDto.empresaId,
         );
-        const dadosAntes = ExtractDataAuditoria(buscar);
+        const dadosAntes = ExtractDataAuditoria(buscarContador);
         const atualizar = await this.prisma.contadorDeCracha.update({
-          where: { id: buscar.id },
+          where: { id: buscarContador.id },
           data: { contador: { increment: 1 } },
         });
         const dadosdepois = await ExtractDataAuditoria(atualizar);
         const dadosAuditoria = StructureDataAuditoriaUpdate(
-          'CONTADOR-CRACHA',
+          'CONTADOR_CRACHA',
           atualizar.id,
           dadosAntes,
           dadosdepois,
@@ -153,6 +152,39 @@ export class ContadorCrachaService {
       return plainToClass(ResponseContadorAdminDto, atualizarContador);
     } catch (error) {
       this.logger.error('Falha ao atualizar o contador de crachá.');
+      throw error;
+    }
+  }
+  // INATIVA O CONTADOR DE CRACHAS ATRAVES DA INATIVAÇÃO DA EMPRESA
+  async deactiveAccountant(updateContadorCrachaDto: UpdateContadorCrachaDto) {
+    try {
+      const inativarContador = this.prisma.$transaction(async (tx) => {
+        const buscarContador = await this.findEnterpriseAccountant(
+          updateContadorCrachaDto.empresaId,
+        );
+        const antesSemId = await ExtractDataAuditoria(buscarContador);
+
+        const inativarContador = await tx.contadorDeCracha.update({
+          where: { id: buscarContador.id },
+          data: { status: false },
+        });
+        const depoisSemId = await ExtractDataAuditoria(inativarContador);
+
+        const dadosAtualizados = StructureDataAuditoriaUpdate(
+          'CONTADOR_CRACHA',
+          buscarContador.id,
+          antesSemId,
+          depoisSemId,
+          updateContadorCrachaDto.registradoPorId,
+        );
+
+        await this.auditoria.update(dadosAtualizados);
+
+        return inativarContador;
+      });
+      return plainToClass(ResponseContadorAdminDto, inativarContador);
+    } catch (error) {
+      this.logger.error('Falha ao inativar o contador de cracha.');
       throw error;
     }
   }

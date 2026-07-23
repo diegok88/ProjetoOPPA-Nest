@@ -4,12 +4,8 @@ import { plainToClass } from 'class-transformer';
 import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
 import { ResponseAuditoriaDto } from './dto/response-auditoria.dto';
 import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
-
-type DadosAtualizadosAuditoria = {
-  mudancas: Record<string, { antes: any; depois: any }>;
-  camposAlterados: string[];
-  totalMudancas: number;
-};
+import { Acao } from '@/generated/prisma/enums';
+import { Prisma } from '@/generated/prisma/client';
 
 @Injectable()
 export class AuditoriaService {
@@ -100,7 +96,38 @@ export class AuditoriaService {
       throw error;
     }
   }
+  // SERVIÇO DE CRIAÇÃO DE UMA LISTA DE DADOS ATUALIZADOS PARA CADASTRO DE AUDITORIA
+  async updateAllAudit(
+    items: Array<UpdateAuditoriaDto>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    try {
+      const client = tx || this.prisma;
 
+      const dadosAtualizados = items.map((item) => {
+        const mudancas = this.calculateDifference(item.antes, item.depois);
+        const camposAlterados = Object.keys(mudancas);
+        const dados = {
+          mudancas,
+          camposAlterados,
+          totalMudancas: camposAlterados.length,
+        };
+        return {
+          entidade: item.entidade,
+          registroId: item.registroId,
+          acao: Acao.UPDATE,
+          dadosRegistrados: JSON.stringify(dados),
+          registradoPorId: item.registradoPorId,
+        };
+      });
+      await client.auditoria.createMany({
+        data: dadosAtualizados,
+      });
+    } catch (error) {
+      this.logger.error('Falha na criação da lista de auditorias - UPDATE ALL');
+      throw error;
+    }
+  }
   // SERVIÇO DE LISTAGEM DE AUDITORIAS CADASTRADAS
   async findAll(): Promise<ResponseAuditoriaDto[]> {
     try {

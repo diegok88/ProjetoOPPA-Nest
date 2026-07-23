@@ -4,7 +4,10 @@ import {
   ExtractDataAuditoria,
   ExtractRegisteredById,
 } from '@/utils/extract-data-auditoria.util';
-import { StructureDataAuditoriaCreate } from '@/utils/structure-data-auditoria.util';
+import {
+  StructureDataAuditoriaCreate,
+  StructureDataAuditoriaUpdate,
+} from '@/utils/structure-data-auditoria.util';
 import {
   BadRequestException,
   Injectable,
@@ -29,9 +32,13 @@ import { ResponseUsuarioDto } from './dto/response-usuario.dto';
 import { UpdateDataUsuarioDto } from './dto/update-data-usuario.dto';
 import { UpdatePasswordUsuarioDto } from './dto/update-password-usuario.dto';
 import { UpdatePinUsuarioDto } from './dto/update-pin-usuario.dto';
-import { UpdateUsuarioDto } from './dto/update-usuario.dto';
+import {
+  UpdateUsuarioDeactiveDto,
+  UpdateUsuarioDto,
+} from './dto/update-usuario.dto';
 import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
 import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
+import { Acao } from '@/generated/prisma/enums';
 
 @Injectable()
 export class UsuarioService {
@@ -39,8 +46,6 @@ export class UsuarioService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly perfil: PerfilService,
-    private readonly empresa: EmpresaService,
     private readonly contadorCracha: ContadorCrachaService,
     private readonly auditoria: AuditoriaService,
   ) {}
@@ -68,7 +73,7 @@ export class UsuarioService {
       throw error;
     }
   }
-  // CRIAR USUARIO ADMINISTRADOR DO SISTEMA - o mesmo é criado mediante empresa, contador de cracha e perfil criados
+  // CRIAR USUARIO COM TODOS OS PERFIS DO SISTEMA - o mesmo é criado mediante empresa, contador de cracha e perfil criados
   async createAdmin(
     createUsuarioAdmin: CreateUsuarioAdmin,
   ): Promise<ResponseUsuarioDto> {
@@ -116,6 +121,8 @@ export class UsuarioService {
       throw error;
     }
   }
+  // CRIAR USUARIO OPERADOR - o autorizado apenas para o perfil de supervisor
+
   // LISTA OS USUARIOS
   async findAll(): Promise<ResponseUsuarioDto[]> {
     try {
@@ -172,7 +179,7 @@ export class UsuarioService {
       throw error;
     }
   }
-  // ATUALIZA USUARIO PELO ID
+  // ATUALIZA USUARIO PELO ID - atualiza todos os dados
   async update(
     idUser: string,
     updateUsuarioDto: UpdateUsuarioDto,
@@ -325,24 +332,102 @@ export class UsuarioService {
     }
   }
   // INATIVAR USUARIO
-  async deactive(id: string): Promise<ResponseUsuarioDto> {
+  async deactive(
+    id: string,
+    updateEmpresaDeactiveDto: UpdateUsuarioDeactiveDto,
+  ): Promise<ResponseUsuarioDto> {
     try {
-      const buscarUsuario = await this.findOne(id);
-      if (!buscarUsuario) {
-        this.logger.warn(`Usuário id ${id} não encontrado.`);
-        throw new NotFoundException();
-      }
-      const inativarUsuario = await this.prisma.usuario.update({
-        where: { id: id },
-        data: {
-          dataDesligamento: new Date(),
-          status: false,
-        },
+      const inativarUsuario = await this.prisma.$transaction(async (tx) => {
+        const buscarUsuario = await this.findOne(id);
+        if (!buscarUsuario) {
+          this.logger.warn(`Usuário id ${id} não encontrado.`);
+          throw new NotFoundException();
+        }
+        const antesSemId = await ExtractDataAuditoria(buscarUsuario);
+
+        const inativarUsuario = await this.prisma.usuario.update({
+          where: { id: id },
+          data: {
+            dataDesligamento: new Date(),
+            status: false,
+          },
+        });
+        const depoisSemId = await ExtractDataAuditoria(inativarUsuario);
+
+        const dadosAtualizados = await StructureDataAuditoriaUpdate(
+          'USUARIO',
+          id,
+          antesSemId,
+          depoisSemId,
+          updateEmpresaDeactiveDto.registradoPorId,
+        );
+
+        await this.auditoria.update(dadosAtualizados);
+
+        return inativarUsuario;
       });
+
       this.logger.log(`Usuário id ${id} inativado com sucesso.`);
       return plainToClass(ResponseUsuarioDto, inativarUsuario);
     } catch (error) {
       this.logger.error('Falha ao inativar usuário.');
+      throw error;
+    }
+  }
+  // INATIVA TODOS OS USUARIO ATRAVES DA INATIVAÇÃO DA EMPRESA
+  async deactiveAll(
+    updateUsuarioDeactiveDto: UpdateUsuarioDeactiveDto,
+  ): Promise<void> {
+    try {
+      const { empresaId, registradoPorId } = updateUsuarioDeactiveDto;
+      await this.prisma.$transaction(async (tx) => {
+        const listarUsuarios = await tx.usuario.findMany({
+          where: { empresaId: empresaId },
+        });
+
+        if (listarUsuarios.length === 0) {
+          this.logger.warn(
+            `Nenhum usuário encontrado para a empresa ${empresaId}`,
+          );
+          return;
+        }
+
+        const antesSemId = listarUsuarios.map((usuario) =>
+          ExtractDataAuditoria(usuario),
+        );
+
+        const ids = listarUsuarios.map((usuario) => usuario.id);
+
+        await tx.usuario.updateMany({
+          where: { id: { in: ids } },
+          data: {
+            dataDesligamento: new Date(),
+            status: false,
+          },
+        });
+
+        const listarAtualizados = await tx.usuario.findMany({
+          where: { empresaId: empresaId },
+        });
+        const depoisSemId = listarAtualizados.map((usuario) =>
+          ExtractDataAuditoria(usuario),
+        );
+
+        const listarAuditorias = listarUsuarios.map((usuario, index) => ({
+          entidade: 'USUARIO',
+          registroId: usuario.id,
+          acao: Acao.UPDATE,
+          antes: antesSemId[index],
+          depois: depoisSemId[index],
+          registradoPorId: registradoPorId,
+        }));
+        await this.auditoria.updateAllAudit(listarAuditorias, tx);
+      });
+      this.logger.log(
+        `Todos usuários cadastrados na empresa id ${updateUsuarioDeactiveDto.empresaId} foram inativados com sucesso.`,
+      );
+    } catch (error) {
+      this.logger.error('Falha ao inativar o conjunto de usuários.');
       throw error;
     }
   }

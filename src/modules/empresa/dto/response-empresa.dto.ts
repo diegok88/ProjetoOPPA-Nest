@@ -1,8 +1,8 @@
-
 import { FormatCep } from '@/utils/format-cep.util';
 import { FormatCNPJ } from '@/utils/format-cnpj.util';
 import { FormatFone } from '@/utils/format-fone.util';
-import { Expose, Transform } from 'class-transformer';
+import { OmitType } from '@nestjs/mapped-types';
+import { Expose } from 'class-transformer';
 
 export class ResponseEmpresaDto {
   @Expose()
@@ -12,7 +12,6 @@ export class ResponseEmpresaDto {
   codigo!: number;
 
   @Expose()
-  @FormatCNPJ()
   cnpj!: string;
 
   @Expose()
@@ -22,7 +21,6 @@ export class ResponseEmpresaDto {
   nomeFantasia!: string;
 
   @Expose()
-  @FormatFone()
   contato!: string;
 
   @Expose()
@@ -44,9 +42,26 @@ export class ResponseEmpresaDto {
   estado!: string;
 
   @Expose()
-  @FormatCep()
   cep!: string;
 
   @Expose()
   status!: boolean;
+}
+
+export class ResponseEmpresaAdminDto extends OmitType(ResponseEmpresaDto, [
+  'cnpj',
+  'contato',
+  'cep',
+]) {
+  @Expose()
+  @FormatCNPJ()
+  cnpj!: string;
+
+  @Expose()
+  @FormatFone()
+  contato!: string;
+
+  @Expose()
+  @FormatCep()
+  cep!: string;
 }

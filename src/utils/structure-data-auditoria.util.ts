@@ -11,7 +11,7 @@ export function StructureDataAuditoriaCreate(
   const dados: CreateAuditoriaDto = {
     entidade: entidade,
     registroId: registroId,
-    acao: 'CREATE',
+    acao: Acao.CREATE,
     dadosRegistrados: dadosRegistrados,
     registradoPorId: registradoPorId,
   };
@@ -23,11 +23,11 @@ export function StructureDataAuditoriaUpdate(
   antes: any,
   depois: any,
   registradoPorId: string,
-) {
+): any {
   const dados: UpdateAuditoriaDto = {
     entidade: entidade,
     registroId: registroId,
-    acao: 'UPDATE',
+    acao: Acao.UPDATE,
     antes: antes,
     depois: depois,
     registradoPorId: registradoPorId,
