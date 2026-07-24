@@ -4,18 +4,45 @@ import { plainToClass } from 'class-transformer';
 import { CreatePerfilDto } from './dto/create-perfil.dto';
 import { ResponsePerfilDto } from './dto/response-perfil.dto';
 import { UpdatePerfilDto } from './dto/update-perfil.dto';
+import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
+import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
+import { Acao } from '@/generated/prisma/enums';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 
 @Injectable()
 export class PerfilService {
   private logger = new Logger(PerfilService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
+
   // CRIAR PERFIL
   async create(createPerfilDto: CreatePerfilDto): Promise<ResponsePerfilDto> {
     try {
-      const criarPerfil = await this.prisma.perfil.create({
-        data: createPerfilDto,
+      const criarPerfil = await this.prisma.$transaction(async (tx) => {
+        const { registradoPorId, empresaId, descricao } = createPerfilDto;
+        const criar = await tx.perfil.create({
+          data: { descricao: descricao },
+        });
+
+        const dados = ExtractDataAuditoria(criar);
+
+        const dadosAuditoria: CreateAuditoriaDto = {
+          entidade: 'PERFIL',
+          registroId: criar.id,
+          acao: Acao.CREATE,
+          dadosRegistrados: dados,
+          empresaId: empresaId,
+          registradoPorId: registradoPorId,
+        };
+
+        await this.auditoria.create(dadosAuditoria, tx);
+
+        return criar;
       });
+
       this.logger.log(`Perfil id ${criarPerfil.id} criado com sucesso.`);
       return plainToClass(ResponsePerfilDto, criarPerfil);
     } catch (error) {

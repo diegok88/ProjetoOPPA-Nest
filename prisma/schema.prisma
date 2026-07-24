@@ -15,8 +15,8 @@ model Auditoria {
   acao             Acao
   dadosRegistrados String
   dataHora         DateTime @default(now())
+  empresaId        String
   registradoPorId  String
-  registradoPor    Usuario  @relation("registradoPor", fields: [registradoPorId], references: [id])
 
   @@index([registroId])
   @@index([dataHora])
@@ -50,7 +50,6 @@ model Usuario {
   status               Boolean     @default(true)
   gestorComoOperador   Gestor[]    @relation("operador")
   gestorComoSupervisor Gestor[]    @relation("supervisor")
-  auditoria            Auditoria[] @relation("registradoPor")
 
   @@map("usuario")
 }

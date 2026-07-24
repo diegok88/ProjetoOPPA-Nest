@@ -5,10 +5,6 @@ import {
   ExtractRegisteredById,
 } from '@/utils/extract-data-auditoria.util';
 import {
-  StructureDataAuditoriaCreate,
-  StructureDataAuditoriaUpdate,
-} from '@/utils/structure-data-auditoria.util';
-import {
   BadRequestException,
   Injectable,
   Logger,
@@ -20,11 +16,8 @@ import { plainToClass } from 'class-transformer';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
-import { EmpresaService } from '../empresa/empresa.service';
-import { PerfilService } from '../perfil/perfil.service';
 import {
   CreateUsuarioAdmin,
-  CreateUsuarioDto,
   CreateUsuarioMaster,
 } from './dto/create-usuario.dto';
 import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
@@ -39,6 +32,8 @@ import {
 import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
 import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
 import { Acao } from '@/generated/prisma/enums';
+import { DeleteUsuarioDto } from './dto/delete-usuario.dto';
+import { Prisma } from '@/generated/prisma/client';
 
 @Injectable()
 export class UsuarioService {
@@ -89,8 +84,7 @@ export class UsuarioService {
           empresaId: createUsuarioAdmin.empresaId,
           registradoPorId: createUsuarioAdmin.registradoPorId,
         };
-        const novoCracha =
-          await this.contadorCracha.updateAccountant(dadosContador);
+        const novoCracha = await this.contadorCracha.update(dadosContador);
 
         const criar = await tx.usuario.create({
           data: {
@@ -102,14 +96,16 @@ export class UsuarioService {
           },
         });
 
-        const dadosSemId = await ExtractDataAuditoria(criar);
+        const dados = await ExtractDataAuditoria(criar);
 
-        const dadosAuditoria = await StructureDataAuditoriaCreate(
-          'USUARIO',
-          criar.id,
-          dadosSemId,
-          createUsuarioAdmin.registradoPorId,
-        );
+        const dadosAuditoria: CreateAuditoriaDto = {
+          entidade: 'USUARIO',
+          registroId: criar.id,
+          acao: Acao.CREATE,
+          dadosRegistrados: dados,
+          empresaId: createUsuarioAdmin.empresaId,
+          registradoPorId: createUsuarioAdmin.registradoPorId,
+        };
 
         await this.auditoria.create(dadosAuditoria);
         return criar;
@@ -160,9 +156,14 @@ export class UsuarioService {
     }
   }
   // BUSCA USUARIO PELO ID
-  async findOne(id: string): Promise<ResponseUsuarioDto> {
+  async findOne(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ResponseUsuarioDto> {
     try {
-      const buscaUsuario = await this.prisma.usuario.findUnique({
+      const client = tx ?? this.prisma;
+
+      const buscaUsuario = await client.usuario.findUnique({
         where: { id: id },
       });
 
@@ -184,32 +185,30 @@ export class UsuarioService {
     idUser: string,
     updateUsuarioDto: UpdateUsuarioDto,
   ): Promise<ResponseUsuarioDto> {
-    const { registradoPorId, ...dados } = updateUsuarioDto;
+    const { registradoPorId, empresaId, ...dados } = updateUsuarioDto;
     try {
       const atualizarUsuario = await this.prisma.$transaction(async (tx) => {
-        const buscar = await tx.usuario.findUnique({
-          where: { id: idUser },
-        });
+        const buscar = await this.findOne(idUser);
         if (!buscar) {
           throw new NotFoundException();
         }
-        const buscaDados = plainToClass(ResponseUsuarioDto, buscar);
-        const antes = ExtractDataAuditoria(buscaDados);
+
+        const antes = ExtractDataAuditoria(buscar);
 
         const atualizar = await tx.usuario.update({
           where: { id: idUser },
           data: dados,
         });
-        const dadosAtualizados = plainToClass(ResponseUsuarioDto, atualizar);
-        const depois = ExtractDataAuditoria(dadosAtualizados);
 
-        this.logger.log(`Registrado por: ${updateUsuarioDto.registradoPorId}`);
+        const depois = ExtractDataAuditoria(atualizar);
+
         const dadosAuditoria: UpdateAuditoriaDto = {
           entidade: 'USUARIO',
           registroId: atualizar.id,
           acao: 'UPDATE',
           antes: antes,
           depois: depois,
+          empresaId: empresaId,
           registradoPorId: registradoPorId,
         };
         await this.auditoria.update(dadosAuditoria);
@@ -338,33 +337,37 @@ export class UsuarioService {
   ): Promise<ResponseUsuarioDto> {
     try {
       const inativarUsuario = await this.prisma.$transaction(async (tx) => {
-        const buscarUsuario = await this.findOne(id);
-        if (!buscarUsuario) {
+        const { registradoPorId, empresaId } = updateEmpresaDeactiveDto;
+        const buscar = await this.findOne(id, tx);
+        if (!buscar) {
           this.logger.warn(`Usuário id ${id} não encontrado.`);
           throw new NotFoundException();
         }
-        const antesSemId = await ExtractDataAuditoria(buscarUsuario);
 
-        const inativarUsuario = await this.prisma.usuario.update({
+        const antes = ExtractDataAuditoria(buscar);
+
+        const inativar = await tx.usuario.update({
           where: { id: id },
           data: {
             dataDesligamento: new Date(),
             status: false,
           },
         });
-        const depoisSemId = await ExtractDataAuditoria(inativarUsuario);
+        const depois = ExtractDataAuditoria(inativar);
 
-        const dadosAtualizados = await StructureDataAuditoriaUpdate(
-          'USUARIO',
-          id,
-          antesSemId,
-          depoisSemId,
-          updateEmpresaDeactiveDto.registradoPorId,
-        );
+        const dados: UpdateAuditoriaDto = {
+          entidade: 'USUARIO',
+          registroId: id,
+          acao: Acao.UPDATE,
+          antes: antes,
+          depois: depois,
+          empresaId: empresaId,
+          registradoPorId: registradoPorId,
+        };
 
-        await this.auditoria.update(dadosAtualizados);
+        await this.auditoria.update(dados, tx);
 
-        return inativarUsuario;
+        return inativar;
       });
 
       this.logger.log(`Usuário id ${id} inativado com sucesso.`);
@@ -377,28 +380,30 @@ export class UsuarioService {
   // INATIVA TODOS OS USUARIO ATRAVES DA INATIVAÇÃO DA EMPRESA
   async deactiveAll(
     updateUsuarioDeactiveDto: UpdateUsuarioDeactiveDto,
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
     try {
-      const { empresaId, registradoPorId } = updateUsuarioDeactiveDto;
-      await this.prisma.$transaction(async (tx) => {
-        const listarUsuarios = await tx.usuario.findMany({
+      const executar = async (
+        client: Prisma.TransactionClient | PrismaService,
+      ) => {
+        const { empresaId, registradoPorId } = updateUsuarioDeactiveDto;
+
+        const listar = await client.usuario.findMany({
           where: { empresaId: empresaId },
         });
 
-        if (listarUsuarios.length === 0) {
+        if (listar.length === 0) {
           this.logger.warn(
             `Nenhum usuário encontrado para a empresa ${empresaId}`,
           );
           return;
         }
 
-        const antesSemId = listarUsuarios.map((usuario) =>
-          ExtractDataAuditoria(usuario),
-        );
+        const antes = listar.map((usuario) => ExtractDataAuditoria(usuario));
 
-        const ids = listarUsuarios.map((usuario) => usuario.id);
+        const ids = listar.map((usuario) => usuario.id);
 
-        await tx.usuario.updateMany({
+        await client.usuario.updateMany({
           where: { id: { in: ids } },
           data: {
             dataDesligamento: new Date(),
@@ -406,23 +411,38 @@ export class UsuarioService {
           },
         });
 
-        const listarAtualizados = await tx.usuario.findMany({
+        const listarAtualizados = await client.usuario.findMany({
           where: { empresaId: empresaId },
         });
-        const depoisSemId = listarAtualizados.map((usuario) =>
+
+        const depois = listarAtualizados.map((usuario) =>
           ExtractDataAuditoria(usuario),
         );
 
-        const listarAuditorias = listarUsuarios.map((usuario, index) => ({
-          entidade: 'USUARIO',
-          registroId: usuario.id,
-          acao: Acao.UPDATE,
-          antes: antesSemId[index],
-          depois: depoisSemId[index],
-          registradoPorId: registradoPorId,
-        }));
-        await this.auditoria.updateAllAudit(listarAuditorias, tx);
-      });
+        const listarAuditorias: UpdateAuditoriaDto[] = listar.map(
+          (usuario, index) => ({
+            entidade: 'USUARIO',
+            registroId: usuario.id,
+            acao: Acao.UPDATE,
+            antes: antes[index],
+            depois: depois[index],
+            empresaId: empresaId,
+            registradoPorId: registradoPorId,
+          }),
+        );
+
+        await this.auditoria.updateAll(listarAuditorias, client);
+      };
+
+      let inativarUsuario: any;
+      if (tx) {
+        inativarUsuario = await executar(tx);
+      } else {
+        inativarUsuario = await this.prisma.$transaction(async (novatx) => {
+          return executar(novatx);
+        });
+      }
+
       this.logger.log(
         `Todos usuários cadastrados na empresa id ${updateUsuarioDeactiveDto.empresaId} foram inativados com sucesso.`,
       );
@@ -432,15 +452,109 @@ export class UsuarioService {
     }
   }
   // DELETA O USUARIO
-  async remove(id: string): Promise<ResponseUsuarioDto> {
+  async remove(
+    id: string,
+    deleteUsuarioDto: DeleteUsuarioDto,
+  ): Promise<ResponseUsuarioDto> {
     try {
-      const deletarUsuario = await this.prisma.usuario.delete({
-        where: { id: id },
+      const deletarUsuario = await this.prisma.$transaction(async (tx) => {
+        const { empresaId, registradoPorId } = deleteUsuarioDto;
+        const buscar = await this.findOne(id);
+        if (buscar.status === true) {
+          this.logger.warn(
+            `Usuário id ${id} não está inativo para ser deletado.`,
+          );
+          throw new UnauthorizedException();
+        }
+        if (buscar.empresaId !== empresaId) {
+          this.logger.warn(
+            `Usuário id ${id} não pertence a empresa para ser deletado.`,
+          );
+          throw new UnauthorizedException();
+        }
+        const deletar = await this.prisma.usuario.delete({
+          where: { id: id },
+        });
+
+        const dados = ExtractDataAuditoria(deletar);
+
+        const dadosAuditoria: CreateAuditoriaDto = {
+          entidade: 'USUARIO',
+          registroId: id,
+          acao: Acao.DELETE,
+          dadosRegistrados: dados,
+          empresaId: empresaId,
+          registradoPorId: registradoPorId,
+        };
+
+        await this.auditoria.create(dadosAuditoria);
       });
+
       this.logger.log(`Usuário id ${id} deletado com sucesso.`);
       return plainToClass(ResponseUsuarioDto, deletarUsuario);
     } catch (error) {
       this.logger.error('Falha ao deletar usuário.');
+      throw error;
+    }
+  }
+  // DELETA TODOS USUARIOS MEDIANTE O DELETE DE UMA EMPRESA
+  async removeAll(
+    deleteUsuarioDto: DeleteUsuarioDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    try {
+      const executar = async (
+        client: Prisma.TransactionClient | PrismaService,
+      ) => {
+        const { empresaId, registradoPorId } = deleteUsuarioDto;
+
+        const listar = await client.usuario.findMany({
+          where: { empresaId: empresaId },
+        });
+
+        if (listar.length === 0) {
+          this.logger.warn('Lista de usuário vazia.');
+          return;
+        }
+
+        const ids = listar.map((usuario) => usuario.id);
+
+        await client.usuario.deleteMany({
+          where: { id: { in: ids } },
+        });
+
+        const dados = listar.map((usuario) => {
+          ExtractDataAuditoria(usuario);
+        });
+
+        const dadosAuditoria: CreateAuditoriaDto[] = listar.map(
+          (usuario, index) => ({
+            entidade: 'USUARIO',
+            registroId: usuario.id,
+            acao: Acao.DELETE,
+            dadosRegistrados: dados[index],
+            empresaId: empresaId,
+            registradoPorId: registradoPorId,
+          }),
+        );
+
+        await this.auditoria.createAll(dadosAuditoria, client);
+      };
+
+      let removerUsuarios: any;
+      if (tx) {
+        removerUsuarios = await executar(tx);
+      } else {
+        removerUsuarios = await this.prisma.$transaction(async (novatx) => {
+          return executar(novatx);
+        });
+      }
+
+      this.logger.log(
+        `Usuários da empresa id ${deleteUsuarioDto.empresaId} deletados com sucesso.`,
+      );
+    } catch (error) {
+      this.logger.error('Falha ao deletar os usuários cadastrados na empresa.');
       throw error;
     }
   }

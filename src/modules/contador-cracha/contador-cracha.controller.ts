@@ -16,47 +16,47 @@ import {
   ResponseContadorEnterpriseDto,
 } from './dto/response-contador-cracha.dto';
 import { UpdateContadorCrachaDto } from './dto/update-contador-cracha.dto';
+import { DeleteContadorCrachaDto } from './dto/delete-contador-cracha.dto';
 
 @Controller('contador-cracha')
 export class ContadorCrachaController {
   constructor(private readonly contadorCrachaService: ContadorCrachaService) {}
 
   @Post()
-  async createAccountant(
+  async create(
     @Body() createContadorCrachaDto: CreateContadorCrachaDto,
   ): Promise<ResponseContadorCrachaDto> {
-    return this.contadorCrachaService.createAccountant(createContadorCrachaDto);
+    return this.contadorCrachaService.create(createContadorCrachaDto);
   }
 
   @Get()
-  async findAllAccountant(): Promise<ResponseContadorAdminDto[]> {
-    return this.contadorCrachaService.findAllAccountant();
+  async findAll(): Promise<ResponseContadorAdminDto[]> {
+    return this.contadorCrachaService.findAll();
   }
 
   @Get(':id')
-  async findOneAccountant(
+  async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseContadorAdminDto> {
-    return this.contadorCrachaService.findOneAccountant(id);
+    return this.contadorCrachaService.findOne(id);
   }
 
   @Get('enterprise/:id')
-  async findEnterpriseAccountant(
+  async findEnterprise(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseContadorEnterpriseDto> {
-    return this.contadorCrachaService.findEnterpriseAccountant(id);
+    return this.contadorCrachaService.findEnterprise(id);
   }
 
-  @Patch('update-accountant/:id')
-  updateAccountant(@Body() updateContadorCrachaDto: UpdateContadorCrachaDto) {
-    return this.contadorCrachaService.updateAccountant(updateContadorCrachaDto);
+  @Patch(':id')
+  update(@Body() updateContadorCrachaDto: UpdateContadorCrachaDto) {
+    return this.contadorCrachaService.update(updateContadorCrachaDto);
   }
 
-  @Delete(':id')
-  async removeAccountant(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() registradoPorId: string,
+  @Delete()
+  async remove(
+    @Body() deleteContadorCrachaDto: DeleteContadorCrachaDto,
   ): Promise<ResponseContadorCrachaDto> {
-    return this.contadorCrachaService.removeAccountant(id, registradoPorId);
+    return this.contadorCrachaService.remove(deleteContadorCrachaDto);
   }
 }

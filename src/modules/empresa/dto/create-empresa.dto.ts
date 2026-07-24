@@ -64,9 +64,9 @@ export class CreateEmpresaDto {
 
   @IsString({ message: 'O bairro não é do tipo String.' })
   @IsNotEmpty({ message: 'O bairro é um campo obrigatório.' })
-  @Length(10, 50, {
+  @Length(5, 50, {
     message:
-      'O bairro deve conter no minimo 10 caracteres e no maximo 50 caracteres.',
+      'O bairro deve conter no minimo 5 caracteres e no maximo 50 caracteres.',
   })
   @formatUppercase()
   bairro!: string;

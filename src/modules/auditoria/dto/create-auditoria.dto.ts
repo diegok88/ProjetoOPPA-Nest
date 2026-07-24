@@ -19,5 +19,9 @@ export class CreateAuditoriaDto {
 
   @IsUUID()
   @IsNotEmpty()
+  empresaId!: string;
+
+  @IsUUID()
+  @IsNotEmpty()
   registradoPorId!: string;
 }

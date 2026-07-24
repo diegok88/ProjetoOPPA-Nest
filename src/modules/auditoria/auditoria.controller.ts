@@ -1,8 +1,17 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { AuditoriaService } from './auditoria.service';
 import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
 import { ResponseAuditoriaDto } from './dto/response-auditoria.dto';
 import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
+import { QueryAuditoriaRegisteredByIdDto } from './dto/query-auditoria.dto';
 
 @Controller('auditoria')
 export class AuditoriaController {
@@ -27,13 +36,19 @@ export class AuditoriaController {
     return this.auditoriaService.findAll();
   }
 
+  async findRegisteredById(
+    @Query() query: QueryAuditoriaRegisteredByIdDto,
+  ): Promise<ResponseAuditoriaDto[]> {
+    return this.auditoriaService.findRegisteredById(query);
+  }
+
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.auditoriaService.findOne(+id);
+  async findOne(@Param('id') id: string): Promise<ResponseAuditoriaDto> {
+    return this.auditoriaService.findOne(id);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.auditoriaService.remove(+id);
+  async remove(@Param('id') id: string): Promise<ResponseAuditoriaDto> {
+    return this.auditoriaService.remove(id);
   }
 }

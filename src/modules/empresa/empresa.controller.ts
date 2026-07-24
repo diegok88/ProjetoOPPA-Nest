@@ -15,6 +15,7 @@ import {
   UpdateEmpresaDto,
 } from './dto/update-empresa.dto';
 import { EmpresaService } from './empresa.service';
+import { DeleteEmpresaDto } from './dto/delete-empresa';
 
 @Controller('empresa')
 export class EmpresaController {
@@ -25,7 +26,7 @@ export class EmpresaController {
   async create(
     @Body() createEmpresaDto: CreateEmpresaDto,
   ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.createEnterprise(createEmpresaDto);
+    return this.empresaService.create(createEmpresaDto);
   }
 
   // CONTROLLER LISTAR EMPRESAS
@@ -39,7 +40,7 @@ export class EmpresaController {
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.findOneEnterprise(id);
+    return this.empresaService.findOne(id);
   }
 
   // CONTROLLER ATUALIZAR EMPRESA PELO ID
@@ -48,7 +49,7 @@ export class EmpresaController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateEmpresaDto: UpdateEmpresaDto,
   ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.updateEnterprise(id, updateEmpresaDto);
+    return this.empresaService.update(id, updateEmpresaDto);
   }
 
   // CONTROLLER INATIVAR EMPRESA PELO ID
@@ -57,14 +58,15 @@ export class EmpresaController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateEmpresaDeactiveDto: UpdateEmpresaDeactiveDto,
   ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.deactiveEnterprise(id, updateEmpresaDeactiveDto);
+    return this.empresaService.deactive(id, updateEmpresaDeactiveDto);
   }
 
   // CONTROLLER DELETAR EMPRESA PELO ID
   @Delete(':id')
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() deleteEmpresaDto: DeleteEmpresaDto,
   ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.removeEnterprise(id);
+    return this.empresaService.remove(id, deleteEmpresaDto);
   }
 }

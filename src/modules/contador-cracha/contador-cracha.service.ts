@@ -3,10 +3,6 @@ import {
   ExtractDataAuditoria,
   ExtractRegisteredById,
 } from '@/utils/extract-data-auditoria.util';
-import {
-  StructureDataAuditoriaCreate,
-  StructureDataAuditoriaUpdate,
-} from '@/utils/structure-data-auditoria.util';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -17,6 +13,11 @@ import {
   ResponseContadorEnterpriseDto,
 } from './dto/response-contador-cracha.dto';
 import { UpdateContadorCrachaDto } from './dto/update-contador-cracha.dto';
+import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
+import { Acao } from '@/generated/prisma/enums';
+import { DeleteContadorCrachaDto } from './dto/delete-contador-cracha.dto';
+import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
+import { Prisma } from '@/generated/prisma/client';
 
 @Injectable()
 export class ContadorCrachaService {
@@ -27,34 +28,45 @@ export class ContadorCrachaService {
     private readonly auditoria: AuditoriaService,
   ) {}
   // CRIA UM NOVO CONTADOR A CADA CRIAÇÃO DE EMPRESA
-  async createAccountant(
+  async create(
     createContadorCrachaDto: CreateContadorCrachaDto,
+    tx?: Prisma.TransactionClient,
   ): Promise<ResponseContadorCrachaDto> {
     try {
-      // transação de criação e auditoria
-      const criarContador = await this.prisma.$transaction(async (tx) => {
-        // Função de eliminação do atributo registradoPOrId
-        const dadosSemRegistrado = await ExtractRegisteredById(
-          createContadorCrachaDto,
-        );
-        // Cria o contador de cracha
-        const criar = await tx.contadorDeCracha.create({
-          data: dadosSemRegistrado,
+      const executar = async (
+        client: Prisma.TransactionClient | PrismaService,
+      ) => {
+        const { registradoPorId, ...dadosContador } = createContadorCrachaDto;
+
+        const criar = await client.contadorDeCracha.create({
+          data: dadosContador,
         });
-        // Retira o id dos dados criados
-        const dadosSemId = await ExtractDataAuditoria(criar);
-        // Função de estruturação de criação de auditoria
-        const dadosAuditoria = await StructureDataAuditoriaCreate(
-          'CONTADOR_CRACHA',
-          criar.id,
-          dadosSemId,
-          createContadorCrachaDto.registradoPorId,
-        );
-        // Função de criação de auditoria
-        await this.auditoria.create(dadosAuditoria);
-        // Retorno da criação do constador de cracha
+
+        const dados = ExtractDataAuditoria(criar);
+
+        const dadosAuditoria: CreateAuditoriaDto = {
+          entidade: 'CONTADOR_CRACHA',
+          registroId: criar.id,
+          acao: Acao.CREATE,
+          dadosRegistrados: dados,
+          empresaId: createContadorCrachaDto.empresaId,
+          registradoPorId: registradoPorId,
+        };
+
+        await this.auditoria.create(dadosAuditoria, client);
+
         return criar;
-      });
+      };
+
+      let criarContador: any;
+      if (tx) {
+        criarContador = await executar(tx);
+      } else {
+        criarContador = await this.prisma.$transaction(async (novaTx) => {
+          return executar(novaTx);
+        });
+      }
+
       this.logger.log('Contador de crachá criada com sucesso.');
       return plainToClass(ResponseContadorCrachaDto, criarContador);
     } catch (error) {
@@ -63,7 +75,7 @@ export class ContadorCrachaService {
     }
   }
   // LISTAGEM DE CONTADORES DE CRACHAS
-  async findAllAccountant(): Promise<ResponseContadorAdminDto[]> {
+  async findAll(): Promise<ResponseContadorAdminDto[]> {
     try {
       const listar = await this.prisma.contadorDeCracha.findMany({
         include: {
@@ -85,7 +97,7 @@ export class ContadorCrachaService {
     }
   }
   // BUSCAR DE CONTADORES DE CRACHAS
-  async findOneAccountant(id: string): Promise<ResponseContadorAdminDto> {
+  async findOne(id: string): Promise<ResponseContadorAdminDto> {
     try {
       const buscar = await this.prisma.contadorDeCracha.findUnique({
         where: { id: id },
@@ -109,11 +121,13 @@ export class ContadorCrachaService {
     }
   }
   // BUSCAR CONTADOR DE CRACHA POR ID EMPRESA
-  async findEnterpriseAccountant(
+  async findEnterprise(
     id: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<ResponseContadorEnterpriseDto> {
     try {
-      const buscar = await this.prisma.contadorDeCracha.findFirst({
+      const client = tx ?? this.prisma;
+      const buscar = await client.contadorDeCracha.findFirst({
         where: { empresaId: id },
       });
 
@@ -124,27 +138,28 @@ export class ContadorCrachaService {
     }
   }
   // ATUALIZA O ATRIBUTO CONTADOR A CADA CADASTRO DE UM NOVO USUARIO DA EMPRESA CADASTRANTE
-  async updateAccountant(
+  async update(
     updateContadorCrachaDto: UpdateContadorCrachaDto,
   ): Promise<ResponseContadorAdminDto> {
     try {
       const atualizarContador = await this.prisma.$transaction(async (tx) => {
-        const buscarContador = await this.findEnterpriseAccountant(
-          updateContadorCrachaDto.empresaId,
-        );
-        const dadosAntes = ExtractDataAuditoria(buscarContador);
+        const { empresaId, registradoPorId } = updateContadorCrachaDto;
+        const buscar = await this.findEnterprise(empresaId);
+        const antes = ExtractDataAuditoria(buscar);
         const atualizar = await this.prisma.contadorDeCracha.update({
-          where: { id: buscarContador.id },
+          where: { id: buscar.id },
           data: { contador: { increment: 1 } },
         });
-        const dadosdepois = await ExtractDataAuditoria(atualizar);
-        const dadosAuditoria = StructureDataAuditoriaUpdate(
-          'CONTADOR_CRACHA',
-          atualizar.id,
-          dadosAntes,
-          dadosdepois,
-          updateContadorCrachaDto.registradoPorId,
-        );
+        const depois = await ExtractDataAuditoria(atualizar);
+        const dadosAuditoria: UpdateAuditoriaDto = {
+          entidade: 'CONTADOR_CRACHA',
+          registroId: empresaId,
+          acao: Acao.UPDATE,
+          antes: antes,
+          depois: depois,
+          empresaId: empresaId,
+          registradoPorId: registradoPorId,
+        };
         await this.auditoria.update(dadosAuditoria);
 
         return atualizar;
@@ -156,57 +171,99 @@ export class ContadorCrachaService {
     }
   }
   // INATIVA O CONTADOR DE CRACHAS ATRAVES DA INATIVAÇÃO DA EMPRESA
-  async deactiveAccountant(updateContadorCrachaDto: UpdateContadorCrachaDto) {
+  async deactive(
+    updateContadorCrachaDto: UpdateContadorCrachaDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     try {
-      const inativarContador = this.prisma.$transaction(async (tx) => {
-        const buscarContador = await this.findEnterpriseAccountant(
-          updateContadorCrachaDto.empresaId,
-        );
-        const antesSemId = await ExtractDataAuditoria(buscarContador);
+      const executar = async (
+        client: Prisma.TransactionClient | PrismaService,
+      ) => {
+        const { empresaId, registradoPorId } = updateContadorCrachaDto;
 
-        const inativarContador = await tx.contadorDeCracha.update({
-          where: { id: buscarContador.id },
+        const buscar = await this.findEnterprise(empresaId, client);
+
+        const antes = ExtractDataAuditoria(buscar);
+
+        const inativar = await client.contadorDeCracha.update({
+          where: { id: buscar.id },
           data: { status: false },
         });
-        const depoisSemId = await ExtractDataAuditoria(inativarContador);
 
-        const dadosAtualizados = StructureDataAuditoriaUpdate(
-          'CONTADOR_CRACHA',
-          buscarContador.id,
-          antesSemId,
-          depoisSemId,
-          updateContadorCrachaDto.registradoPorId,
-        );
+        const depois = ExtractDataAuditoria(inativar);
 
-        await this.auditoria.update(dadosAtualizados);
+        const dadosAtualizados: UpdateAuditoriaDto = {
+          entidade: 'CONTADOR_CRACHA',
+          registroId: empresaId,
+          acao: Acao.UPDATE,
+          antes: antes,
+          depois: depois,
+          empresaId: empresaId,
+          registradoPorId: registradoPorId,
+        };
 
-        return inativarContador;
-      });
-      return plainToClass(ResponseContadorAdminDto, inativarContador);
+        await this.auditoria.update(dadosAtualizados, client);
+
+        return inativar;
+      };
+
+      let inativarContador: any;
+      if (tx) {
+        inativarContador = await executar(tx);
+      } else {
+        inativarContador = await this.prisma.$transaction(async (novaTx) => {
+          return executar(novaTx);
+        });
+      }
+
+      this.logger.log(
+        'Atualização do contador de cracha realizado com sucesso.',
+      );
     } catch (error) {
       this.logger.error('Falha ao inativar o contador de cracha.');
       throw error;
     }
   }
   // REMOVER DADO DO BANCO PELO ID
-  async removeAccountant(
-    id: string,
-    registradoPorId: string,
+  async remove(
+    deleteContadorCrachaDto: DeleteContadorCrachaDto,
+    tx?: Prisma.TransactionClient,
   ): Promise<ResponseContadorCrachaDto> {
     try {
-      const removerContador = await this.prisma.$transaction(async (tx) => {
-        const remover = await tx.contadorDeCracha.delete({
-          where: { id: id },
+      const executar = async (
+        client: Prisma.TransactionClient | PrismaService,
+      ) => {
+        const { empresaId, registradoPorId } = deleteContadorCrachaDto;
+
+        const buscar = await this.findEnterprise(empresaId, client);
+
+        const remover = await client.contadorDeCracha.delete({
+          where: { id: buscar.id },
         });
-        const dadosSemId = await ExtractDataAuditoria(remover);
-        const dadosAuditoria = await StructureDataAuditoriaCreate(
-          'CONTADOR-CRACHA',
-          remover.id,
-          dadosSemId,
-          registradoPorId,
-        );
-        await this.auditoria.create(dadosAuditoria);
-      });
+
+        const dados = ExtractDataAuditoria(remover);
+
+        const dadosAuditoria: CreateAuditoriaDto = {
+          entidade: 'CONTADOR_CRACHA',
+          registroId: buscar.id,
+          acao: Acao.DELETE,
+          dadosRegistrados: dados,
+          empresaId: empresaId,
+          registradoPorId: registradoPorId,
+        };
+
+        await this.auditoria.create(dadosAuditoria, client);
+      };
+
+      let removerContador: any;
+      if (tx) {
+        removerContador = await executar(tx);
+      } else {
+        removerContador = await this.prisma.$transaction(async (novatx) => {
+          return executar(novatx);
+        });
+      }
+
       return plainToClass(ResponseContadorCrachaDto, removerContador);
     } catch (error) {
       this.logger.error('Falha ao remover o contador de crachá.');

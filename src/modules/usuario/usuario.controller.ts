@@ -23,6 +23,7 @@ import {
   UpdateUsuarioDto,
 } from './dto/update-usuario.dto';
 import { UsuarioService } from './usuario.service';
+import { DeleteUsuarioDto } from './dto/delete-usuario.dto';
 
 @Controller('usuario')
 export class UsuarioController {
@@ -101,7 +102,8 @@ export class UsuarioController {
   @Delete(':id')
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() deleteUsuarioDto: DeleteUsuarioDto,
   ): Promise<ResponseUsuarioDto> {
-    return this.usuarioService.remove(id);
+    return this.usuarioService.remove(id, deleteUsuarioDto);
   }
 }

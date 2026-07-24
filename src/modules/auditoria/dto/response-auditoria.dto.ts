@@ -24,5 +24,8 @@ export class ResponseAuditoriaDto {
   dataHora!: Date;
 
   @Expose()
+  empresaId!: string;
+
+  @Expose()
   registradoPorId!: string;
 }
