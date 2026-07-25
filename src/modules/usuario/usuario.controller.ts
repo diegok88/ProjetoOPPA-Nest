@@ -7,12 +7,14 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   CreateUsuarioAdmin,
-  CreateUsuarioDto,
   CreateUsuarioMaster,
 } from './dto/create-usuario.dto';
+import { DeleteUsuarioDto } from './dto/delete-usuario.dto';
+import { QueryUsuarioDto } from './dto/query-usuario.dto';
 import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
 import { ResponseUsuarioDto } from './dto/response-usuario.dto';
 import { UpdateDataUsuarioDto } from './dto/update-data-usuario.dto';
@@ -23,7 +25,6 @@ import {
   UpdateUsuarioDto,
 } from './dto/update-usuario.dto';
 import { UsuarioService } from './usuario.service';
-import { DeleteUsuarioDto } from './dto/delete-usuario.dto';
 
 @Controller('usuario')
 export class UsuarioController {
@@ -44,9 +45,12 @@ export class UsuarioController {
   }
   // LISTA OS USUARIOS
   @Get()
-  async findAll(): Promise<ResponseUsuarioDto[]> {
-    return this.usuarioService.findAll();
+  async findAll(
+    @Query() queryUsuarioDto: QueryUsuarioDto,
+  ): Promise<ResponseUsuarioDto[]> {
+    return this.usuarioService.findAll(queryUsuarioDto);
   }
+
   @Get('findAllActive')
   async findAllActive(): Promise<ResponseActiveUsuario[]> {
     return this.usuarioService.findAllActive();

@@ -1,12 +1,12 @@
+import { Prisma } from '@/generated/prisma/client';
+import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
 import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
+import { QueryAuditoriaRegisteredByIdDto } from './dto/query-auditoria.dto';
 import { ResponseAuditoriaDto } from './dto/response-auditoria.dto';
 import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
-import { Acao } from '@/generated/prisma/enums';
-import { Prisma } from '@/generated/prisma/client';
-import { QueryAuditoriaRegisteredByIdDto } from './dto/query-auditoria.dto';
 
 @Injectable()
 export class AuditoriaService {
@@ -185,8 +185,8 @@ export class AuditoriaService {
         where.registroId = query.registroId;
       }
       if (query.registradoPorId && query.empresaId) {
-        where.empresaId = query.empresaId;
         where.registradoPorId = query.registradoPorId;
+        where.empresaId = query.empresaId;
       }
 
       const listar = await this.prisma.auditoria.findMany({

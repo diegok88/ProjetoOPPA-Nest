@@ -1,20 +1,20 @@
+import { Prisma } from '@/generated/prisma/client';
+import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
+import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
+import { AuditoriaService } from '../auditoria/auditoria.service';
+import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
+import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
+import { QueryUsuarioDto } from '../usuario/dto/query-usuario.dto';
+import { UsuarioService } from '../usuario/usuario.service';
 import { CreatePerfilDto } from './dto/create-perfil.dto';
 import { ResponsePerfilDto } from './dto/response-perfil.dto';
 import {
   UpdatePerfilDeactiveDto,
   UpdatePerfilDto,
 } from './dto/update-perfil.dto';
-import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
-import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
-import { Acao } from '@/generated/prisma/enums';
-import { AuditoriaService } from '../auditoria/auditoria.service';
-import { NotFoundError } from 'rxjs';
-import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
-import { Prisma } from '@/generated/prisma/client';
-import { UsuarioService } from '../usuario/usuario.service';
 
 @Injectable()
 export class PerfilService {
@@ -22,7 +22,7 @@ export class PerfilService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly usurio: UsuarioService,
+    private readonly usuario: UsuarioService,
     private readonly auditoria: AuditoriaService,
   ) {}
 
@@ -149,7 +149,11 @@ export class PerfilService {
   ): Promise<ResponsePerfilDto> {
     try {
       const inativarPerfil = await this.prisma.$transaction(async (tx) => {
-        const verificar = await this.usurio.findAll(tx);
+        const dadosVerificar: QueryUsuarioDto = {
+          perfilId: id,
+          campos: 'perfilId',
+        };
+        const verificar = await this.usuario.findAll(dadosVerificar, tx);
 
         const { registradoPorId, empresaId } = updatePerfilDeactiveDto;
 

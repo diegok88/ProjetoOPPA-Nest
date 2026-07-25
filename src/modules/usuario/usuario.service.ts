@@ -1,4 +1,6 @@
 import { PasswordPin } from '@/constants/password-pin.const';
+import { Prisma } from '@/generated/prisma/client';
+import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
 import {
   ExtractDataAuditoria,
@@ -16,10 +18,14 @@ import { plainToClass } from 'class-transformer';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
+import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
+import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
 import {
   CreateUsuarioAdmin,
   CreateUsuarioMaster,
 } from './dto/create-usuario.dto';
+import { DeleteUsuarioDto } from './dto/delete-usuario.dto';
+import { QueryUsuarioDto } from './dto/query-usuario.dto';
 import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
 import { ResponseUsuarioDto } from './dto/response-usuario.dto';
 import { UpdateDataUsuarioDto } from './dto/update-data-usuario.dto';
@@ -29,11 +35,6 @@ import {
   UpdateUsuarioDeactiveDto,
   UpdateUsuarioDto,
 } from './dto/update-usuario.dto';
-import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
-import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
-import { Acao } from '@/generated/prisma/enums';
-import { DeleteUsuarioDto } from './dto/delete-usuario.dto';
-import { Prisma } from '@/generated/prisma/client';
 
 @Injectable()
 export class UsuarioService {
@@ -44,6 +45,7 @@ export class UsuarioService {
     private readonly contadorCracha: ContadorCrachaService,
     private readonly auditoria: AuditoriaService,
   ) {}
+
   // CRIAR USUARIO MASTER - acesso ao usuario principal
   async createMaster(
     createUsuarioMaster: CreateUsuarioMaster,
@@ -68,6 +70,7 @@ export class UsuarioService {
       throw error;
     }
   }
+
   // CRIAR USUARIO COM TODOS OS PERFIS DO SISTEMA - o mesmo é criado mediante empresa, contador de cracha e perfil criados
   async createAdmin(
     createUsuarioAdmin: CreateUsuarioAdmin,
@@ -117,14 +120,43 @@ export class UsuarioService {
       throw error;
     }
   }
+
   // CRIAR USUARIO OPERADOR - o autorizado apenas para o perfil de supervisor
+  createGestor() {}
 
   // LISTA OS USUARIOS
-  async findAll(tx?: Prisma.TransactionClient): Promise<ResponseUsuarioDto[]> {
+  async findAll(
+    queryUsuarioDto: QueryUsuarioDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ResponseUsuarioDto[]> {
     try {
       const client = tx ?? this.prisma;
 
-      const listarUsuarios = await client.usuario.findMany();
+      const { campos, ...filtros } = queryUsuarioDto;
+
+      const condicao: Prisma.UsuarioWhereInput = {};
+
+      if (filtros.id) condicao.id = filtros.id;
+      if (filtros.cracha) condicao.cracha = filtros.cracha;
+      if (filtros.nome)
+        condicao.nome = { contains: filtros.nome, mode: 'insensitive' };
+      if (filtros.dataAdmissao) condicao.dataAdmissao = filtros.dataAdmissao;
+      if (filtros.dataNascimento)
+        condicao.dataNascimento = filtros.dataNascimento;
+      if (filtros.dataDesligamento)
+        condicao.dataDesligamento = filtros.dataDesligamento;
+      if (filtros.turno) condicao.turno = filtros.turno;
+      if (filtros.escala) condicao.escala = filtros.escala;
+      if (filtros.empresaId) condicao.empresaId = filtros.empresaId;
+      if (filtros.perfilId) condicao.perfilId = filtros.perfilId;
+      if (filtros.status) condicao.status = filtros.status;
+
+      const selecao = this.buildSelect(campos);
+
+      const listarUsuarios = await client.usuario.findMany({
+        where: condicao,
+        select: selecao,
+      });
 
       this.logger.log('Lista de usuário gerada com sucesso.');
 
@@ -136,6 +168,7 @@ export class UsuarioService {
       throw error;
     }
   }
+
   // LISTA OS USUARIO ATIVOS
   async findAllActive(): Promise<ResponseActiveUsuario[]> {
     try {
@@ -159,6 +192,7 @@ export class UsuarioService {
       throw error;
     }
   }
+
   // BUSCA USUARIO PELO ID
   async findOne(
     id: string,
@@ -184,6 +218,7 @@ export class UsuarioService {
       throw error;
     }
   }
+
   // ATUALIZA USUARIO PELO ID - atualiza todos os dados
   async update(
     idUser: string,
@@ -225,6 +260,7 @@ export class UsuarioService {
       throw error;
     }
   }
+
   // ATUALIZAR DADOS DO USUARIO - menos senha e pin
   async updateDataUsuario(
     id: string,
@@ -250,6 +286,7 @@ export class UsuarioService {
       throw error;
     }
   }
+
   // ATUALIZAR SENHA
   async updatePasswordUsuario(
     id: string,
@@ -296,6 +333,7 @@ export class UsuarioService {
       throw error;
     }
   }
+
   // ATUALIZAR PIN
   async updatePinUsuario(id: string, updatePin: UpdatePinUsuarioDto) {
     try {
@@ -334,6 +372,7 @@ export class UsuarioService {
       throw error;
     }
   }
+
   // INATIVAR USUARIO
   async deactive(
     id: string,
@@ -381,6 +420,7 @@ export class UsuarioService {
       throw error;
     }
   }
+
   // INATIVA TODOS OS USUARIO ATRAVES DA INATIVAÇÃO DA EMPRESA
   async deactiveAll(
     updateUsuarioDeactiveDto: UpdateUsuarioDeactiveDto,
@@ -455,6 +495,7 @@ export class UsuarioService {
       throw error;
     }
   }
+
   // DELETA O USUARIO
   async remove(
     id: string,
@@ -501,6 +542,7 @@ export class UsuarioService {
       throw error;
     }
   }
+
   // DELETA TODOS USUARIOS MEDIANTE O DELETE DE UMA EMPRESA
   async removeAll(
     deleteUsuarioDto: DeleteUsuarioDto,
@@ -562,6 +604,7 @@ export class UsuarioService {
       throw error;
     }
   }
+
   // METODO DE COMPARAÇÃO DE HASH
   private async compareHash(
     currentHash: string,
@@ -570,9 +613,38 @@ export class UsuarioService {
     const vadidadorHash = await bcrypt.compare(currentHash, newHash);
     return vadidadorHash;
   }
+
   // METODO PRIVADO DE CRIAÇÃO DE HASH
   private async generateHash(hash: string): Promise<string> {
     const novoHash = await bcrypt.hash(hash, 10);
     return novoHash;
+  }
+
+  // METODO DE CONSULTA DINAMICA
+  private readonly allowedUsuarioFiels = [
+    'id',
+    'nome',
+    'dataNascimento',
+    'dataAdmissao',
+    'dataDesligamento',
+    'perfilId',
+    'turno',
+    'escala',
+    'empresaId',
+    'status',
+  ];
+  private buildSelect(campos?: string): Record<string, true> | undefined {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedUsuarioFiels.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
   }
 }
