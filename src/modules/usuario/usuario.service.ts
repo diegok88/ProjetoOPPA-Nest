@@ -120,10 +120,14 @@ export class UsuarioService {
   // CRIAR USUARIO OPERADOR - o autorizado apenas para o perfil de supervisor
 
   // LISTA OS USUARIOS
-  async findAll(): Promise<ResponseUsuarioDto[]> {
+  async findAll(tx?: Prisma.TransactionClient): Promise<ResponseUsuarioDto[]> {
     try {
-      const listarUsuarios = await this.prisma.usuario.findMany();
+      const client = tx ?? this.prisma;
+
+      const listarUsuarios = await client.usuario.findMany();
+
       this.logger.log('Lista de usuário gerada com sucesso.');
+
       return listarUsuarios.map((lista) =>
         plainToClass(ResponseUsuarioDto, lista),
       );

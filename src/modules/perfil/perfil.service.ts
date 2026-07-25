@@ -1,13 +1,20 @@
 import { PrismaService } from '@/prisma/prisma.service';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
 import { CreatePerfilDto } from './dto/create-perfil.dto';
 import { ResponsePerfilDto } from './dto/response-perfil.dto';
-import { UpdatePerfilDto } from './dto/update-perfil.dto';
+import {
+  UpdatePerfilDeactiveDto,
+  UpdatePerfilDto,
+} from './dto/update-perfil.dto';
 import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
 import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { Acao } from '@/generated/prisma/enums';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { NotFoundError } from 'rxjs';
+import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
+import { Prisma } from '@/generated/prisma/client';
+import { UsuarioService } from '../usuario/usuario.service';
 
 @Injectable()
 export class PerfilService {
@@ -15,6 +22,7 @@ export class PerfilService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly usurio: UsuarioService,
     private readonly auditoria: AuditoriaService,
   ) {}
 
@@ -64,9 +72,13 @@ export class PerfilService {
     }
   }
   // BUSCAR PERFIL PELO ID
-  async findOne(id: string): Promise<ResponsePerfilDto> {
+  async findOne(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ResponsePerfilDto> {
     try {
-      const buscarPerfil = await this.prisma.perfil.findUnique({
+      const client = tx ?? this.prisma;
+      const buscarPerfil = await client.perfil.findUnique({
         where: { id: id },
       });
       if (!buscarPerfil) {
@@ -86,17 +98,44 @@ export class PerfilService {
     updatePerfilDto: UpdatePerfilDto,
   ): Promise<ResponsePerfilDto> {
     try {
-      const atualizarPerfil = await this.prisma.perfil.update({
-        where: { id: id },
-        data: updatePerfilDto,
+      const atualizarPerfil = await this.prisma.$transaction(async (tx) => {
+        const { registradoPorId, empresaId, descricao } = updatePerfilDto;
+
+        const buscar = await this.findOne(id, tx);
+
+        const antes = ExtractDataAuditoria(buscar);
+
+        const atualizar = await tx.perfil.update({
+          where: { id: id },
+          data: { descricao: descricao },
+        });
+
+        if (!atualizar) {
+          this.logger.warn(`Perfil id ${id} não encontrado.`);
+          throw new NotFoundException();
+        }
+
+        const depois = ExtractDataAuditoria(atualizar);
+
+        const dadosAuditoria: UpdateAuditoriaDto = {
+          entidade: 'PERFIL',
+          registroId: id,
+          acao: Acao.UPDATE,
+          antes: antes,
+          depois: depois,
+          empresaId: empresaId,
+          registradoPorId: registradoPorId,
+        };
+
+        await this.auditoria.update(dadosAuditoria, tx);
+
+        return atualizar;
       });
-      if (!atualizarPerfil) {
-        this.logger.warn(`Perfil id ${id} não encontrado.`);
-      } else {
-        this.logger.log(
-          `Perfil id ${atualizarPerfil.id} atualizado com sucesso.`,
-        );
-      }
+
+      this.logger.log(
+        `Perfil id ${atualizarPerfil.id} atualizado com sucesso.`,
+      );
+
       return plainToClass(ResponsePerfilDto, atualizarPerfil);
     } catch (error) {
       this.logger.error(`Falha ao atualizar o perfil.`);
@@ -104,20 +143,48 @@ export class PerfilService {
     }
   }
   // INATIVAÇÃO DO PERFIL PELO ID
-  async deactive(id: string): Promise<ResponsePerfilDto> {
+  async deactive(
+    id: string,
+    updatePerfilDeactiveDto: UpdatePerfilDeactiveDto,
+  ): Promise<ResponsePerfilDto> {
     try {
-      const inativarPerfil = await this.prisma.perfil.update({
-        where: { id: id },
-        data: { status: false },
-      });
-      if (!inativarPerfil) {
-        this.logger.warn(`Perfil id ${id} não foi encontrado.`);
-      } else {
-        this.logger.log(
-          `Perfil id ${inativarPerfil.id} inativado com sucesso.`,
-        );
-      }
+      const inativarPerfil = await this.prisma.$transaction(async (tx) => {
+        const verificar = await this.usurio.findAll(tx);
 
+        const { registradoPorId, empresaId } = updatePerfilDeactiveDto;
+
+        const buscar = await this.findOne(id, tx);
+
+        const antes = ExtractDataAuditoria(buscar);
+
+        const inativar = await tx.perfil.update({
+          where: { id: id },
+          data: { status: false },
+        });
+
+        if (!inativar) {
+          this.logger.warn(`Perfil id ${id} não foi encontrado.`);
+          throw new NotFoundException();
+        }
+
+        const depois = ExtractDataAuditoria(inativar);
+
+        const dadosAuditoria: UpdateAuditoriaDto = {
+          entidade: 'PERFIL',
+          registroId: id,
+          acao: Acao.DEACTIVATE,
+          antes: antes,
+          depois: depois,
+          empresaId: empresaId,
+          registradoPorId: registradoPorId,
+        };
+
+        await this.auditoria.update(dadosAuditoria, tx);
+
+        return inativar;
+      });
+
+      this.logger.log(`Perfil id ${id} inativado com sucesso.`);
       return plainToClass(ResponsePerfilDto, inativarPerfil);
     } catch (error) {
       this.logger.error(`Falha ao inativar o perfil`);

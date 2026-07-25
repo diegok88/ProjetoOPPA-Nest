@@ -10,7 +10,10 @@ import {
 } from '@nestjs/common';
 import { CreatePerfilDto } from './dto/create-perfil.dto';
 import { ResponsePerfilDto } from './dto/response-perfil.dto';
-import { UpdatePerfilDto } from './dto/update-perfil.dto';
+import {
+  UpdatePerfilDeactiveDto,
+  UpdatePerfilDto,
+} from './dto/update-perfil.dto';
 import { PerfilService } from './perfil.service';
 
 @Controller('perfil')
@@ -47,8 +50,9 @@ export class PerfilController {
   @Patch('deactive/:id')
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() updatePerfilDeactiveDto: UpdatePerfilDeactiveDto,
   ): Promise<ResponsePerfilDto> {
-    return this.perfilService.deactive(id);
+    return this.perfilService.deactive(id, updatePerfilDeactiveDto);
   }
   // DELETE DO PERFIL PELO ID
   @Delete(':id')
