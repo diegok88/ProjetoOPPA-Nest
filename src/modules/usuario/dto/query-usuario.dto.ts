@@ -1,9 +1,9 @@
-import { OmitType, PartialType } from '@nestjs/mapped-types';
+import { OmitType, PartialType, PickType } from '@nestjs/mapped-types';
 import { IsBoolean, IsOptional, IsString, IsUUID } from 'class-validator';
 import { CreateUsuarioDto } from './create-usuario.dto';
 
 export class QueryUsuarioDto extends PartialType(
-  OmitType(CreateUsuarioDto, ['senha', 'pin', 'registradoPorId']),
+  OmitType(CreateUsuarioDto, ['registradoPorId']),
 ) {
   @IsOptional()
   @IsUUID('all', { message: 'Usuário id inválido.' })
@@ -27,4 +27,14 @@ export class QueryAdminDto extends OmitType(QueryUsuarioDto, [
   'escala',
   'turno',
   'cracha',
+]) {}
+
+export class QueryBagdeEnterpriceDto extends PickType(QueryUsuarioDto, [
+  'cracha',
+  'empresaId',
+]) {}
+
+export class QueryGenerateTokenDto extends PickType(QueryUsuarioDto, [
+  'id',
+  'perfilId',
 ]) {}

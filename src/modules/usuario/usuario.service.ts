@@ -25,7 +25,10 @@ import {
   CreateUsuarioMaster,
 } from './dto/create-usuario.dto';
 import { DeleteUsuarioDto } from './dto/delete-usuario.dto';
-import { QueryUsuarioDto } from './dto/query-usuario.dto';
+import {
+  QueryBagdeEnterpriceDto,
+  QueryUsuarioDto,
+} from './dto/query-usuario.dto';
 import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
 import { ResponseUsuarioDto } from './dto/response-usuario.dto';
 import { UpdateDataUsuarioDto } from './dto/update-data-usuario.dto';
@@ -220,6 +223,37 @@ export class UsuarioService {
       return plainToClass(ResponseUsuarioDto, buscaUsuario);
     } catch (error) {
       this.logger.error('Falha na busca do usuário.');
+      throw error;
+    }
+  }
+
+  async findOneBadgeAndEnterprice(
+    query: QueryBagdeEnterpriceDto,
+    tx?: Prisma.TransactionClient,
+  ) {
+    try {
+      const client = tx ?? this.prisma;
+
+      const condicao: Prisma.UsuarioWhereInput = {};
+      condicao.cracha = query.cracha;
+      condicao.empresaId = query.empresaId;
+
+      const buscar = await client.usuario.findFirst({
+        where: condicao,
+      });
+
+      if (!buscar) {
+        this.logger.warn(
+          `Usuário com as credenciais crachá ${query.cracha} e empresa id ${query.empresaId} não encontradas.`,
+        );
+        throw new NotFoundException();
+      }
+
+      this.logger.log(`Usuário crachá ${query.cracha} encontrado com sucesso.`);
+
+      return plainToClass(ResponseUsuarioDto, buscar);
+    } catch (error) {
+      this.logger.error('Falha na busca do usuário');
       throw error;
     }
   }
@@ -611,11 +645,11 @@ export class UsuarioService {
   }
 
   // METODO DE COMPARAÇÃO DE HASH
-  private async compareHash(
-    currentHash: string,
-    newHash: string,
-  ): Promise<boolean> {
-    const vadidadorHash = await bcrypt.compare(currentHash, newHash);
+  async compareHash(currentHash: string, newHash: string): Promise<boolean> {
+    const vadidadorHash = await bcrypt.compare(newHash, currentHash);
+    this.logger.debug(
+      `Condição: ${vadidadorHash} - senha atual: ${currentHash} - senha nova: ${newHash}`,
+    );
     return vadidadorHash;
   }
 

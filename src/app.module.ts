@@ -1,16 +1,15 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ConfigModule } from '@nestjs/config';
-import { PrismaModule } from './prisma/prisma.module';
-import { UsuarioModule } from './modules/usuario/usuario.module';
-import { PerfilModule } from './modules/perfil/perfil.module';
-import { GestorModule } from './modules/gestor/gestor.module';
-import { AuditoriaModule } from './modules/auditoria/auditoria.module';
-import { EmpresaModule } from './modules/empresa/empresa.module';
 import { AuthModule } from './auth/auth.module';
+import { AuditoriaModule } from './modules/auditoria/auditoria.module';
 import { ContadorCrachaModule } from './modules/contador-cracha/contador-cracha.module';
-import { LoginModule } from './modules/login/login.module';
+import { EmpresaModule } from './modules/empresa/empresa.module';
+import { GestorModule } from './modules/gestor/gestor.module';
+import { PerfilModule } from './modules/perfil/perfil.module';
+import { UsuarioModule } from './modules/usuario/usuario.module';
+import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
@@ -26,7 +25,6 @@ import { LoginModule } from './modules/login/login.module';
     EmpresaModule,
     AuthModule,
     ContadorCrachaModule,
-    LoginModule,
   ],
   controllers: [AppController],
   providers: [AppService],
