@@ -10,6 +10,7 @@ import { AuditoriaModule } from './modules/auditoria/auditoria.module';
 import { EmpresaModule } from './modules/empresa/empresa.module';
 import { AuthModule } from './auth/auth.module';
 import { ContadorCrachaModule } from './modules/contador-cracha/contador-cracha.module';
+import { LoginModule } from './modules/login/login.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ContadorCrachaModule } from './modules/contador-cracha/contador-cracha.
     EmpresaModule,
     AuthModule,
     ContadorCrachaModule,
+    LoginModule,
   ],
   controllers: [AppController],
   providers: [AppService],

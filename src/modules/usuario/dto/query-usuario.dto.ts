@@ -17,3 +17,14 @@ export class QueryUsuarioDto extends PartialType(
   @IsString({ message: 'Campos não é do tipo string,' })
   campos?: string;
 }
+
+export class QueryAdminDto extends OmitType(QueryUsuarioDto, [
+  'id',
+  'dataAdmissao',
+  'dataDesligamento',
+  'dataNascimento',
+  'nome',
+  'escala',
+  'turno',
+  'cracha',
+]) {}

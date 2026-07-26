@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const logger = new Logger('bootstrap');
@@ -35,6 +36,9 @@ async function bootstrap() {
       strategy: 'excludeAll', // Exclui tudo, só expõe com @Expose
     }),
   );
+  // EXTRAI OS DADOS DO COOKIE
+  app.use(cookieParser());
+  // CONTROLA A PORTA DE ACESSO
   app.enableCors({
     origin: 'http://localhost:4200',
     Credentials: true,

@@ -2,7 +2,12 @@ import { Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
 import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
@@ -15,6 +20,7 @@ import {
   UpdatePerfilDeactiveDto,
   UpdatePerfilDto,
 } from './dto/update-perfil.dto';
+import { DeletePerfilDto } from './dto/delete-perfil.dto';
 
 @Injectable()
 export class PerfilService {
@@ -153,7 +159,18 @@ export class PerfilService {
           perfilId: id,
           campos: 'perfilId',
         };
+
         const verificar = await this.usuario.findAll(dadosVerificar, tx);
+        this.logger.debug(
+          `Total de registros de usuários com o perfil é de ${verificar.length}.`,
+        );
+
+        if (verificar.length > 0) {
+          this.logger.warn(
+            `Perfil id ${id} não pode ser inativado, pois possui usuários relacionados.`,
+          );
+          throw new UnauthorizedException();
+        }
 
         const { registradoPorId, empresaId } = updatePerfilDeactiveDto;
 
@@ -196,16 +213,49 @@ export class PerfilService {
     }
   }
   // DELETE DO PERFIL PELO ID
-  async remove(id: string): Promise<ResponsePerfilDto> {
+  async remove(
+    id: string,
+    deletePerfilDto: DeletePerfilDto,
+  ): Promise<ResponsePerfilDto> {
     try {
-      const deletarPerfil = await this.prisma.perfil.delete({
-        where: { id: id },
+      const deletarPerfil = await this.prisma.$transaction(async (tx) => {
+        const { registradoPorId, empresaId } = deletePerfilDto;
+
+        const verificar = await this.findOne(id, tx);
+
+        const dados = ExtractDataAuditoria(verificar);
+
+        if (verificar.status === true) {
+          this.logger.warn(
+            `Perfil id ${id} não pode ser deletado, pois esta ativo.`,
+          );
+          throw new UnauthorizedException();
+        }
+
+        const deletar = await tx.perfil.delete({
+          where: { id: id },
+        });
+
+        if (!deletarPerfil) {
+          this.logger.warn(`Perfil id ${id} não encontrado.`);
+        }
+
+        const dadosAuditoria: CreateAuditoriaDto = {
+          entidade: 'PERFIL',
+          registroId: id,
+          acao: Acao.DELETE,
+          dadosRegistrados: dados,
+          empresaId: empresaId,
+          registradoPorId: registradoPorId,
+        };
+
+        await this.auditoria.create(dadosAuditoria, tx);
+
+        return deletar;
       });
-      if (!deletarPerfil) {
-        this.logger.warn(`Perfil id ${id} não encontrado.`);
-      } else {
-        this.logger.log(`Perfil id ${deletarPerfil.id} deletado com sucesso.`);
-      }
+
+      this.logger.log(`Perfil id ${id} deletado com sucesso.`);
+
       return plainToClass(ResponsePerfilDto, deletarPerfil);
     } catch (error) {
       throw error;

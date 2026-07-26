@@ -151,13 +151,18 @@ export class UsuarioService {
       if (filtros.perfilId) condicao.perfilId = filtros.perfilId;
       if (filtros.status) condicao.status = filtros.status;
 
-      const selecao = this.buildSelect(campos);
+      const selecao = await this.buildSelect(campos);
+
+      this.logger.debug(
+        `Condição: ${condicao.perfilId} e Seleção: ${selecao}.`,
+      );
 
       const listarUsuarios = await client.usuario.findMany({
         where: condicao,
         select: selecao,
       });
 
+      this.logger.debug(`Total de registros: ${listarUsuarios.length}.`);
       this.logger.log('Lista de usuário gerada com sucesso.');
 
       return listarUsuarios.map((lista) =>
@@ -623,6 +628,7 @@ export class UsuarioService {
   // METODO DE CONSULTA DINAMICA
   private readonly allowedUsuarioFiels = [
     'id',
+    'cracha',
     'nome',
     'dataNascimento',
     'dataAdmissao',
@@ -633,7 +639,9 @@ export class UsuarioService {
     'empresaId',
     'status',
   ];
-  private buildSelect(campos?: string): Record<string, true> | undefined {
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
     if (!campos) return undefined;
 
     const campoArray = campos.split(',').map((c) => c.trim());

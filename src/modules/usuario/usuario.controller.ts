@@ -14,7 +14,7 @@ import {
   CreateUsuarioMaster,
 } from './dto/create-usuario.dto';
 import { DeleteUsuarioDto } from './dto/delete-usuario.dto';
-import { QueryUsuarioDto } from './dto/query-usuario.dto';
+import { QueryAdminDto, QueryUsuarioDto } from './dto/query-usuario.dto';
 import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
 import { ResponseUsuarioDto } from './dto/response-usuario.dto';
 import { UpdateDataUsuarioDto } from './dto/update-data-usuario.dto';
@@ -48,6 +48,21 @@ export class UsuarioController {
   async findAll(
     @Query() queryUsuarioDto: QueryUsuarioDto,
   ): Promise<ResponseUsuarioDto[]> {
+    return this.usuarioService.findAll(queryUsuarioDto);
+  }
+
+  // LISTA OS USUARIOS COM PARAMETROS ESPECIFICOS, MAIS USANDO O MESMO SERVIÇO
+  @Get('admin')
+  async findAllAdmin(
+    @Query() queryAdminDto: QueryAdminDto,
+  ): Promise<ResponseUsuarioDto[]> {
+    const queryUsuarioDto: QueryUsuarioDto = {
+      empresaId: queryAdminDto.empresaId,
+      perfilId: queryAdminDto.perfilId,
+      status: queryAdminDto.status ?? true,
+      campos: queryAdminDto.campos ?? 'id,nome,cracha',
+    };
+
     return this.usuarioService.findAll(queryUsuarioDto);
   }
 

@@ -15,6 +15,7 @@ import {
   UpdatePerfilDto,
 } from './dto/update-perfil.dto';
 import { PerfilService } from './perfil.service';
+import { DeletePerfilDto } from './dto/delete-perfil.dto';
 
 @Controller('perfil')
 export class PerfilController {
@@ -58,7 +59,8 @@ export class PerfilController {
   @Delete(':id')
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() deletePerfilDto: DeletePerfilDto,
   ): Promise<ResponsePerfilDto> {
-    return this.perfilService.remove(id);
+    return this.perfilService.remove(id, deletePerfilDto);
   }
 }
