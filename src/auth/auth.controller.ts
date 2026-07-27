@@ -7,7 +7,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/create-auth.dto';
 import { ResponseAuthDto } from './dto/response-auth.dto';
@@ -22,9 +22,18 @@ export class AuthController {
   async login(
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) res: Response,
-    @Req() req: AuthenticatedRequest,
   ): Promise<{ message: string; usuario: number }> {
-    return this.authService.login(res, req, loginDto);
+    const resultado = await this.authService.login(loginDto);
+    const token = resultado.token;
+
+    res.cookie('jwt', token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
+    return { message: 'Autenticado com sucesso!', usuario: resultado.dado };
   }
 
   @Post('logout')
@@ -32,7 +41,13 @@ export class AuthController {
     @Req() req: AuthenticatedRequest,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ message: string }> {
-    return this.authService.logout(res, req);
+    const usuario: string = req.user.userId;
+
+    const message = await this.authService.logout(usuario);
+
+    res.clearCookie('jwt');
+
+    return message;
   }
 
   @UseGuards(JwtAuthGuard)

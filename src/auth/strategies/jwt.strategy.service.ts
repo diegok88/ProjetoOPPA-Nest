@@ -31,6 +31,7 @@ export class JwtStrategyService extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any): Promise<RequestUser> {
+    this.logger.log('Validação da JwtStrategyService - validate( )');
     return {
       userId: payload.sub,
       perfil: payload.perfil,
