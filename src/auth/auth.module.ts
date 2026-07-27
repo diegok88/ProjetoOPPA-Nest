@@ -1,4 +1,5 @@
 import { AuditoriaModule } from '@/modules/auditoria/auditoria.module';
+import { PerfilModule } from '@/modules/perfil/perfil.module';
 import { UsuarioModule } from '@/modules/usuario/usuario.module';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
@@ -16,6 +17,7 @@ import { JwtStrategyService } from './strategies/jwt.strategy.service';
     }),
     UsuarioModule,
     AuditoriaModule,
+    PerfilModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategyService],

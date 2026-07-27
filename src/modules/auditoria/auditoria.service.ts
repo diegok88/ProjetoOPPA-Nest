@@ -1,10 +1,13 @@
 import { Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
-import { Injectable, Logger } from '@nestjs/common';
-import { plainToClass } from 'class-transformer';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
-import { QueryAuditoriaRegisteredByIdDto } from './dto/query-auditoria.dto';
+import {
+  QueryAuditoriaFilterDto,
+  QueryAuditoriaFindOneLastDto,
+} from './dto/query-auditoria.dto';
 import { ResponseAuditoriaDto } from './dto/response-auditoria.dto';
 import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
 
@@ -42,26 +45,25 @@ export class AuditoriaService {
   async create(
     createAuditoriaDto: CreateAuditoriaDto,
     tx?: Prisma.TransactionClient,
-  ): Promise<ResponseAuditoriaDto> {
+  ): Promise<void> {
     try {
       const { dadosRegistrados, ...dados } = createAuditoriaDto;
       const formatString = JSON.stringify(dadosRegistrados);
-
       const client = tx ?? this.prisma;
 
-      const criarAuditoria = await client.auditoria.create({
+      await client.auditoria.create({
         data: { ...dados, dadosRegistrados: formatString },
       });
 
-      this.logger.log('Registro de auditoria gerada com sucesso.');
-      return plainToClass(ResponseAuditoriaDto, criarAuditoria);
+      this.logger.log(TYPES_NOTICES.CREATE);
     } catch (error) {
-      this.logger.error('Falha na criação do registro de auditoria - CREATE.');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
       throw error;
     }
   }
 
   // SERVIÇO DE CRIAÇÃO DE OBJETOS PARA AÇÃO DE DELETE
+  // Os creates possuem transformação de json para string de formas diferentes
   async createAll(
     items: Array<CreateAuditoriaDto>,
     tx?: Prisma.TransactionClient,
@@ -72,8 +74,10 @@ export class AuditoriaService {
       await client.auditoria.createMany({
         data: items,
       });
+
+      this.logger.log(TYPES_NOTICES.CREATE_MANY);
     } catch (error) {
-      this.logger.log('Falha na criação da lista de auditorias - CREATE ALL');
+      this.logger.log(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATEALL');
       throw error;
     }
   }
@@ -82,7 +86,7 @@ export class AuditoriaService {
   async update(
     updateAuditoriaDto: UpdateAuditoriaDto,
     tx?: Prisma.TransactionClient,
-  ): Promise<ResponseAuditoriaDto> {
+  ): Promise<void> {
     try {
       const client = tx ?? this.prisma;
 
@@ -99,15 +103,16 @@ export class AuditoriaService {
 
       const dadosAtualizados = JSON.stringify(dadosAuditoria);
 
-      const criarAuditoria = await client.auditoria.create({
+      await client.auditoria.create({
         data: {
           ...dados,
           dadosRegistrados: dadosAtualizados,
         },
       });
-      return plainToClass(ResponseAuditoriaDto, criarAuditoria);
+
+      this.logger.log(TYPES_NOTICES.UPDATE);
     } catch (error) {
-      this.logger.error('Falha na criação do registro de auditoria - UPDATE.');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
       throw error;
     }
   }
@@ -140,23 +145,41 @@ export class AuditoriaService {
       await client.auditoria.createMany({
         data: dadosAtualizados,
       });
+
+      this.logger.log(TYPES_NOTICES.UPDATE_MANY);
     } catch (error) {
-      this.logger.error('Falha na criação da lista de auditorias - UPDATE ALL');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATEALL');
       throw error;
     }
   }
 
   // SERVIÇO DE LISTAGEM DE AUDITORIAS CADASTRADAS - SOMENTE PERFIL MASTER
-  async findAll(): Promise<ResponseAuditoriaDto[]> {
+  async findAll(
+    query: QueryAuditoriaFilterDto,
+  ): Promise<ResponseAuditoriaDto[]> {
     try {
-      const listarRegistros = await this.prisma.auditoria.findMany();
-      this.logger.log('Lista de registros de auditoria gerada com sucesso.');
+      const condicao: Prisma.AuditoriaWhereInput = {};
 
-      return listarRegistros.map((lista) =>
-        plainToClass(ResponseAuditoriaDto, lista),
-      );
+      if (query.acao) condicao.acao = query.acao;
+      if (query.dataHora) condicao.dataHora = query.dataHora;
+      if (query.empresaId) condicao.empresaId = query.empresaId;
+      if (query.entidade) condicao.entidade = query.entidade;
+      if (query.registradoPorId)
+        condicao.registradoPorId = query.registradoPorId;
+      if (query.registroId) condicao.registroId = query.registroId;
+
+      const listarRegistros = await this.prisma.auditoria.findMany({
+        where: condicao,
+      });
+
+      if (listarRegistros.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listarRegistros.map((lista) => lista);
     } catch (error) {
-      this.logger.error('Falha ao listar registros de auditoria.');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
       throw error;
     }
   }
@@ -167,53 +190,56 @@ export class AuditoriaService {
       const buscar = await this.prisma.auditoria.findUnique({
         where: { id: id },
       });
-      this.logger.log(`Busca da auditoria por id ${id} gerada com sucesso.`);
-      return plainToClass(ResponseAuditoriaDto, buscar);
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException();
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ONE);
+      return buscar;
     } catch (error) {
-      this.logger.error('Falha na busca da auditoria.');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
       throw error;
     }
   }
 
-  // SERVIÇO DE LISTAGEM DE DADOS PELO ATRIBUTO REGISTRADO POR ID E EMPRESA ID
-  async findRegisteredById(
-    query: QueryAuditoriaRegisteredByIdDto,
-  ): Promise<ResponseAuditoriaDto[]> {
+  // SERVIÇO DE BUSCA DE DADOS SEM ID
+  async findOneLast(
+    query: QueryAuditoriaFindOneLastDto,
+  ): Promise<ResponseAuditoriaDto> {
     try {
-      const where: Prisma.AuditoriaWhereInput = {};
-      if (query?.registroId) {
-        where.registroId = query.registroId;
-      }
-      if (query.registradoPorId && query.empresaId) {
-        where.registradoPorId = query.registradoPorId;
-        where.empresaId = query.empresaId;
+      const condicao: Prisma.AuditoriaWhereInput = {};
+      condicao.acao = query.acao;
+      condicao.empresaId = query.empresaId;
+      condicao.registradoPorId = query.registradoPorId;
+
+      const buscar = await this.prisma.auditoria.findFirst({
+        where: condicao,
+      });
+
+      if (!buscar) {
+        throw new NotFoundException();
       }
 
-      const listar = await this.prisma.auditoria.findMany({
-        where,
-      });
-      this.logger.log(
-        this.logger.log(
-          'Lista de auditoria gerada com sucesso - findRegisteredById.',
-        ),
-      );
-      return listar.map((lista) => plainToClass(ResponseAuditoriaDto, lista));
+      return buscar;
     } catch (error) {
-      this.logger.error('Falha ao listar registros de auditoria.');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONELAST');
       throw error;
     }
   }
 
   // SERVIÇO DE ELIMINAÇÃO DE AUDITORIA POR ID
-  async remove(id: string): Promise<ResponseAuditoriaDto> {
+  async remove(id: string): Promise<{ message: string }> {
     try {
-      const deletar = await this.prisma.auditoria.delete({
+      await this.prisma.auditoria.delete({
         where: { id: id },
       });
-      this.logger.log(`Delete da auditoria ${id} realizada com sucesso`);
-      return plainToClass(ResponseAuditoriaDto, deletar);
+
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return { message: TYPES_NOTICES.DELETE };
     } catch (error) {
-      this.logger.error('Falha ao deletar o registro de auditoria.');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
       throw error;
     }
   }

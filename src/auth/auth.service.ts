@@ -1,10 +1,8 @@
 import { Acao } from '@/generated/prisma/enums';
 import { AuditoriaService } from '@/modules/auditoria/auditoria.service';
 import { CreateAuditoriaDto } from '@/modules/auditoria/dto/create-auditoria.dto';
-import {
-  QueryGenerateTokenDto,
-  QueryUsuarioDto,
-} from '@/modules/usuario/dto/query-usuario.dto';
+import { QueryAuditoriaFindOneLastDto } from '@/modules/auditoria/dto/query-auditoria.dto';
+import { QueryUsuarioDto } from '@/modules/usuario/dto/query-usuario.dto';
 import { UsuarioService } from '@/modules/usuario/usuario.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import {
@@ -15,13 +13,8 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { plainToClass } from 'class-transformer';
-import { Response } from 'express';
 import { LoginDto } from './dto/create-auth.dto';
-import {
-  ResponseAuthDto,
-  ResponseAuthValidateDto,
-} from './dto/response-auth.dto';
-import { AuthenticatedRequest } from './express/authenticated-request.interface';
+import { ResponseAuthDto } from './dto/response-auth.dto';
 
 @Injectable()
 export class AuthService {
@@ -116,15 +109,22 @@ export class AuthService {
     }
   }
 
+  // LOGOUT DO USUARIO
   async logout(usuario: string): Promise<{ message: string }> {
     try {
       const buscar = await this.usuario.findOne(usuario);
+      const queryAuditoria: QueryAuditoriaFindOneLastDto = {
+        acao: Acao.LOGIN,
+        empresaId: buscar.empresaId,
+        registradoPorId: buscar.id,
+      };
+      const auditoria = await this.auditoria.findOneLast(queryAuditoria);
 
       const dadosAuditoria: CreateAuditoriaDto = {
         entidade: 'AUTH',
         registroId: buscar.id,
         acao: Acao.LOGOUT,
-        dadosRegistrados: "token",
+        dadosRegistrados: auditoria.dadosRegistrados,
         empresaId: buscar.empresaId,
         registradoPorId: buscar.id,
       };

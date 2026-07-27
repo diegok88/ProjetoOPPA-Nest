@@ -2,12 +2,13 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   Post,
   Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
-import type { Response, Request } from 'express';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/create-auth.dto';
 import { ResponseAuthDto } from './dto/response-auth.dto';
@@ -16,6 +17,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
+  private logger = new Logger(AuthController.name);
+
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
@@ -36,10 +39,11 @@ export class AuthController {
     return { message: 'Autenticado com sucesso!', usuario: resultado.dado };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('logout')
   async logout(
-    @Req() req: AuthenticatedRequest,
     @Res({ passthrough: true }) res: Response,
+    @Req() req: AuthenticatedRequest,
   ): Promise<{ message: string }> {
     const usuario: string = req.user.userId;
 
@@ -56,3 +60,7 @@ export class AuthController {
     return this.authService.findProfile(req.user.userId);
   }
 }
+/* 
+ @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASSN2)
+*/

@@ -3,13 +3,6 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
-interface JwtPayload {
-  sub: string;
-  perfil: string;
-  iat?: number;
-  exp?: number;
-}
-
 interface RequestUser {
   userId: string;
   perfil: string;

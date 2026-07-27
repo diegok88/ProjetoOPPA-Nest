@@ -1,6 +1,6 @@
-import { OmitType } from '@nestjs/mapped-types';
+import { OmitType, PartialType, PickType } from '@nestjs/mapped-types';
+import { IsDate, IsOptional, IsUUID } from 'class-validator';
 import { CreateAuditoriaDto } from './create-auditoria.dto';
-import { IsOptional, IsUUID } from 'class-validator';
 
 export class QueryAuditoriaRegisteredByIdDto extends OmitType(
   CreateAuditoriaDto,
@@ -9,4 +9,18 @@ export class QueryAuditoriaRegisteredByIdDto extends OmitType(
   @IsOptional()
   @IsUUID()
   registroId?: string;
+}
+
+export class QueryAuditoriaFindOneLastDto extends PickType(CreateAuditoriaDto, [
+  'acao',
+  'empresaId',
+  'registradoPorId',
+]) {}
+
+export class QueryAuditoriaFilterDto extends PartialType(
+  OmitType(CreateAuditoriaDto, ['dadosRegistrados']),
+) {
+  @IsDate({ message: 'Data e hora não é do tipo Date!' })
+  @IsOptional()
+  dataHora?: Date;
 }

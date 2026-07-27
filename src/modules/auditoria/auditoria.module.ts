@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
-import { AuditoriaService } from './auditoria.service';
+import { PerfilModule } from '../perfil/perfil.module';
 import { AuditoriaController } from './auditoria.controller';
+import { AuditoriaService } from './auditoria.service';
 
 @Module({
+  imports: [PerfilModule],
   controllers: [AuditoriaController],
   providers: [AuditoriaService],
   exports: [AuditoriaService],
