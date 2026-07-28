@@ -1,4 +1,3 @@
-import { CreateUsuarioDto } from '@/modules/usuario/dto/create-usuario.dto';
 import { ResponseUsuarioDto } from '@/modules/usuario/dto/response-usuario.dto';
 import { OmitType, PickType } from '@nestjs/mapped-types';
 
@@ -14,3 +13,7 @@ export class ResponseAuthValidateDto extends PickType(ResponseUsuarioDto, [
   'id',
   'senha',
 ]) {}
+
+export class ResponseAuthMessageDto {
+  message!: string;
+}

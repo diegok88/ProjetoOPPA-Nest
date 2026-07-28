@@ -5,6 +5,7 @@ import { QueryAuditoriaFindOneLastDto } from '@/modules/auditoria/dto/query-audi
 import { QueryUsuarioDto } from '@/modules/usuario/dto/query-usuario.dto';
 import { UsuarioService } from '@/modules/usuario/usuario.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import {
   Injectable,
   Logger,
@@ -37,17 +38,15 @@ export class AuthService {
     return this.jwtService.sign(payload);
   }
 
-  // OBTER O PERFIL
+  // OBTER O PERFIL - criar entidade usuario para tipar o retorno
   async findProfile(id: string): Promise<ResponseAuthDto> {
     const usuario = await this.usuario.findOne(id);
-
     if (!usuario) throw new UnauthorizedException();
-
     return plainToClass(ResponseAuthDto, usuario);
   }
 
   // LOGIN DO USUARIO
-  async login(login: LoginDto): Promise<{ dado: number; token: string }> {
+  async login(login: LoginDto): Promise<string> {
     try {
       const loginUsuario = await this.prisma.$transaction(async (tx) => {
         const verificar: QueryUsuarioDto = {
@@ -55,33 +54,24 @@ export class AuthService {
           senha: login.senha,
           empresaId: login.empresaId,
         };
-
         const validarUsuario =
           await this.usuario.findOneBadgeAndEnterprice(verificar);
-
         if (!validarUsuario) {
           this.logger.warn(`Usuário crachá ${login.cracha} não encontrado.`);
           throw new NotFoundException();
         }
-
         const { senha, perfilId, id, empresaId, cracha } = validarUsuario;
-
         if (verificar.cracha !== cracha || verificar.empresaId !== empresaId) {
           this.logger.warn('Usuário com credenciais não autorizado.');
           throw new UnauthorizedException();
         }
-
         const validarSenha = this.usuario.compareHash(senha, login.senha);
-
         if (!validarSenha) {
           this.logger.warn(`Usuário crachá ${login.cracha} não autorizado.`);
           throw new UnauthorizedException();
         }
-
         const token = await this.generateToken(id, perfilId);
-
         this.logger.log('Token gerado com sucesso!');
-
         const dadosAuditoria: CreateAuditoriaDto = {
           entidade: 'AUTH',
           registroId: id,
@@ -90,19 +80,11 @@ export class AuthService {
           empresaId: login.empresaId,
           registradoPorId: id,
         };
-
         await this.auditoria.create(dadosAuditoria, tx);
-
-        const dado = cracha;
-
-        return { dado, token };
+        return token;
       });
-
       this.logger.log('Login realizado com sucesso!');
-
-      const { dado, token } = loginUsuario;
-
-      return { dado, token };
+      return loginUsuario;
     } catch (error) {
       this.logger.error('Falha ao logar o usuário!');
       throw error;
@@ -110,7 +92,7 @@ export class AuthService {
   }
 
   // LOGOUT DO USUARIO
-  async logout(usuario: string): Promise<{ message: string }> {
+  async logout(usuario: string): Promise<void> {
     try {
       const buscar = await this.usuario.findOne(usuario);
       const queryAuditoria: QueryAuditoriaFindOneLastDto = {
@@ -119,7 +101,6 @@ export class AuthService {
         registradoPorId: buscar.id,
       };
       const auditoria = await this.auditoria.findOneLast(queryAuditoria);
-
       const dadosAuditoria: CreateAuditoriaDto = {
         entidade: 'AUTH',
         registroId: buscar.id,
@@ -128,14 +109,10 @@ export class AuthService {
         empresaId: buscar.empresaId,
         registradoPorId: buscar.id,
       };
-
       await this.auditoria.create(dadosAuditoria);
-
       this.logger.log('Logout realizado com sucesso!');
-
-      return { message: 'Logout realizado' };
     } catch (error) {
-      this.logger.error('Falha do logout do usuário!');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE);
       throw error;
     }
   }

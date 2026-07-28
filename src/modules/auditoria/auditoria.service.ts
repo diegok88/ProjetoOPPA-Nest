@@ -1,4 +1,4 @@
-import { Prisma } from '@/generated/prisma/client';
+import { Auditoria, Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
@@ -8,7 +8,6 @@ import {
   QueryAuditoriaFilterDto,
   QueryAuditoriaFindOneLastDto,
 } from './dto/query-auditoria.dto';
-import { ResponseAuditoriaDto } from './dto/response-auditoria.dto';
 import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
 
 @Injectable()
@@ -45,17 +44,18 @@ export class AuditoriaService {
   async create(
     createAuditoriaDto: CreateAuditoriaDto,
     tx?: Prisma.TransactionClient,
-  ): Promise<void> {
+  ): Promise<Auditoria> {
     try {
       const { dadosRegistrados, ...dados } = createAuditoriaDto;
       const formatString = JSON.stringify(dadosRegistrados);
       const client = tx ?? this.prisma;
 
-      await client.auditoria.create({
+      const criar = await client.auditoria.create({
         data: { ...dados, dadosRegistrados: formatString },
       });
 
       this.logger.log(TYPES_NOTICES.CREATE);
+      return criar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
       throw error;
@@ -67,15 +67,17 @@ export class AuditoriaService {
   async createAll(
     items: Array<CreateAuditoriaDto>,
     tx?: Prisma.TransactionClient,
-  ): Promise<void> {
+  ): Promise<Prisma.BatchPayload> {
+    // Prisma.BatchPayload: retorna apenas {{ count: number }}
     try {
       const client = tx || this.prisma;
 
-      await client.auditoria.createMany({
+      const criar = await client.auditoria.createMany({
         data: items,
       });
 
       this.logger.log(TYPES_NOTICES.CREATE_MANY);
+      return criar;
     } catch (error) {
       this.logger.log(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATEALL');
       throw error;
@@ -86,7 +88,7 @@ export class AuditoriaService {
   async update(
     updateAuditoriaDto: UpdateAuditoriaDto,
     tx?: Prisma.TransactionClient,
-  ): Promise<void> {
+  ): Promise<Auditoria> {
     try {
       const client = tx ?? this.prisma;
 
@@ -103,7 +105,7 @@ export class AuditoriaService {
 
       const dadosAtualizados = JSON.stringify(dadosAuditoria);
 
-      await client.auditoria.create({
+      const atualizar = await client.auditoria.create({
         data: {
           ...dados,
           dadosRegistrados: dadosAtualizados,
@@ -111,6 +113,7 @@ export class AuditoriaService {
       });
 
       this.logger.log(TYPES_NOTICES.UPDATE);
+      return atualizar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
       throw error;
@@ -121,7 +124,7 @@ export class AuditoriaService {
   async updateAll(
     items: Array<UpdateAuditoriaDto>,
     tx?: Prisma.TransactionClient,
-  ): Promise<void> {
+  ): Promise<Prisma.BatchPayload> {
     try {
       const client = tx || this.prisma;
 
@@ -142,11 +145,12 @@ export class AuditoriaService {
           registradoPorId: item.registradoPorId,
         };
       });
-      await client.auditoria.createMany({
+      const atualizar = await client.auditoria.createMany({
         data: dadosAtualizados,
       });
 
       this.logger.log(TYPES_NOTICES.UPDATE_MANY);
+      return atualizar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATEALL');
       throw error;
@@ -154,9 +158,7 @@ export class AuditoriaService {
   }
 
   // SERVIÇO DE LISTAGEM DE AUDITORIAS CADASTRADAS - SOMENTE PERFIL MASTER
-  async findAll(
-    query: QueryAuditoriaFilterDto,
-  ): Promise<ResponseAuditoriaDto[]> {
+  async findAll(query: QueryAuditoriaFilterDto): Promise<Auditoria[]> {
     try {
       const condicao: Prisma.AuditoriaWhereInput = {};
 
@@ -177,7 +179,7 @@ export class AuditoriaService {
       }
 
       this.logger.log(TYPES_NOTICES.FIND_ALL);
-      return listarRegistros.map((lista) => lista);
+      return listarRegistros;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
       throw error;
@@ -185,7 +187,7 @@ export class AuditoriaService {
   }
 
   // SERVIÇO DE BUSCA DE AUDITORIA POR ID - SOMENTE PERFIL MASTER
-  async findOne(id: string): Promise<ResponseAuditoriaDto> {
+  async findOne(id: string): Promise<Auditoria> {
     try {
       const buscar = await this.prisma.auditoria.findUnique({
         where: { id: id },
@@ -204,10 +206,8 @@ export class AuditoriaService {
     }
   }
 
-  // SERVIÇO DE BUSCA DE DADOS SEM ID
-  async findOneLast(
-    query: QueryAuditoriaFindOneLastDto,
-  ): Promise<ResponseAuditoriaDto> {
+  // SERVIÇO DE BUSCA DE DADOS SEM ID - função interna sem CONTROLLER
+  async findOneLast(query: QueryAuditoriaFindOneLastDto): Promise<Auditoria> {
     try {
       const condicao: Prisma.AuditoriaWhereInput = {};
       condicao.acao = query.acao;
@@ -230,14 +230,14 @@ export class AuditoriaService {
   }
 
   // SERVIÇO DE ELIMINAÇÃO DE AUDITORIA POR ID
-  async remove(id: string): Promise<{ message: string }> {
+  async remove(id: string): Promise<Auditoria> {
     try {
-      await this.prisma.auditoria.delete({
+      const remover = await this.prisma.auditoria.delete({
         where: { id: id },
       });
 
       this.logger.log(TYPES_NOTICES.DELETE);
-      return { message: TYPES_NOTICES.DELETE };
+      return remover;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
       throw error;

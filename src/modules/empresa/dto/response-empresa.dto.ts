@@ -65,3 +65,8 @@ export class ResponseEmpresaAdminDto extends OmitType(ResponseEmpresaDto, [
   @FormatCep()
   cep!: string;
 }
+
+export class ResponseEmpresaMessageDto {
+  @Expose()
+  message!: string;
+}

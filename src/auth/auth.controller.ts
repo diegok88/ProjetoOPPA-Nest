@@ -1,42 +1,41 @@
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import {
   Body,
   Controller,
   Get,
-  Logger,
   Post,
   Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { plainToClass } from 'class-transformer';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/create-auth.dto';
-import { ResponseAuthDto } from './dto/response-auth.dto';
+import {
+  ResponseAuthDto,
+  ResponseAuthMessageDto,
+} from './dto/response-auth.dto';
 import type { AuthenticatedRequest } from './express/authenticated-request.interface';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
-  private logger = new Logger(AuthController.name);
-
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
   async login(
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ message: string; usuario: number }> {
-    const resultado = await this.authService.login(loginDto);
-    const token = resultado.token;
-
+  ): Promise<ResponseAuthMessageDto> {
+    const token = await this.authService.login(loginDto);
     res.cookie('jwt', token, {
       httpOnly: true,
       secure: false,
       sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000,
     });
-
-    return { message: 'Autenticado com sucesso!', usuario: resultado.dado };
+    return plainToClass(ResponseAuthMessageDto, TYPES_NOTICES.LOGIN);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -44,14 +43,11 @@ export class AuthController {
   async logout(
     @Res({ passthrough: true }) res: Response,
     @Req() req: AuthenticatedRequest,
-  ): Promise<{ message: string }> {
+  ): Promise<ResponseAuthMessageDto> {
     const usuario: string = req.user.userId;
-
-    const message = await this.authService.logout(usuario);
-
+    await this.authService.logout(usuario);
     res.clearCookie('jwt');
-
-    return message;
+    return plainToClass(ResponseAuthMessageDto, TYPES_NOTICES.LOGOUT);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -60,7 +56,3 @@ export class AuthController {
     return this.authService.findProfile(req.user.userId);
   }
 }
-/* 
- @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.ASSN2)
-*/

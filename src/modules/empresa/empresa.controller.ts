@@ -1,3 +1,9 @@
+import type { AuthenticatedRequest } from '@/auth/express/authenticated-request.interface';
+import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
+import { RolesGuard } from '@/auth/guards/roles-auth.guard';
+import { ROLES } from '@/auth/guards/roles.const';
+import { Roles } from '@/auth/guards/roles.decorator';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import {
   Body,
   Controller,
@@ -7,15 +13,23 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
+import { plainToClass } from 'class-transformer';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
-import { ResponseEmpresaDto } from './dto/response-empresa.dto';
+import { DeleteEmpresaDto } from './dto/delete-empresa';
+import { QueryEmpresaFilterDto } from './dto/query-empresa.dto';
+import {
+  ResponseEmpresaDto,
+  ResponseEmpresaMessageDto,
+} from './dto/response-empresa.dto';
 import {
   UpdateEmpresaDeactiveDto,
   UpdateEmpresaDto,
 } from './dto/update-empresa.dto';
 import { EmpresaService } from './empresa.service';
-import { DeleteEmpresaDto } from './dto/delete-empresa';
 
 @Controller('empresa')
 export class EmpresaController {
@@ -23,16 +37,24 @@ export class EmpresaController {
 
   // CONTROLLER CRIAR EMPRESA
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASN1)
   async create(
     @Body() createEmpresaDto: CreateEmpresaDto,
-  ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.create(createEmpresaDto);
+  ): Promise<ResponseEmpresaMessageDto> {
+    await this.empresaService.create(createEmpresaDto);
+    return plainToClass(ResponseEmpresaMessageDto, TYPES_NOTICES.CREATE);
   }
 
   // CONTROLLER LISTAR EMPRESAS
   @Get()
-  async findAll(): Promise<ResponseEmpresaDto[]> {
-    return this.empresaService.findAllEnterprise();
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASN1)
+  async findAll(
+    @Query() query: QueryEmpresaFilterDto,
+  ): Promise<ResponseEmpresaDto[]> {
+    const dados = await this.empresaService.findAll(query);
+    return dados.map((lista) => plainToClass(ResponseEmpresaDto, lista));
   }
 
   // CONTROLLER BUSCAR EMPRESA PELO ID
@@ -40,16 +62,19 @@ export class EmpresaController {
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.findOne(id);
+    const dado = this.empresaService.findOne(id);
+    return plainToClass(ResponseEmpresaDto, dado);
   }
 
-  // CONTROLLER ATUALIZAR EMPRESA PELO ID
+  // CONTROLLER ATUALIZAR EMPRESA PELO ID - Implementar o id da empresa no token
   @Patch(':id')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateEmpresaDto: UpdateEmpresaDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.update(id, updateEmpresaDto);
+    const usuario = req.user.userId;
+    return this.empresaService.update(id, usuario, updateEmpresaDto);
   }
 
   // CONTROLLER INATIVAR EMPRESA PELO ID

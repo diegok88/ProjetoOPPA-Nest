@@ -29,3 +29,8 @@ export class ResponseAuditoriaDto {
   @Expose()
   registradoPorId!: string;
 }
+
+export class ResponseAuditoriaMessageDto {
+  @Expose()
+  message!: string;
+}

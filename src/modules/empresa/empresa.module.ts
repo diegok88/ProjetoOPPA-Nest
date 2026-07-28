@@ -1,15 +1,13 @@
 import { Module } from '@nestjs/common';
-import { AuditoriaService } from '../auditoria/auditoria.service';
-import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
-import { EmpresaController } from './empresa.controller';
-import { EmpresaService } from './empresa.service';
-import { UsuarioService } from '../usuario/usuario.service';
-import { UsuarioModule } from '../usuario/usuario.module';
 import { AuditoriaModule } from '../auditoria/auditoria.module';
 import { ContadorCrachaModule } from '../contador-cracha/contador-cracha.module';
+import { PerfilModule } from '../perfil/perfil.module';
+import { UsuarioModule } from '../usuario/usuario.module';
+import { EmpresaController } from './empresa.controller';
+import { EmpresaService } from './empresa.service';
 
 @Module({
-  imports: [UsuarioModule, AuditoriaModule, ContadorCrachaModule],
+  imports: [UsuarioModule, AuditoriaModule, ContadorCrachaModule, PerfilModule],
   controllers: [EmpresaController],
   providers: [EmpresaService],
   exports: [EmpresaService],

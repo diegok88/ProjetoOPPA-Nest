@@ -16,4 +16,6 @@ export const TYPES_NOTICES = {
   EMPTY_LIST: 'Lista de registros vazia!',
   FIND_ONE: 'Registro encontrado com sucesso!',
   NOT_FOUND: 'Registro não encontrado!',
+  LOGOUT: 'Logout realizado com sucesso!',
+  LOGIN: 'Login realizado com sucesso!',
 } as const;
