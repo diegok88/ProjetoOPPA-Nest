@@ -1,26 +1,19 @@
+import { Prisma } from '@/generated/prisma/client';
+import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
-import {
-  ExtractDataAuditoria,
-  ExtractRegisteredById,
-} from '@/utils/extract-data-auditoria.util';
+import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
 import { AuditoriaService } from '../auditoria/auditoria.service';
-import { CreateContadorCrachaDto } from './dto/create-contador-cracha.dto';
-import {
-  ResponseContadorAdminDto,
-  ResponseContadorCrachaDto,
-  ResponseContadorEnterpriseDto,
-} from './dto/response-contador-cracha.dto';
-import { UpdateContadorCrachaDto } from './dto/update-contador-cracha.dto';
 import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
-import { Acao } from '@/generated/prisma/enums';
-import { DeleteContadorCrachaDto } from './dto/delete-contador-cracha.dto';
 import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
-import { Prisma } from '@/generated/prisma/client';
-import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
-import { ContadorCracha } from './entities/contador-cracha.entity';
+import { CreateContadorCrachaDto } from './dto/create-contador-cracha.dto';
+import { DeleteContadorCrachaDto } from './dto/delete-contador-cracha.dto';
 import { QueryContadorCrachaFilterDto } from './dto/query-contador-cracha.dto';
+import { ResponseContadorEnterpriseDto } from './dto/response-contador-cracha.dto';
+import { UpdateContadorCrachaDto } from './dto/update-contador-cracha.dto';
+import { ContadorCracha } from './entities/contador-cracha.entity';
 
 @Injectable()
 export class ContadorCrachaService {
@@ -180,14 +173,14 @@ export class ContadorCrachaService {
   }
   // INATIVA O CONTADOR DE CRACHAS ATRAVES DA INATIVAÇÃO DA EMPRESA
   async deactive(
-    updateContadorCrachaDto: UpdateContadorCrachaDto,
+    update: UpdateContadorCrachaDto,
     tx?: Prisma.TransactionClient,
-  ): Promise<void> {
+  ): Promise<ContadorCracha> {
     try {
       const executar = async (
         client: Prisma.TransactionClient | PrismaService,
       ) => {
-        const { empresaId, registradoPorId } = updateContadorCrachaDto;
+        const { empresaId, registradoPorId } = update;
 
         const buscar = await this.findEnterprise(empresaId, client);
 
@@ -224,9 +217,8 @@ export class ContadorCrachaService {
         });
       }
 
-      this.logger.log(
-        'Atualização do contador de cracha realizado com sucesso.',
-      );
+      this.logger.log(TYPES_NOTICES.UPDATE);
+      return inativarContador;
     } catch (error) {
       this.logger.error('Falha ao inativar o contador de cracha.');
       throw error;
@@ -234,14 +226,14 @@ export class ContadorCrachaService {
   }
   // REMOVER DADO DO BANCO PELO ID
   async remove(
-    deleteContadorCrachaDto: DeleteContadorCrachaDto,
+    deleteCCD: DeleteContadorCrachaDto,
     tx?: Prisma.TransactionClient,
-  ): Promise<ResponseContadorCrachaDto> {
+  ): Promise<ContadorCracha> {
     try {
       const executar = async (
         client: Prisma.TransactionClient | PrismaService,
       ) => {
-        const { empresaId, registradoPorId } = deleteContadorCrachaDto;
+        const { empresaId, registradoPorId } = deleteCCD;
 
         const buscar = await this.findEnterprise(empresaId, client);
 
@@ -272,9 +264,9 @@ export class ContadorCrachaService {
         });
       }
 
-      return plainToClass(ResponseContadorCrachaDto, removerContador);
+      return removerContador;
     } catch (error) {
-      this.logger.error('Falha ao remover o contador de crachá.');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
       throw error;
     }
   }

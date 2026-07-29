@@ -1,3 +1,4 @@
+import { Auth } from '@/auth/entities/auth.entity';
 import { PasswordPin } from '@/constants/password-pin.const';
 import { Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
@@ -6,6 +7,7 @@ import {
   ExtractDataAuditoria,
   ExtractRegisteredById,
 } from '@/utils/extract-data-auditoria.util';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import {
   BadRequestException,
   Injectable,
@@ -22,6 +24,7 @@ import { ContadorCrachaService } from '../contador-cracha/contador-cracha.servic
 import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
 import {
   CreateUsuarioAdmin,
+  CreateUsuarioAssistDto,
   CreateUsuarioMaster,
 } from './dto/create-usuario.dto';
 import { DeleteUsuarioDto } from './dto/delete-usuario.dto';
@@ -38,6 +41,7 @@ import {
   UpdateUsuarioDeactiveDto,
   UpdateUsuarioDto,
 } from './dto/update-usuario.dto';
+import { Usuario, UsuarioMaster } from './entities/usuario.entity';
 
 @Injectable()
 export class UsuarioService {
@@ -50,11 +54,9 @@ export class UsuarioService {
   ) {}
 
   // CRIAR USUARIO MASTER - acesso ao usuario principal
-  async createMaster(
-    createUsuarioMaster: CreateUsuarioMaster,
-  ): Promise<ResponseUsuarioDto> {
+  async createMaster(create: CreateUsuarioMaster): Promise<UsuarioMaster> {
     try {
-      const { senha, pin, ...dados } = createUsuarioMaster;
+      const { senha, pin, ...dados } = create;
       const senhaHash = await this.generateHash(senha);
       const pinHash = await this.generateHash(pin);
 
@@ -67,7 +69,7 @@ export class UsuarioService {
       });
 
       this.logger.log('Usuário master criado com sucesso.');
-      return plainToClass(ResponseUsuarioDto, criar);
+      return criar;
     } catch (error) {
       this.logger.error('Falha ao cadastrar usuário master');
       throw error;
@@ -75,20 +77,68 @@ export class UsuarioService {
   }
 
   // CRIAR USUARIO COM TODOS OS PERFIS DO SISTEMA - o mesmo é criado mediante empresa, contador de cracha e perfil criados
-  async createAdmin(
-    createUsuarioAdmin: CreateUsuarioAdmin,
-  ): Promise<ResponseUsuarioDto> {
+  async createAssist(
+    autenticado: Auth,
+    create: CreateUsuarioAssistDto,
+  ): Promise<Usuario> {
     try {
-      const dadosSemRegistradoPorId =
-        await ExtractRegisteredById(createUsuarioAdmin);
-
       const criarUsuario = await this.prisma.$transaction(async (tx) => {
         const senhaHash = await this.generateHash(PasswordPin.password);
         const pinHash = await this.generateHash(PasswordPin.pin);
 
         const dadosContador: UpdateContadorCrachaDto = {
-          empresaId: createUsuarioAdmin.empresaId,
-          registradoPorId: createUsuarioAdmin.registradoPorId,
+          empresaId: autenticado.empresa,
+          registradoPorId: autenticado.userId,
+        };
+        const criarContador = await this.contadorCracha.update(dadosContador);
+
+        const criar = await tx.usuario.create({
+          data: {
+            ...create,
+            cracha: criarContador.contador,
+            senha: senhaHash,
+            pin: pinHash,
+          },
+        });
+
+        const dados = ExtractDataAuditoria(criar);
+
+        const dadosAuditoria: CreateAuditoriaDto = {
+          entidade: 'USUARIO',
+          registroId: criar.id,
+          acao: Acao.CREATE,
+          dadosRegistrados: dados,
+          empresaId: autenticado.empresa,
+          registradoPorId: autenticado.userId,
+        };
+
+        await this.auditoria.create(dadosAuditoria, tx);
+
+        return criar;
+      });
+
+      return criarUsuario;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE);
+      throw error;
+    }
+  }
+
+  // CRIAR USUARIO COM TODOS OS PERFIS DO SISTEMA - o mesmo é criado mediante empresa, contador de cracha e perfil criados
+  async createAdmin(
+    autenticado: Auth,
+    create: CreateUsuarioAdmin,
+  ): Promise<ResponseUsuarioDto> {
+    try {
+      const dadosSemRegistradoPorId = await ExtractRegisteredById(create);
+
+      const criarUsuario = await this.prisma.$transaction(async (tx) => {
+        const senhaHash = this.generateHash(PasswordPin.password);
+        const pinHash = this.generateHash(PasswordPin.pin);
+
+        const dadosContador: UpdateContadorCrachaDto = {
+          empresaId: create.empresaId,
+          registradoPorId: create.registradoPorId,
         };
         const novoCracha = await this.contadorCracha.update(dadosContador);
 
@@ -98,7 +148,7 @@ export class UsuarioService {
             cracha: novoCracha.contador,
             senha: senhaHash,
             pin: pinHash,
-            empresaId: createUsuarioAdmin.empresaId,
+            empresaId: create.empresaId,
           },
         });
 
@@ -109,8 +159,8 @@ export class UsuarioService {
           registroId: criar.id,
           acao: Acao.CREATE,
           dadosRegistrados: dados,
-          empresaId: createUsuarioAdmin.empresaId,
-          registradoPorId: createUsuarioAdmin.registradoPorId,
+          empresaId: create.empresaId,
+          registradoPorId: create.registradoPorId,
         };
 
         await this.auditoria.create(dadosAuditoria);

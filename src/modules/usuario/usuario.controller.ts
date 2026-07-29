@@ -1,3 +1,8 @@
+import type { AuthenticatedRequest } from '@/auth/express/authenticated-request.interface';
+import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
+import { RolesGuard } from '@/auth/guards/roles-auth.guard';
+import { ROLES } from '@/auth/guards/roles.const';
+import { Roles } from '@/auth/guards/roles.decorator';
 import {
   Body,
   Controller,
@@ -8,7 +13,10 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
+import { plainToClass } from 'class-transformer';
 import {
   CreateUsuarioAdmin,
   CreateUsuarioMaster,
@@ -34,14 +42,33 @@ export class UsuarioController {
   async createMaster(
     @Body() createUsuarioMaster: CreateUsuarioMaster,
   ): Promise<ResponseUsuarioDto> {
-    return this.usuarioService.createMaster(createUsuarioMaster);
+    const dado = await this.usuarioService.createMaster(createUsuarioMaster);
+    return plainToClass(ResponseUsuarioDto, dado);
   }
+
+  // CRIAR USUARIO ADMINISTRADOR
+  @Post('assist')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASN1)
+  async createAssist(
+    @Req() req: AuthenticatedRequest,
+    @Body() create: CreateUsuarioAdmin,
+  ): Promise<ResponseUsuarioDto> {
+    const autenticado = req.user;
+    const dado = await this.usuarioService.createAssist(autenticado, create);
+    return plainToClass(ResponseUsuarioDto, dado);
+  }
+
   // CRIAR USUARIO ADMINISTRADOR
   @Post('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASN1)
   async createAdmin(
-    @Body() createUsuarioAdmin: CreateUsuarioAdmin,
+    @Req() req: AuthenticatedRequest,
+    @Body() create: CreateUsuarioAdmin,
   ): Promise<ResponseUsuarioDto> {
-    return this.usuarioService.createAdmin(createUsuarioAdmin);
+    const autenticado = req.user;
+    return this.usuarioService.createAdmin(autenticado, create);
   }
   // LISTA OS USUARIOS
   @Get()

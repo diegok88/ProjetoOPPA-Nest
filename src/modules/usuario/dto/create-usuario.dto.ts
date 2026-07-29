@@ -1,6 +1,6 @@
 import { TipoEscala, TipoTurno } from '@/generated/prisma/enums';
 import { formatUppercase } from '@/utils/format-uppercase.util';
-import { OmitType } from '@nestjs/mapped-types';
+import { OmitType, PickType } from '@nestjs/mapped-types';
 import {
   IsDate,
   IsEnum,
@@ -83,15 +83,17 @@ export class CreateUsuarioDto {
   registradoPorId!: string;
 }
 
-export class CreateUsuarioMaster extends OmitType(CreateUsuarioDto, [
+export class CreateUsuarioMaster extends PickType(CreateUsuarioDto, [
+  'nome',
+  'senha',
+  'pin',
+]) {}
+
+export class CreateUsuarioAssistDto extends OmitType(CreateUsuarioDto, [
   'cracha',
-  'dataAdmissao',
-  'dataNascimento',
   'dataDesligamento',
-  'escala',
-  'turno',
-  'perfilId',
-  'empresaId',
+  'senha',
+  'pin',
   'registradoPorId',
 ]) {}
 

@@ -1,30 +1,19 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  ParseUUIDPipe,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import { ContadorCrachaService } from './contador-cracha.service';
-import { CreateContadorCrachaDto } from './dto/create-contador-cracha.dto';
-import {
-  ResponseContadorAdminDto,
-  ResponseContadorCrachaDto,
-  ResponseContadorEnterpriseDto,
-} from './dto/response-contador-cracha.dto';
-import { UpdateContadorCrachaDto } from './dto/update-contador-cracha.dto';
-import { DeleteContadorCrachaDto } from './dto/delete-contador-cracha.dto';
-import { QueryContadorCrachaFilterDto } from './dto/query-contador-cracha.dto';
-import { plainToClass } from 'class-transformer';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { plainToClass } from 'class-transformer';
+import { ContadorCrachaService } from './contador-cracha.service';
+import { QueryContadorCrachaFilterDto } from './dto/query-contador-cracha.dto';
+import { ResponseContadorCrachaDto } from './dto/response-contador-cracha.dto';
 
 @Controller('contador-cracha')
 export class ContadorCrachaController {
@@ -48,12 +37,5 @@ export class ContadorCrachaController {
   ): Promise<ResponseContadorCrachaDto> {
     const dado = await this.contadorCrachaService.findOne(id);
     return plainToClass(ResponseContadorCrachaDto, dado);
-  }
-
-  @Delete()
-  async remove(
-    @Body() deleteContadorCrachaDto: DeleteContadorCrachaDto,
-  ): Promise<ResponseContadorCrachaDto> {
-    return this.contadorCrachaService.remove(deleteContadorCrachaDto);
   }
 }
