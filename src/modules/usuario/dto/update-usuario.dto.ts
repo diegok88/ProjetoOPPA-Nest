@@ -1,4 +1,4 @@
-import { OmitType, PartialType } from '@nestjs/mapped-types';
+import { OmitType, PartialType, PickType } from '@nestjs/mapped-types';
 import {
   IsNotEmpty,
   IsString,
@@ -76,15 +76,7 @@ export class UpdatePinUsuarioDto extends OmitType(CreateUsuarioDto, [
   novoPin!: string;
 }
 
-export class UpdateUsuarioDeactiveDto extends OmitType(CreateUsuarioDto, [
-  'cracha',
-  'dataAdmissao',
-  'dataDesligamento',
-  'dataNascimento',
-  'escala',
-  'nome',
-  'perfilId',
-  'pin',
-  'senha',
-  'turno',
+export class UpdateUsuarioDeactiveDto extends PickType(CreateUsuarioDto, [
+  'empresaId',
+  'registradoPorId',
 ]) {}

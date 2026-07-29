@@ -8,19 +8,17 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { plainToClass } from 'class-transformer';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 import { QueryUsuarioDto } from '../usuario/dto/query-usuario.dto';
 import { UsuarioService } from '../usuario/usuario.service';
 import { CreatePerfilDto } from './dto/create-perfil.dto';
-import { ResponsePerfilDto } from './dto/response-perfil.dto';
-import {
-  UpdatePerfilDeactiveDto,
-  UpdatePerfilDto,
-} from './dto/update-perfil.dto';
-import { DeletePerfilDto } from './dto/delete-perfil.dto';
+import { UpdatePerfilDto } from './dto/update-perfil.dto';
+import { Auth } from '@/auth/entities/auth.entity';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+import { Perfil } from './entities/perfil.entity';
+import { QueryPerfilFilterDto } from './dto/query-perfil.dto';
 
 @Injectable()
 export class PerfilService {
@@ -33,12 +31,15 @@ export class PerfilService {
   ) {}
 
   // CRIAR PERFIL
-  async create(createPerfilDto: CreatePerfilDto): Promise<ResponsePerfilDto> {
+  async create(
+    autenticado: Auth,
+    createPerfilDto: CreatePerfilDto,
+  ): Promise<Perfil> {
     try {
       const criarPerfil = await this.prisma.$transaction(async (tx) => {
-        const { registradoPorId, empresaId, descricao } = createPerfilDto;
+        const { userId, empresa } = autenticado;
         const criar = await tx.perfil.create({
-          data: { descricao: descricao },
+          data: createPerfilDto,
         });
 
         const dados = ExtractDataAuditoria(criar);
@@ -48,8 +49,8 @@ export class PerfilService {
           registroId: criar.id,
           acao: Acao.CREATE,
           dadosRegistrados: dados,
-          empresaId: empresaId,
-          registradoPorId: registradoPorId,
+          empresaId: empresa,
+          registradoPorId: userId,
         };
 
         await this.auditoria.create(dadosAuditoria, tx);
@@ -57,68 +58,77 @@ export class PerfilService {
         return criar;
       });
 
-      this.logger.log(`Perfil id ${criarPerfil.id} criado com sucesso.`);
-      return plainToClass(ResponsePerfilDto, criarPerfil);
+      this.logger.log(TYPES_NOTICES.CREATE);
+      return criarPerfil;
     } catch (error) {
-      this.logger.log(`Falha na criação do perfil.`);
+      this.logger.log(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
       throw error;
     }
   }
+
   // LISTAR PERFIS
-  async findAll(): Promise<ResponsePerfilDto[]> {
+  async findAll(query: QueryPerfilFilterDto): Promise<Perfil[]> {
     try {
-      const listarPerfis = await this.prisma.perfil.findMany();
-      this.logger.log(`Lista de perfis gerada com sucesso.`);
-      return listarPerfis.map((lista) =>
-        plainToClass(ResponsePerfilDto, lista),
-      );
+      const condicao: Prisma.PerfilWhereInput = {};
+      if (query.codigo) condicao.codigo = query.codigo;
+      if (query.descricao) condicao.descricao = query.descricao;
+      if (query.status) condicao.status = query.status;
+
+      const listarPerfis = await this.prisma.perfil.findMany({
+        where: condicao,
+      });
+
+      if (listarPerfis.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listarPerfis;
     } catch (error) {
-      this.logger.error(`Falha ao listar perfis.`);
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
       throw error;
     }
   }
+
   // BUSCAR PERFIL PELO ID
-  async findOne(
-    id: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<ResponsePerfilDto> {
+  async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Perfil> {
     try {
       const client = tx ?? this.prisma;
       const buscarPerfil = await client.perfil.findUnique({
         where: { id: id },
       });
       if (!buscarPerfil) {
-        this.logger.warn(`Perfil id ${id} não encontrado.`);
-      } else {
-        this.logger.log(`Busca de perfil id ${id} gerada com sucesso.`);
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
       }
-      return plainToClass(ResponsePerfilDto, buscarPerfil);
+
+      this.logger.log(TYPES_NOTICES.FIND_ONE);
+      return buscarPerfil;
     } catch (error) {
-      this.logger.error(`Falha ao buscar perfil.`);
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
       throw error;
     }
   }
   // ATUALIZAÇÃO DO PERFIL PELO ID
   async update(
     id: string,
+    autenticado: Auth,
     updatePerfilDto: UpdatePerfilDto,
-  ): Promise<ResponsePerfilDto> {
+  ): Promise<Perfil> {
     try {
       const atualizarPerfil = await this.prisma.$transaction(async (tx) => {
-        const { registradoPorId, empresaId, descricao } = updatePerfilDto;
-
         const buscar = await this.findOne(id, tx);
 
         const antes = ExtractDataAuditoria(buscar);
 
         const atualizar = await tx.perfil.update({
           where: { id: id },
-          data: { descricao: descricao },
+          data: updatePerfilDto,
         });
 
         if (!atualizar) {
-          this.logger.warn(`Perfil id ${id} não encontrado.`);
-          throw new NotFoundException();
+          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+          throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
         }
 
         const depois = ExtractDataAuditoria(atualizar);
@@ -129,8 +139,8 @@ export class PerfilService {
           acao: Acao.UPDATE,
           antes: antes,
           depois: depois,
-          empresaId: empresaId,
-          registradoPorId: registradoPorId,
+          empresaId: autenticado.empresa,
+          registradoPorId: autenticado.userId,
         };
 
         await this.auditoria.update(dadosAuditoria, tx);
@@ -138,21 +148,15 @@ export class PerfilService {
         return atualizar;
       });
 
-      this.logger.log(
-        `Perfil id ${atualizarPerfil.id} atualizado com sucesso.`,
-      );
-
-      return plainToClass(ResponsePerfilDto, atualizarPerfil);
+      this.logger.log(TYPES_NOTICES.UPDATE);
+      return atualizarPerfil;
     } catch (error) {
-      this.logger.error(`Falha ao atualizar o perfil.`);
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
       throw error;
     }
   }
   // INATIVAÇÃO DO PERFIL PELO ID
-  async deactive(
-    id: string,
-    updatePerfilDeactiveDto: UpdatePerfilDeactiveDto,
-  ): Promise<ResponsePerfilDto> {
+  async deactive(id: string, autenticado: Auth): Promise<Perfil> {
     try {
       const inativarPerfil = await this.prisma.$transaction(async (tx) => {
         const dadosVerificar: QueryUsuarioDto = {
@@ -161,18 +165,11 @@ export class PerfilService {
         };
 
         const verificar = await this.usuario.findAll(dadosVerificar, tx);
-        this.logger.debug(
-          `Total de registros de usuários com o perfil é de ${verificar.length}.`,
-        );
 
         if (verificar.length > 0) {
-          this.logger.warn(
-            `Perfil id ${id} não pode ser inativado, pois possui usuários relacionados.`,
-          );
-          throw new UnauthorizedException();
+          this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+          throw new UnauthorizedException(TYPES_NOTICES.EMPTY_LIST);
         }
-
-        const { registradoPorId, empresaId } = updatePerfilDeactiveDto;
 
         const buscar = await this.findOne(id, tx);
 
@@ -196,8 +193,8 @@ export class PerfilService {
           acao: Acao.DEACTIVATE,
           antes: antes,
           depois: depois,
-          empresaId: empresaId,
-          registradoPorId: registradoPorId,
+          empresaId: autenticado.empresa,
+          registradoPorId: autenticado.userId,
         };
 
         await this.auditoria.update(dadosAuditoria, tx);
@@ -205,31 +202,24 @@ export class PerfilService {
         return inativar;
       });
 
-      this.logger.log(`Perfil id ${id} inativado com sucesso.`);
-      return plainToClass(ResponsePerfilDto, inativarPerfil);
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
+      return inativarPerfil;
     } catch (error) {
       this.logger.error(`Falha ao inativar o perfil`);
       throw error;
     }
   }
   // DELETE DO PERFIL PELO ID
-  async remove(
-    id: string,
-    deletePerfilDto: DeletePerfilDto,
-  ): Promise<ResponsePerfilDto> {
+  async remove(id: string, autenticado: Auth): Promise<Perfil> {
     try {
       const deletarPerfil = await this.prisma.$transaction(async (tx) => {
-        const { registradoPorId, empresaId } = deletePerfilDto;
-
         const verificar = await this.findOne(id, tx);
 
         const dados = ExtractDataAuditoria(verificar);
 
         if (verificar.status === true) {
-          this.logger.warn(
-            `Perfil id ${id} não pode ser deletado, pois esta ativo.`,
-          );
-          throw new UnauthorizedException();
+          this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+          throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
         }
 
         const deletar = await tx.perfil.delete({
@@ -245,8 +235,8 @@ export class PerfilService {
           registroId: id,
           acao: Acao.DELETE,
           dadosRegistrados: dados,
-          empresaId: empresaId,
-          registradoPorId: registradoPorId,
+          empresaId: autenticado.empresa,
+          registradoPorId: autenticado.userId,
         };
 
         await this.auditoria.create(dadosAuditoria, tx);
@@ -254,10 +244,10 @@ export class PerfilService {
         return deletar;
       });
 
-      this.logger.log(`Perfil id ${id} deletado com sucesso.`);
-
-      return plainToClass(ResponsePerfilDto, deletarPerfil);
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return deletarPerfil;
     } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
       throw error;
     }
   }

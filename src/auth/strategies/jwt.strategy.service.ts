@@ -2,11 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-
-interface RequestUser {
-  userId: string;
-  perfil: string;
-}
+import { Auth } from '../entities/auth.entity';
 
 @Injectable()
 export class JwtStrategyService extends PassportStrategy(Strategy) {
@@ -23,10 +19,11 @@ export class JwtStrategyService extends PassportStrategy(Strategy) {
     this.logger.log('JWT_SECRET carregado:', process.env.JWT_SECRET);
   }
 
-  async validate(payload: any): Promise<RequestUser> {
+  async validate(payload: any): Promise<Auth> {
     this.logger.log('Validação da JwtStrategyService - validate( )');
     return {
       userId: payload.sub,
+      empresa: payload.empresaId,
       perfil: payload.perfil,
     };
   }

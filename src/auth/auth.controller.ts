@@ -11,7 +11,7 @@ import {
 import { plainToClass } from 'class-transformer';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dto/create-auth.dto';
+import { LoginDto, LogoutDto } from './dto/create-auth.dto';
 import {
   ResponseAuthDto,
   ResponseAuthMessageDto,
@@ -44,7 +44,10 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResponseAuthMessageDto> {
-    const usuario: string = req.user.userId;
+    const usuario: LogoutDto = {
+      usuarioId: req.user.userId,
+      empresaId: req.user.empresa,
+    };
     await this.authService.logout(usuario);
     res.clearCookie('jwt');
     return plainToClass(ResponseAuthMessageDto, TYPES_NOTICES.LOGOUT);

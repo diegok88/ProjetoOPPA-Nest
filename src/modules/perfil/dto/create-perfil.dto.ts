@@ -1,11 +1,5 @@
 import { formatUppercase } from '@/utils/format-uppercase.util';
-import {
-  IsNotEmpty,
-  IsString,
-  IsUppercase,
-  IsUUID,
-  Length,
-} from 'class-validator';
+import { IsNotEmpty, IsString, Length } from 'class-validator';
 
 export class CreatePerfilDto {
   @IsString({ message: 'A descrição deve ser do tipo string.' })
@@ -16,12 +10,4 @@ export class CreatePerfilDto {
   })
   @formatUppercase()
   descricao!: string;
-
-  @IsUUID('all', { message: 'Empresa id inválido.' })
-  @IsNotEmpty({ message: 'Empresa é um campo obrigatório.' })
-  empresaId!: string;
-
-  @IsUUID('all', { message: 'Usuário id inválido.' })
-  @IsNotEmpty({ message: 'Usuário é um campo obrigatório.' })
-  registradoPorId!: string;
 }

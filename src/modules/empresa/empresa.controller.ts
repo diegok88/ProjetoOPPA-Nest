@@ -19,16 +19,12 @@ import {
 } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
-import { DeleteEmpresaDto } from './dto/delete-empresa';
 import { QueryEmpresaFilterDto } from './dto/query-empresa.dto';
 import {
   ResponseEmpresaDto,
   ResponseEmpresaMessageDto,
 } from './dto/response-empresa.dto';
-import {
-  UpdateEmpresaDeactiveDto,
-  UpdateEmpresaDto,
-} from './dto/update-empresa.dto';
+import { UpdateEmpresaDto } from './dto/update-empresa.dto';
 import { EmpresaService } from './empresa.service';
 
 @Controller('empresa')
@@ -41,8 +37,10 @@ export class EmpresaController {
   @Roles(ROLES.ASN1)
   async create(
     @Body() createEmpresaDto: CreateEmpresaDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResponseEmpresaMessageDto> {
-    await this.empresaService.create(createEmpresaDto);
+    const usuario = req.user.userId;
+    await this.empresaService.create(usuario, createEmpresaDto);
     return plainToClass(ResponseEmpresaMessageDto, TYPES_NOTICES.CREATE);
   }
 
@@ -59,39 +57,56 @@ export class EmpresaController {
 
   // CONTROLLER BUSCAR EMPRESA PELO ID
   @Get(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASN1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseEmpresaDto> {
-    const dado = this.empresaService.findOne(id);
+    const dado = await this.empresaService.findOne(id);
     return plainToClass(ResponseEmpresaDto, dado);
   }
 
-  // CONTROLLER ATUALIZAR EMPRESA PELO ID - Implementar o id da empresa no token
+  // CONTROLLER ATUALIZAR EMPRESA PELO ID
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASN1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateEmpresaDto: UpdateEmpresaDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResponseEmpresaDto> {
     const usuario = req.user.userId;
-    return this.empresaService.update(id, usuario, updateEmpresaDto);
+    const dado = await this.empresaService.update(
+      id,
+      usuario,
+      updateEmpresaDto,
+    );
+    return plainToClass(ResponseEmpresaDto, dado);
   }
 
   // CONTROLLER INATIVAR EMPRESA PELO ID
   @Patch('deactive/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASN1)
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateEmpresaDeactiveDto: UpdateEmpresaDeactiveDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.deactive(id, updateEmpresaDeactiveDto);
+    const usuario = req.user.userId;
+    const dado = await this.empresaService.deactive(id, usuario);
+    return plainToClass(ResponseEmpresaDto, dado);
   }
 
   // CONTROLLER DELETAR EMPRESA PELO ID
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASN1)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() deleteEmpresaDto: DeleteEmpresaDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResponseEmpresaDto> {
-    return this.empresaService.remove(id, deleteEmpresaDto);
+    const usuario = req.user.userId;
+    const dado = await this.empresaService.remove(id, usuario);
+    return plainToClass(ResponseEmpresaDto, dado);
   }
 }

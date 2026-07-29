@@ -37,7 +37,7 @@ export class AuditoriaController {
   @UseGuards(JwtAuthGuard)
   @Roles(ROLES.ASN1)
   async findOne(@Param('id') id: string): Promise<ResponseAuditoriaDto> {
-    const dado = this.auditoriaService.findOne(id);
+    const dado = await this.auditoriaService.findOne(id);
     return plainToClass(ResponseAuditoriaDto, dado);
   }
 
@@ -45,7 +45,7 @@ export class AuditoriaController {
   @Roles(ROLES.ASN1)
   @UseGuards(JwtAuthGuard)
   async remove(@Param('id') id: string): Promise<ResponseAuditoriaMessageDto> {
-    const dado = this.auditoriaService.remove(id);
+    const dado = await this.auditoriaService.remove(id);
     return plainToClass(ResponseAuditoriaMessageDto, {
       message: TYPES_NOTICES.DELETE,
     });

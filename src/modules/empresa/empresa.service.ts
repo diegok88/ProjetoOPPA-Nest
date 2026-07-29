@@ -9,7 +9,6 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { plainToClass } from 'class-transformer';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
@@ -20,13 +19,8 @@ import { DeleteUsuarioDto } from '../usuario/dto/delete-usuario.dto';
 import { UpdateUsuarioDeactiveDto } from '../usuario/dto/update-usuario.dto';
 import { UsuarioService } from '../usuario/usuario.service';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
-import { DeleteEmpresaDto } from './dto/delete-empresa';
 import { QueryEmpresaFilterDto } from './dto/query-empresa.dto';
-import { ResponseEmpresaDto } from './dto/response-empresa.dto';
-import {
-  UpdateEmpresaDeactiveDto,
-  UpdateEmpresaDto,
-} from './dto/update-empresa.dto';
+import { UpdateEmpresaDto } from './dto/update-empresa.dto';
 import { Empresa } from './entities/empresa.entity';
 
 @Injectable()
@@ -41,18 +35,20 @@ export class EmpresaService {
   ) {}
 
   // SERVIÇO CRIAR EMPRESA
-  async create(createEmpresaDto: CreateEmpresaDto): Promise<Empresa> {
+  async create(
+    usuarioId: string,
+    createEmpresaDto: CreateEmpresaDto,
+  ): Promise<Empresa> {
     try {
       const criarEmpresa = await this.prisma.$transaction(async (tx) => {
-        const { registradoPorId, ...dadosEmpresa } = createEmpresaDto;
         const criar = await tx.empresa.create({
-          data: dadosEmpresa,
+          data: createEmpresaDto,
         });
         const dados = ExtractDataAuditoria(criar);
         const dadosCriarContador = {
           empresaId: criar.id,
           contador: 0,
-          registradoPorId: createEmpresaDto.registradoPorId,
+          registradoPorId: usuarioId,
         };
         await this.contadorCracha.create(dadosCriarContador, tx);
         const dadosAuditoria: CreateAuditoriaDto = {
@@ -61,7 +57,7 @@ export class EmpresaService {
           acao: Acao.CREATE,
           dadosRegistrados: dados,
           empresaId: criar.id,
-          registradoPorId: registradoPorId,
+          registradoPorId: usuarioId,
         };
         await this.auditoria.create(dadosAuditoria, tx);
         return criar;
@@ -126,15 +122,10 @@ export class EmpresaService {
   ): Promise<Empresa> {
     try {
       const atualizarEmpresa = await this.prisma.$transaction(async (tx) => {
-        const { registradoPorId, ...dadosEmpresa } = updateEmpresaDto;
-        const buscarUsuario = await this.usuario.findOne(registradoPorId, tx);
+        const buscarUsuario = await this.usuario.findOne(usuarioId, tx);
         if (id !== buscarUsuario.empresaId) {
-          this.logger.warn(
-            `Usuario id ${buscarUsuario.id} não pertence a está empresa.`,
-          );
-          throw new UnauthorizedException(
-            `Usuario id ${buscarUsuario.id} não pertence a está empresa.`,
-          );
+          this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+          throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
         }
 
         const buscarEmpresa = await this.findOne(id, tx);
@@ -142,7 +133,7 @@ export class EmpresaService {
 
         const atualizarEmpresa = await tx.empresa.update({
           where: { id: id },
-          data: dadosEmpresa,
+          data: updateEmpresaDto,
         });
         const depois = ExtractDataAuditoria(atualizarEmpresa);
 
@@ -153,7 +144,7 @@ export class EmpresaService {
           antes: antes,
           depois: depois,
           empresaId: id,
-          registradoPorId: registradoPorId,
+          registradoPorId: usuarioId,
         };
 
         await this.auditoria.update(dadosAuditoria, tx);
@@ -161,24 +152,18 @@ export class EmpresaService {
         return atualizarEmpresa;
       });
 
-      this.logger.log(
-        `Atualização da empresa id ${atualizarEmpresa.id} realizada com sucesso.`,
-      );
-      return plainToClass(ResponseEmpresaDto, atualizarEmpresa);
+      this.logger.log(TYPES_NOTICES.UPDATE);
+
+      return atualizarEmpresa;
     } catch (error) {
-      this.logger.error(`Falha ao atualizar a empresa.`);
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
       throw error;
     }
   }
   // INATIVAR EMPRESA PELO ID
-  async deactive(
-    id: string,
-    updateEmpresaDeactiveDto: UpdateEmpresaDeactiveDto,
-  ): Promise<ResponseEmpresaDto> {
+  async deactive(id: string, usuarioId: string): Promise<Empresa> {
     try {
       const inativarEmpresa = await this.prisma.$transaction(async (tx) => {
-        const { registradoPorId } = updateEmpresaDeactiveDto;
-
         const buscarEmpresa = await this.findOne(id, tx);
 
         const antes = ExtractDataAuditoria(buscarEmpresa);
@@ -197,19 +182,19 @@ export class EmpresaService {
           antes: antes,
           depois: depois,
           empresaId: id,
-          registradoPorId: registradoPorId,
+          registradoPorId: usuarioId,
         };
 
         const inativarContador: UpdateContadorCrachaDto = {
           empresaId: id,
-          registradoPorId: updateEmpresaDeactiveDto.registradoPorId,
+          registradoPorId: usuarioId,
         };
 
         await this.contadorCracha.deactive(inativarContador, tx);
 
         const inativarUsuario: UpdateUsuarioDeactiveDto = {
           empresaId: id,
-          registradoPorId: updateEmpresaDeactiveDto.registradoPorId,
+          registradoPorId: usuarioId,
         };
         await this.usuario.deactiveAll(inativarUsuario, tx);
 
@@ -217,33 +202,26 @@ export class EmpresaService {
 
         return inativarEmpresa;
       });
-      this.logger.log(
-        `Inativação da empresa id ${inativarEmpresa.id} realizada com sucesso.`,
-      );
-      return plainToClass(ResponseEmpresaDto, inativarEmpresa);
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
+      return inativarEmpresa;
     } catch (error) {
-      this.logger.error(`Falha ao inativar a empresa.`);
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE');
       throw error;
     }
   }
   // DELETAR EMPRESA PELO ID
-  async remove(
-    id: string,
-    deleteEmpresaDto: DeleteEmpresaDto,
-  ): Promise<ResponseEmpresaDto> {
+  async remove(id: string, usuarioId: string): Promise<Empresa> {
     try {
       const deletarEmpresa = this.prisma.$transaction(async (tx) => {
-        const { registradoPorId, empresaId } = deleteEmpresaDto;
-
         const contadorCracha: DeleteContadorCrachaDto = {
-          empresaId: empresaId,
-          registradoPorId: registradoPorId,
+          empresaId: id,
+          registradoPorId: usuarioId,
         };
         await this.contadorCracha.remove(contadorCracha, tx);
 
         const usuario: DeleteUsuarioDto = {
-          empresaId: empresaId,
-          registradoPorId: registradoPorId,
+          empresaId: id,
+          registradoPorId: usuarioId,
         };
         await this.usuario.removeAll(usuario);
 
@@ -259,17 +237,17 @@ export class EmpresaService {
           registroId: 'id',
           acao: Acao.DELETE,
           dadosRegistrados: dados,
-          empresaId: empresaId,
-          registradoPorId: registradoPorId,
+          empresaId: id,
+          registradoPorId: usuarioId,
         };
         await this.auditoria.create(dadosAuditoria, tx);
 
         return deletar;
       });
-      this.logger.log(`Delete da empresa id ${id} realizada com sucesso.`);
-      return plainToClass(ResponseEmpresaDto, deletarEmpresa);
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return deletarEmpresa;
     } catch (error) {
-      this.logger.error(`Falha ao deletar a empresa.`);
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
       throw error;
     }
   }

@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { plainToClass } from 'class-transformer';
-import { LoginDto } from './dto/create-auth.dto';
+import { LoginDto, LogoutDto } from './dto/create-auth.dto';
 import { ResponseAuthDto } from './dto/response-auth.dto';
 
 @Injectable()
@@ -92,13 +92,13 @@ export class AuthService {
   }
 
   // LOGOUT DO USUARIO
-  async logout(usuario: string): Promise<void> {
+  async logout(logout: LogoutDto): Promise<void> {
     try {
-      const buscar = await this.usuario.findOne(usuario);
+      const buscar = await this.usuario.findOne(logout.usuarioId);
       const queryAuditoria: QueryAuditoriaFindOneLastDto = {
         acao: Acao.LOGIN,
-        empresaId: buscar.empresaId,
-        registradoPorId: buscar.id,
+        empresaId: logout.usuarioId,
+        registradoPorId: logout.usuarioId,
       };
       const auditoria = await this.auditoria.findOneLast(queryAuditoria);
       const dadosAuditoria: CreateAuditoriaDto = {
@@ -106,11 +106,11 @@ export class AuthService {
         registroId: buscar.id,
         acao: Acao.LOGOUT,
         dadosRegistrados: auditoria.dadosRegistrados,
-        empresaId: buscar.empresaId,
-        registradoPorId: buscar.id,
+        empresaId: logout.empresaId,
+        registradoPorId: logout.usuarioId,
       };
       await this.auditoria.create(dadosAuditoria);
-      this.logger.log('Logout realizado com sucesso!');
+      this.logger.log(TYPES_NOTICES.LOGOUT);
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE);
       throw error;

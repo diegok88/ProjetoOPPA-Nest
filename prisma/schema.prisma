@@ -119,3 +119,5 @@ model Empresa {
 
   @@map("empresa")
 }
+
+// Alteração

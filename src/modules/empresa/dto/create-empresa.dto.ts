@@ -95,8 +95,4 @@ export class CreateEmpresaDto {
     message: 'O cep deve conter apenas números',
   })
   cep!: string;
-
-  @IsUUID('all', { message: 'Usuário com id inválido' })
-  @IsNotEmpty({ message: 'RegistradoPorId é um campo obrigatório.' })
-  registradoPorId!: string;
 }
