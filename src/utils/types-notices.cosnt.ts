@@ -8,6 +8,7 @@ export const TYPES_NOTICES = {
   UPDATE: 'Registro atualizado com sucesso!',
   UPDATE_MANY: 'Registros atualizados com sucesso!',
   DEACTIVE: 'Registro inativado com sucesso!',
+  NOT_DEACTIVE: 'Registro não está inativo!',
   DELETE: 'Registro removido com sucesso!',
   DELETE_MANY: 'Registros removidos com sucesso!',
   SERVICE_FAILURE: 'Falha na execução do serviço!',
@@ -18,4 +19,7 @@ export const TYPES_NOTICES = {
   NOT_FOUND: 'Registro não encontrado!',
   LOGOUT: 'Logout realizado com sucesso!',
   LOGIN: 'Login realizado com sucesso!',
+  INVALID_CREDENTIAL: 'Credencial inválida!',
+  EQUALS_CREDENTIAL: 'Credencial igual!',
+  NOT_BELONG: 'Registro não pertence!',
 } as const;

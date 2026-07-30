@@ -1,4 +1,5 @@
 import { Auth } from '@/auth/entities/auth.entity';
+import { ROLES } from '@/auth/guards/roles.const';
 import { PasswordPin } from '@/constants/password-pin.const';
 import { Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
@@ -13,35 +14,28 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { plainToClass } from 'class-transformer';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
 import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
+import { PerfilService } from '../perfil/perfil.service';
 import {
   CreateUsuarioAdmin,
   CreateUsuarioAssistDto,
   CreateUsuarioGestor,
   CreateUsuarioMaster,
 } from './dto/create-usuario.dto';
-import { DeleteUsuarioDto } from './dto/delete-usuario.dto';
 import {
   QueryBagdeEnterpriceDto,
   QueryUsuarioDto,
 } from './dto/query-usuario.dto';
-import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
-import { ResponseUsuarioDto } from './dto/response-usuario.dto';
-import { UpdateDataUsuarioDto } from './dto/update-data-usuario.dto';
-import { UpdatePasswordUsuarioDto } from './dto/update-password-usuario.dto';
-import { UpdatePinUsuarioDto } from './dto/update-pin-usuario.dto';
 import {
+  UpdatePasswordPinDto,
   UpdateUsuarioDeactiveDto,
   UpdateUsuarioDto,
 } from './dto/update-usuario.dto';
 import { Usuario, UsuarioMaster } from './entities/usuario.entity';
-import { ROLES } from '@/auth/guards/roles.const';
-import { PerfilService } from '../perfil/perfil.service';
 
 @Injectable()
 export class UsuarioService {
@@ -387,135 +381,89 @@ export class UsuarioService {
       this.logger.log(TYPES_NOTICES.UPDATE);
       return atualizarUsuario;
     } catch (error) {
-      this.logger.error(TYPES_NOTICES.UPDATE);
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE);
       throw error;
     }
   }
 
-  // ATUALIZAR DADOS DO USUARIO - menos senha e pin
-  async updateDataUsuario(
-    id: string,
-    updateDataUsuarioDto: UpdateDataUsuarioDto,
-  ): Promise<ResponseUsuarioDto> {
+  async updatePasswordPinUsuario(
+    autenticado: Auth,
+    update: UpdatePasswordPinDto,
+    tipo: string,
+  ): Promise<Usuario> {
     try {
       const atualizarUsuario = await this.prisma.$transaction(async (tx) => {
-        const buscar = await this.findOne(id);
+        const buscar = await this.findOne(autenticado.userId, tx);
+
+        const antes = ExtractDataAuditoria(buscar);
 
         if (!buscar) {
-          this.logger.warn(`Usuário id ${id} não encontrado.`);
-          throw new NotFoundException();
+          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+          throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
         }
+
+        const { senha, pin } = buscar;
+        let credencial: string;
+
+        if (tipo === 'PAS') credencial = senha;
+        else credencial = pin;
+
+        const { atual, nova } = update;
+        const validada = await this.compareHash(atual, credencial);
+
+        if (!validada) {
+          this.logger.log(TYPES_NOTICES.INVALID_CREDENTIAL);
+          throw new UnauthorizedException(TYPES_NOTICES.INVALID_CREDENTIAL);
+        }
+
+        const igual = await this.compareHash(nova, credencial);
+
+        if (igual) {
+          this.logger.log(TYPES_NOTICES.EQUALS_CREDENTIAL);
+          throw new BadRequestException(TYPES_NOTICES.EQUALS_CREDENTIAL);
+        }
+
+        const novoHash = await this.generateHash(nova);
+        const dado: { senha?: string; pin?: string } = {};
+        if (tipo === 'PAS') dado.senha = novoHash;
+        else dado.pin = novoHash;
+
         const atualizar = await tx.usuario.update({
-          where: { id: id },
-          data: updateDataUsuarioDto,
+          where: { id: autenticado.userId },
+          data: dado,
         });
+
+        const depois = ExtractDataAuditoria(atualizar);
+
+        const dadosAuditoria: UpdateAuditoriaDto = {
+          entidade: 'USUARIO',
+          registroId: atualizar.id,
+          acao: Acao.UPDATE,
+          antes: antes,
+          depois: depois,
+          empresaId: autenticado.empresa,
+          registradoPorId: autenticado.userId,
+        };
+
+        await this.auditoria.update(dadosAuditoria, tx);
+
+        return atualizar;
       });
-      this.logger.log(`Usuário id ${id} atualizado com sucesso.`);
-      return plainToClass(ResponseUsuarioDto, atualizarUsuario);
+      return atualizarUsuario;
     } catch (error) {
-      this.logger.error('Falha na atualização do usuário.');
-      throw error;
-    }
-  }
-
-  // ATUALIZAR SENHA
-  async updatePasswordUsuario(
-    id: string,
-    updatePassword: UpdatePasswordUsuarioDto,
-  ): Promise<ResponseUsuarioDto> {
-    try {
-      const buscaUsuario = await this.findOne(id);
-
-      if (!buscaUsuario) {
-        this.logger.warn(`Usuário id ${id} não encontrado`);
-        throw new NotFoundException(`Usuário id ${id} não encontrado`);
-      }
-      const { atualSenha, novaSenha } = updatePassword;
-
-      const senhaValidada = await this.compareHash(
-        atualSenha,
-        buscaUsuario.senha,
-      );
-
-      if (!senhaValidada) {
-        this.logger.warn(`Senha do usuário id ${id} é inválida.`);
-        throw new UnauthorizedException();
-      }
-
-      const senhaIgual = await this.compareHash(novaSenha, buscaUsuario.senha);
-
-      if (senhaIgual) {
-        this.logger.warn(
-          `Senha atual do usuário id ${id} é igual a nova senha.`,
-        );
-        throw new BadRequestException();
-      }
-
-      const novoHash = await this.generateHash(novaSenha);
-
-      const atualizarSenha = this.prisma.usuario.update({
-        where: { id: id },
-        data: { senha: novoHash },
-      });
-      this.logger.log(`Senha do usuário id ${id} realizada com sucesso`);
-      return plainToClass(ResponseUsuarioDto, atualizarSenha);
-    } catch (error) {
-      this.logger.error('Falha ao atualizar a nova senha.');
-      throw error;
-    }
-  }
-
-  // ATUALIZAR PIN
-  async updatePinUsuario(id: string, updatePin: UpdatePinUsuarioDto) {
-    try {
-      const buscaUsuario = await this.findOne(id);
-
-      if (!buscaUsuario) {
-        this.logger.warn(`Usuário id ${id} não encontrado`);
-        throw new NotFoundException(`Usuário id ${id} não encontrado`);
-      }
-      const { atualPin, novoPin } = updatePin;
-
-      const pinValidada = await this.compareHash(atualPin, buscaUsuario.pin);
-
-      if (!pinValidada) {
-        this.logger.warn(`Pin do usuário id ${id} é inválida.`);
-        throw new UnauthorizedException();
-      }
-
-      const pinIgual = await this.compareHash(novoPin, buscaUsuario.pin);
-
-      if (pinIgual) {
-        this.logger.warn(`Pin atual do usuário id ${id} é igual a novo pin.`);
-        throw new BadRequestException();
-      }
-
-      const novoHash = await this.generateHash(novoPin);
-
-      const atualizarPin = this.prisma.usuario.update({
-        where: { id: id },
-        data: { pin: novoHash },
-      });
-      this.logger.log(`Pin do usuário id ${id} realizada com sucesso`);
-      return plainToClass(ResponseUsuarioDto, atualizarPin);
-    } catch (error) {
-      this.logger.error('Falha ao atualizar a nova senha.');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE);
       throw error;
     }
   }
 
   // INATIVAR USUARIO
-  async deactive(
-    id: string,
-    updateEmpresaDeactiveDto: UpdateUsuarioDeactiveDto,
-  ): Promise<ResponseUsuarioDto> {
+  async deactive(id: string, autenticado: Auth): Promise<Usuario> {
     try {
       const inativarUsuario = await this.prisma.$transaction(async (tx) => {
-        const { registradoPorId, empresaId } = updateEmpresaDeactiveDto;
         const buscar = await this.findOne(id, tx);
         if (!buscar) {
-          this.logger.warn(`Usuário id ${id} não encontrado.`);
-          throw new NotFoundException();
+          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+          throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
         }
 
         const antes = ExtractDataAuditoria(buscar);
@@ -535,8 +483,8 @@ export class UsuarioService {
           acao: Acao.UPDATE,
           antes: antes,
           depois: depois,
-          empresaId: empresaId,
-          registradoPorId: registradoPorId,
+          empresaId: autenticado.empresa,
+          registradoPorId: autenticado.userId,
         };
 
         await this.auditoria.update(dados, tx);
@@ -544,15 +492,19 @@ export class UsuarioService {
         return inativar;
       });
 
-      this.logger.log(`Usuário id ${id} inativado com sucesso.`);
-      return plainToClass(ResponseUsuarioDto, inativarUsuario);
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
+      return inativarUsuario;
     } catch (error) {
-      this.logger.error('Falha ao inativar usuário.');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - deactive');
       throw error;
     }
   }
 
-  // INATIVA TODOS OS USUARIO ATRAVES DA INATIVAÇÃO DA EMPRESA
+  /* 
+    INATIVA TODOS OS USUARIO ATRAVES DA INATIVAÇÃO DA EMPRESA:
+    - serviço interno elimina todos os usuarios de uma empresa.
+    - ação somente executada pela assistencia
+  */
   async deactiveAll(
     updateUsuarioDeactiveDto: UpdateUsuarioDeactiveDto,
     tx?: Prisma.TransactionClient,
@@ -627,26 +579,21 @@ export class UsuarioService {
     }
   }
 
-  // DELETA O USUARIO
-  async remove(
-    id: string,
-    deleteUsuarioDto: DeleteUsuarioDto,
-  ): Promise<ResponseUsuarioDto> {
+  /* 
+    DELETA O USUARIO TRAVES DO ID:
+    - serviço autorizado apenas para gestores e administradores 
+  */
+  async remove(id: string, autenticado: Auth): Promise<Usuario> {
     try {
       const deletarUsuario = await this.prisma.$transaction(async (tx) => {
-        const { empresaId, registradoPorId } = deleteUsuarioDto;
-        const buscar = await this.findOne(id);
+        const buscar = await this.findOne(id, tx);
         if (buscar.status === true) {
-          this.logger.warn(
-            `Usuário id ${id} não está inativo para ser deletado.`,
-          );
-          throw new UnauthorizedException();
+          this.logger.warn(TYPES_NOTICES.NOT_DEACTIVE);
+          throw new UnauthorizedException(TYPES_NOTICES.NOT_DEACTIVE);
         }
-        if (buscar.empresaId !== empresaId) {
-          this.logger.warn(
-            `Usuário id ${id} não pertence a empresa para ser deletado.`,
-          );
-          throw new UnauthorizedException();
+        if (buscar.empresaId !== autenticado.empresa) {
+          this.logger.warn(TYPES_NOTICES.NOT_BELONG);
+          throw new UnauthorizedException(TYPES_NOTICES.NOT_BELONG);
         }
         const deletar = await this.prisma.usuario.delete({
           where: { id: id },
@@ -659,32 +606,32 @@ export class UsuarioService {
           registroId: id,
           acao: Acao.DELETE,
           dadosRegistrados: dados,
-          empresaId: empresaId,
-          registradoPorId: registradoPorId,
+          empresaId: autenticado.empresa,
+          registradoPorId: autenticado.userId,
         };
 
         await this.auditoria.create(dadosAuditoria);
+        return deletar;
       });
 
-      this.logger.log(`Usuário id ${id} deletado com sucesso.`);
-      return plainToClass(ResponseUsuarioDto, deletarUsuario);
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return deletarUsuario;
     } catch (error) {
-      this.logger.error('Falha ao deletar usuário.');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - delete');
       throw error;
     }
   }
 
   // DELETA TODOS USUARIOS MEDIANTE O DELETE DE UMA EMPRESA
   async removeAll(
-    deleteUsuarioDto: DeleteUsuarioDto,
+    empresaId: string,
+    autenticado: Auth,
     tx?: Prisma.TransactionClient,
   ): Promise<void> {
     try {
       const executar = async (
         client: Prisma.TransactionClient | PrismaService,
       ) => {
-        const { empresaId, registradoPorId } = deleteUsuarioDto;
-
         const listar = await client.usuario.findMany({
           where: { empresaId: empresaId },
         });
@@ -710,8 +657,8 @@ export class UsuarioService {
             registroId: usuario.id,
             acao: Acao.DELETE,
             dadosRegistrados: dados[index],
-            empresaId: empresaId,
-            registradoPorId: registradoPorId,
+            empresaId: autenticado.empresa,
+            registradoPorId: autenticado.userId,
           }),
         );
 
@@ -727,21 +674,16 @@ export class UsuarioService {
         });
       }
 
-      this.logger.log(
-        `Usuários da empresa id ${deleteUsuarioDto.empresaId} deletados com sucesso.`,
-      );
+      this.logger.log(TYPES_NOTICES.DELETE_MANY);
     } catch (error) {
-      this.logger.error('Falha ao deletar os usuários cadastrados na empresa.');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - removeAll');
       throw error;
     }
   }
 
   // METODO DE COMPARAÇÃO DE HASH
-  async compareHash(currentHash: string, newHash: string): Promise<boolean> {
-    const vadidadorHash = await bcrypt.compare(newHash, currentHash);
-    this.logger.debug(
-      `Condição: ${vadidadorHash} - senha atual: ${currentHash} - senha nova: ${newHash}`,
-    );
+  async compareHash(atualHash: string, novoHash: string): Promise<boolean> {
+    const vadidadorHash = await bcrypt.compare(novoHash, atualHash);
     return vadidadorHash;
   }
 

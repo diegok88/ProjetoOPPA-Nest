@@ -1,3 +1,4 @@
+import { Auth } from '@/auth/entities/auth.entity';
 import { Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -13,9 +14,7 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
-import { DeleteContadorCrachaDto } from '../contador-cracha/dto/delete-contador-cracha.dto';
 import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
-import { DeleteUsuarioDto } from '../usuario/dto/delete-usuario.dto';
 import { UpdateUsuarioDeactiveDto } from '../usuario/dto/update-usuario.dto';
 import { UsuarioService } from '../usuario/usuario.service';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
@@ -210,20 +209,12 @@ export class EmpresaService {
     }
   }
   // DELETAR EMPRESA PELO ID
-  async remove(id: string, usuarioId: string): Promise<Empresa> {
+  async remove(id: string, autenticado: Auth): Promise<Empresa> {
     try {
       const deletarEmpresa = this.prisma.$transaction(async (tx) => {
-        const contadorCracha: DeleteContadorCrachaDto = {
-          empresaId: id,
-          registradoPorId: usuarioId,
-        };
-        await this.contadorCracha.remove(contadorCracha, tx);
+        await this.contadorCracha.remove(id, autenticado, tx);
 
-        const usuario: DeleteUsuarioDto = {
-          empresaId: id,
-          registradoPorId: usuarioId,
-        };
-        await this.usuario.removeAll(usuario);
+        await this.usuario.removeAll(id, autenticado, tx);
 
         const buscar = await this.findOne(id, tx);
         const dados = ExtractDataAuditoria(buscar);
@@ -238,12 +229,13 @@ export class EmpresaService {
           acao: Acao.DELETE,
           dadosRegistrados: dados,
           empresaId: id,
-          registradoPorId: usuarioId,
+          registradoPorId: autenticado.userId,
         };
         await this.auditoria.create(dadosAuditoria, tx);
 
         return deletar;
       });
+
       this.logger.log(TYPES_NOTICES.DELETE);
       return deletarEmpresa;
     } catch (error) {

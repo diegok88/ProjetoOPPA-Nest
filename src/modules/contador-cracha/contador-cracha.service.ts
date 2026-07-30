@@ -1,3 +1,4 @@
+import { Auth } from '@/auth/entities/auth.entity';
 import { Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -9,7 +10,6 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 import { CreateContadorCrachaDto } from './dto/create-contador-cracha.dto';
-import { DeleteContadorCrachaDto } from './dto/delete-contador-cracha.dto';
 import { QueryContadorCrachaFilterDto } from './dto/query-contador-cracha.dto';
 import { ResponseContadorEnterpriseDto } from './dto/response-contador-cracha.dto';
 import { UpdateContadorCrachaDto } from './dto/update-contador-cracha.dto';
@@ -226,15 +226,14 @@ export class ContadorCrachaService {
   }
   // REMOVER DADO DO BANCO PELO ID
   async remove(
-    deleteCCD: DeleteContadorCrachaDto,
+    empresaId: string,
+    autenticado: Auth,
     tx?: Prisma.TransactionClient,
   ): Promise<ContadorCracha> {
     try {
       const executar = async (
         client: Prisma.TransactionClient | PrismaService,
       ) => {
-        const { empresaId, registradoPorId } = deleteCCD;
-
         const buscar = await this.findEnterprise(empresaId, client);
 
         const remover = await client.contadorDeCracha.delete({
@@ -249,7 +248,7 @@ export class ContadorCrachaService {
           acao: Acao.DELETE,
           dadosRegistrados: dados,
           empresaId: empresaId,
-          registradoPorId: registradoPorId,
+          registradoPorId: autenticado.userId,
         };
 
         await this.auditoria.create(dadosAuditoria, client);

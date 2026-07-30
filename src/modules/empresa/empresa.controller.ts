@@ -105,7 +105,7 @@ export class EmpresaController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResponseEmpresaDto> {
-    const usuario = req.user.userId;
+    const usuario = req.user;
     const dado = await this.empresaService.remove(id, usuario);
     return plainToClass(ResponseEmpresaDto, dado);
   }

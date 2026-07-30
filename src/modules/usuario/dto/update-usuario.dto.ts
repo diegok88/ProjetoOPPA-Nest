@@ -1,6 +1,7 @@
 import { OmitType, PartialType, PickType } from '@nestjs/mapped-types';
 import {
   IsBoolean,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -18,25 +19,14 @@ export class UpdateUsuarioDto extends PartialType(
   status?: boolean;
 }
 
-export class UpdatePasswordUsuarioDto extends OmitType(CreateUsuarioDto, [
-  'cracha',
-  'dataAdmissao',
-  'dataDesligamento',
-  'dataNascimento',
-  'escala',
-  'nome',
-  'perfilId',
-  'pin',
-  'senha',
-  'turno',
-]) {
+export class UpdatePasswordPinDto {
   @IsString({ message: 'Nome não é do tipo String.' })
   @MinLength(6, { message: 'Senha deve conter no minimo 6 caracteres.' })
   @IsNotEmpty({ message: 'Senha é um campo obrigatório.' })
   @Matches(/^[a-zA-Z0-9]+$/, {
     message: 'Senha deve conter apenas letras e números',
   })
-  atualSenha!: string;
+  atual!: string;
 
   @IsString({ message: 'Nome não é do tipo String.' })
   @MinLength(6, { message: 'Senha deve conter no minimo 6 caracteres.' })
@@ -44,36 +34,7 @@ export class UpdatePasswordUsuarioDto extends OmitType(CreateUsuarioDto, [
   @Matches(/^[a-zA-Z0-9]+$/, {
     message: 'Senha deve conter apenas letras e números',
   })
-  novaSenha!: string;
-}
-
-export class UpdatePinUsuarioDto extends OmitType(CreateUsuarioDto, [
-  'cracha',
-  'dataAdmissao',
-  'dataDesligamento',
-  'dataNascimento',
-  'escala',
-  'nome',
-  'perfilId',
-  'pin',
-  'senha',
-  'turno',
-]) {
-  @IsString({ message: 'Nome não é do tipo String.' })
-  @MaxLength(4, { message: 'Pin deve conter no minimo 4 caracteres.' })
-  @IsNotEmpty({ message: 'Pin é um campo obrigatório.' })
-  @Matches(/^\d+$/, {
-    message: 'O pin deve conter apenas números',
-  })
-  atualPin!: string;
-
-  @IsString({ message: 'Nome não é do tipo String.' })
-  @MaxLength(4, { message: 'Pin deve conter no minimo 4 caracteres.' })
-  @IsNotEmpty({ message: 'Pin é um campo obrigatório.' })
-  @Matches(/^\d+$/, {
-    message: 'O pin deve conter apenas números',
-  })
-  novoPin!: string;
+  nova!: string;
 }
 
 export class UpdateUsuarioDeactiveDto extends PickType(CreateUsuarioDto, [

@@ -21,15 +21,10 @@ import {
   CreateUsuarioAdmin,
   CreateUsuarioMaster,
 } from './dto/create-usuario.dto';
-import { DeleteUsuarioDto } from './dto/delete-usuario.dto';
 import { QueryAdminDto, QueryUsuarioDto } from './dto/query-usuario.dto';
-import { ResponseActiveUsuario } from './dto/response-active-usuario.dto';
 import { ResponseUsuarioDto } from './dto/response-usuario.dto';
-import { UpdateDataUsuarioDto } from './dto/update-data-usuario.dto';
-import { UpdatePasswordUsuarioDto } from './dto/update-password-usuario.dto';
-import { UpdatePinUsuarioDto } from './dto/update-pin-usuario.dto';
 import {
-  UpdateUsuarioDeactiveDto,
+  UpdatePasswordPinDto,
   UpdateUsuarioDto,
 } from './dto/update-usuario.dto';
 import { UsuarioService } from './usuario.service';
@@ -115,6 +110,8 @@ export class UsuarioController {
 
   // ATUALIZA USUARIO PELO ID
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASN1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: AuthenticatedRequest,
@@ -125,48 +122,63 @@ export class UsuarioController {
     return plainToClass(ResponseUsuarioDto, dado);
   }
 
-  // ATUALIZAR DADOS DO USUARIO - menos senha e pin
-  @Patch('updateData/:id')
-  async updateDataUsuario(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateDataUsuarioDto: UpdateDataUsuarioDto,
+  // ATUALIZA O SENHA DO USUARIO
+  @Patch('password')
+  @UseGuards(JwtAuthGuard)
+  async updatePassword(
+    @Req() req: AuthenticatedRequest,
+    @Body() update: UpdatePasswordPinDto,
   ): Promise<ResponseUsuarioDto> {
-    return this.usuarioService.updateDataUsuario(id, updateDataUsuarioDto);
+    const autenticado = req.user;
+    const tipo = 'PAS';
+    const dado = await this.usuarioService.updatePasswordPinUsuario(
+      autenticado,
+      update,
+      tipo,
+    );
+    return plainToClass(ResponseUsuarioDto, dado);
   }
 
-  // ATUALIZAR SENHA
-  @Patch('updatePassword/:id')
-  async updatePasswordUsuario(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updatePassword: UpdatePasswordUsuarioDto,
+  // ATUALIZA O PIN DO USUARIO
+  @Patch('pin')
+  @UseGuards(JwtAuthGuard)
+  async updatePin(
+    @Req() req: AuthenticatedRequest,
+    @Body() update: UpdatePasswordPinDto,
   ): Promise<ResponseUsuarioDto> {
-    return this.usuarioService.updatePasswordUsuario(id, updatePassword);
-  }
-
-  // ATUALIZAR PIN
-  @Patch('updatePin/:id')
-  async updatePinUsuario(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updatePin: UpdatePinUsuarioDto,
-  ): Promise<ResponseUsuarioDto> {
-    return this.usuarioService.updatePinUsuario(id, updatePin);
+    const autenticado = req.user;
+    const tipo = 'PIN';
+    const dado = await this.usuarioService.updatePasswordPinUsuario(
+      autenticado,
+      update,
+      tipo,
+    );
+    return plainToClass(ResponseUsuarioDto, dado);
   }
 
   // INATIVAR USUARIO
   @Patch('deactive/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASN1)
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateUsuarioDeactiveDto: UpdateUsuarioDeactiveDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResponseUsuarioDto> {
-    return this.usuarioService.deactive(id, updateUsuarioDeactiveDto);
+    const autenticado = req.user;
+    const dado = await this.usuarioService.deactive(id, autenticado);
+    return plainToClass(ResponseUsuarioDto, dado);
   }
 
   // DELETA O USUARIO
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASN1)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() deleteUsuarioDto: DeleteUsuarioDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResponseUsuarioDto> {
-    return this.usuarioService.remove(id, deleteUsuarioDto);
+    const autenticado = req.user;
+    const dado = await this.usuarioService.remove(id, autenticado);
+    return plainToClass(ResponseUsuarioDto, dado);
   }
 }
