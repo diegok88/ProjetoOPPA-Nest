@@ -46,7 +46,7 @@ export class UsuarioController {
     return plainToClass(ResponseUsuarioDto, dado);
   }
 
-  // CRIAR USUARIO ADMINISTRADOR
+  // CRIAR USUARIO COMO ASSISTENCIA
   @Post('assist')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
@@ -59,7 +59,7 @@ export class UsuarioController {
     return plainToClass(ResponseUsuarioDto, dado);
   }
 
-  // CRIAR USUARIO ADMINISTRADOR
+  // CRIAR USUARIO COMO ADMINISTRADOR
   @Post('admin')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
@@ -68,50 +68,63 @@ export class UsuarioController {
     @Body() create: CreateUsuarioAdmin,
   ): Promise<ResponseUsuarioDto> {
     const autenticado = req.user;
-    return this.usuarioService.createAdmin(autenticado, create);
+    const dado = this.usuarioService.createAdmin(autenticado, create);
+    return plainToClass(ResponseUsuarioDto, dado);
   }
+
   // LISTA OS USUARIOS
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASN1)
   async findAll(
     @Query() queryUsuarioDto: QueryUsuarioDto,
   ): Promise<ResponseUsuarioDto[]> {
-    return this.usuarioService.findAll(queryUsuarioDto);
+    const dados = await this.usuarioService.findAll(queryUsuarioDto);
+    return dados.map((lista) => plainToClass(ResponseUsuarioDto, lista));
   }
 
   // LISTA OS USUARIOS COM PARAMETROS ESPECIFICOS, MAIS USANDO O MESMO SERVIÇO
   @Get('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASN1)
   async findAllAdmin(
-    @Query() queryAdminDto: QueryAdminDto,
+    @Req() req: AuthenticatedRequest,
+    @Query() query: QueryAdminDto,
   ): Promise<ResponseUsuarioDto[]> {
-    const queryUsuarioDto: QueryUsuarioDto = {
-      empresaId: queryAdminDto.empresaId,
-      perfilId: queryAdminDto.perfilId,
-      status: queryAdminDto.status ?? true,
-      campos: queryAdminDto.campos ?? 'id,nome,cracha',
+    const queryAdmin: QueryUsuarioDto = {
+      ...query,
+      empresaId: req.user.empresa,
+      status: query.status ?? true,
+      campos: query.campos ?? 'id,nome,cracha',
     };
 
-    return this.usuarioService.findAll(queryUsuarioDto);
+    const dados = await this.usuarioService.findAll(queryAdmin);
+
+    return dados.map((lista) => plainToClass(ResponseUsuarioDto, lista));
   }
 
-  @Get('findAllActive')
-  async findAllActive(): Promise<ResponseActiveUsuario[]> {
-    return this.usuarioService.findAllActive();
-  }
   // BUSCA USUARIO PELO ID
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseUsuarioDto> {
-    return this.usuarioService.findOne(id);
+    const dado = await this.usuarioService.findOne(id);
+    return plainToClass(ResponseUsuarioDto, dado);
   }
+
   // ATUALIZA USUARIO PELO ID
   @Patch(':id')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateUsuarioDto: UpdateUsuarioDto,
+    @Req() req: AuthenticatedRequest,
+    @Body() update: UpdateUsuarioDto,
   ): Promise<ResponseUsuarioDto> {
-    return this.usuarioService.update(id, updateUsuarioDto);
+    const autenticado = req.user;
+    const dado = await this.usuarioService.update(id, autenticado, update);
+    return plainToClass(ResponseUsuarioDto, dado);
   }
+
   // ATUALIZAR DADOS DO USUARIO - menos senha e pin
   @Patch('updateData/:id')
   async updateDataUsuario(
@@ -120,6 +133,7 @@ export class UsuarioController {
   ): Promise<ResponseUsuarioDto> {
     return this.usuarioService.updateDataUsuario(id, updateDataUsuarioDto);
   }
+
   // ATUALIZAR SENHA
   @Patch('updatePassword/:id')
   async updatePasswordUsuario(
@@ -128,6 +142,7 @@ export class UsuarioController {
   ): Promise<ResponseUsuarioDto> {
     return this.usuarioService.updatePasswordUsuario(id, updatePassword);
   }
+
   // ATUALIZAR PIN
   @Patch('updatePin/:id')
   async updatePinUsuario(
@@ -136,6 +151,7 @@ export class UsuarioController {
   ): Promise<ResponseUsuarioDto> {
     return this.usuarioService.updatePinUsuario(id, updatePin);
   }
+
   // INATIVAR USUARIO
   @Patch('deactive/:id')
   async deactive(
@@ -144,6 +160,7 @@ export class UsuarioController {
   ): Promise<ResponseUsuarioDto> {
     return this.usuarioService.deactive(id, updateUsuarioDeactiveDto);
   }
+
   // DELETA O USUARIO
   @Delete(':id')
   async remove(

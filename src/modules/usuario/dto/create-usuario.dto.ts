@@ -102,6 +102,7 @@ export class CreateUsuarioAdmin extends OmitType(CreateUsuarioDto, [
   'senha',
   'pin',
   'dataDesligamento',
+  'registradoPorId',
 ]) {}
 
 export class CreateUsuarioGestor extends OmitType(CreateUsuarioDto, [
@@ -109,4 +110,7 @@ export class CreateUsuarioGestor extends OmitType(CreateUsuarioDto, [
   'senha',
   'pin',
   'dataDesligamento',
+  'perfilId',
+  'empresaId',
+  'registradoPorId',
 ]) {}

@@ -109,6 +109,31 @@ export class PerfilService {
       throw error;
     }
   }
+
+  /*
+    BUSCA PERFIL PELA DESCRIÇÃO:
+    - busca da informações do perfil pela descrição retornando todos os dados.
+    - metodo interno 
+  */
+  async findDescription(descricao: string): Promise<Perfil> {
+    try {
+      const buscar = await this.prisma.perfil.findFirst({
+        where: { descricao: descricao },
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ONE);
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
+      throw error;
+    }
+  }
+
   // ATUALIZAÇÃO DO PERFIL PELO ID
   async update(
     id: string,
@@ -155,6 +180,7 @@ export class PerfilService {
       throw error;
     }
   }
+
   // INATIVAÇÃO DO PERFIL PELO ID
   async deactive(id: string, autenticado: Auth): Promise<Perfil> {
     try {
@@ -181,8 +207,8 @@ export class PerfilService {
         });
 
         if (!inativar) {
-          this.logger.warn(`Perfil id ${id} não foi encontrado.`);
-          throw new NotFoundException();
+          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+          throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
         }
 
         const depois = ExtractDataAuditoria(inativar);
@@ -205,10 +231,11 @@ export class PerfilService {
       this.logger.log(TYPES_NOTICES.DEACTIVE);
       return inativarPerfil;
     } catch (error) {
-      this.logger.error(`Falha ao inativar o perfil`);
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE');
       throw error;
     }
   }
+
   // DELETE DO PERFIL PELO ID
   async remove(id: string, autenticado: Auth): Promise<Perfil> {
     try {
@@ -227,7 +254,7 @@ export class PerfilService {
         });
 
         if (!deletarPerfil) {
-          this.logger.warn(`Perfil id ${id} não encontrado.`);
+          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
         }
 
         const dadosAuditoria: CreateAuditoriaDto = {

@@ -6,10 +6,6 @@ export class QueryUsuarioDto extends PartialType(
   OmitType(CreateUsuarioDto, ['registradoPorId']),
 ) {
   @IsOptional()
-  @IsUUID('all', { message: 'Usuário id inválido.' })
-  id?: string;
-
-  @IsOptional()
   @IsBoolean({ message: 'Status não é do tipo boleano.' })
   status?: boolean;
 
@@ -19,14 +15,9 @@ export class QueryUsuarioDto extends PartialType(
 }
 
 export class QueryAdminDto extends OmitType(QueryUsuarioDto, [
-  'id',
-  'dataAdmissao',
-  'dataDesligamento',
-  'dataNascimento',
-  'nome',
-  'escala',
-  'turno',
-  'cracha',
+  'senha',
+  'pin',
+  'empresaId',
 ]) {}
 
 export class QueryBagdeEnterpriceDto extends PickType(QueryUsuarioDto, [
@@ -35,6 +26,5 @@ export class QueryBagdeEnterpriceDto extends PickType(QueryUsuarioDto, [
 ]) {}
 
 export class QueryGenerateTokenDto extends PickType(QueryUsuarioDto, [
-  'id',
   'perfilId',
 ]) {}

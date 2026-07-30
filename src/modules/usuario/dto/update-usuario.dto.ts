@@ -1,21 +1,21 @@
 import { OmitType, PartialType, PickType } from '@nestjs/mapped-types';
 import {
+  IsBoolean,
   IsNotEmpty,
+  IsOptional,
   IsString,
-  IsUUID,
   Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { CreateUsuarioDto } from './create-usuario.dto';
 
-export class UpdateUsuarioDto extends PartialType(CreateUsuarioDto) {
-  @IsUUID('all', { message: 'Empresa id inválido.' })
-  @IsNotEmpty({ message: 'Empresa é um campo obrigatório.' })
-  empresaId!: string;
-  @IsUUID('all', { message: 'Usuário id inválido.' })
-  @IsNotEmpty({ message: 'Usuário é um campo obrigatório.' })
-  registradoPorId!: string;
+export class UpdateUsuarioDto extends PartialType(
+  OmitType(CreateUsuarioDto, ['cracha', 'senha', 'pin', 'registradoPorId']),
+) {
+  @IsOptional()
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
+  status?: boolean;
 }
 
 export class UpdatePasswordUsuarioDto extends OmitType(CreateUsuarioDto, [

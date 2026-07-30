@@ -1,4 +1,5 @@
 export const ROLES = {
   ASN1: 'ASSISTENCIA - NIVEL 1',
   ASN2: 'ASSISTENCIA - NIVEL 2',
+  OPN1: 'OPERACIONAL - NIVEL 1',
 } as const;

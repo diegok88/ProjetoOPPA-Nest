@@ -3,10 +3,7 @@ import { PasswordPin } from '@/constants/password-pin.const';
 import { Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
-import {
-  ExtractDataAuditoria,
-  ExtractRegisteredById,
-} from '@/utils/extract-data-auditoria.util';
+import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import {
   BadRequestException,
@@ -25,6 +22,7 @@ import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-
 import {
   CreateUsuarioAdmin,
   CreateUsuarioAssistDto,
+  CreateUsuarioGestor,
   CreateUsuarioMaster,
 } from './dto/create-usuario.dto';
 import { DeleteUsuarioDto } from './dto/delete-usuario.dto';
@@ -42,6 +40,8 @@ import {
   UpdateUsuarioDto,
 } from './dto/update-usuario.dto';
 import { Usuario, UsuarioMaster } from './entities/usuario.entity';
+import { ROLES } from '@/auth/guards/roles.const';
+import { PerfilService } from '../perfil/perfil.service';
 
 @Injectable()
 export class UsuarioService {
@@ -50,10 +50,16 @@ export class UsuarioService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly contadorCracha: ContadorCrachaService,
+    private readonly perfil: PerfilService,
     private readonly auditoria: AuditoriaService,
   ) {}
 
-  // CRIAR USUARIO MASTER - acesso ao usuario principal
+  /* 
+    CRIAR USUARIO MASTER: 
+    - acesso ao usuario principal. 
+    - ajustar essa criação para um formato de criação apartir da inicialização
+    do sistema, para criar o registro.
+  */
   async createMaster(create: CreateUsuarioMaster): Promise<UsuarioMaster> {
     try {
       const { senha, pin, ...dados } = create;
@@ -68,15 +74,19 @@ export class UsuarioService {
         },
       });
 
-      this.logger.log('Usuário master criado com sucesso.');
+      this.logger.log(TYPES_NOTICES.CREATE);
       return criar;
     } catch (error) {
-      this.logger.error('Falha ao cadastrar usuário master');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATEMASTER');
       throw error;
     }
   }
 
-  // CRIAR USUARIO COM TODOS OS PERFIS DO SISTEMA - o mesmo é criado mediante empresa, contador de cracha e perfil criados
+  /*
+  CRIAR USUARIO COM TODOS OS PERFIS DO SISTEMA: 
+  - o mesmo é criado mediante empresa, contador de cracha e perfil criados.
+  - perfil de usuario da empresa de gestão do sistema.
+  */
   async createAssist(
     autenticado: Auth,
     create: CreateUsuarioAssistDto,
@@ -90,12 +100,12 @@ export class UsuarioService {
           empresaId: autenticado.empresa,
           registradoPorId: autenticado.userId,
         };
-        const criarContador = await this.contadorCracha.update(dadosContador);
+        const criarCracha = await this.contadorCracha.update(dadosContador);
 
         const criar = await tx.usuario.create({
           data: {
             ...create,
-            cracha: criarContador.contador,
+            cracha: criarCracha.contador,
             senha: senhaHash,
             pin: pinHash,
           },
@@ -117,38 +127,40 @@ export class UsuarioService {
         return criar;
       });
 
+      this.logger.log(TYPES_NOTICES.CREATE);
       return criarUsuario;
     } catch (error) {
-      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE);
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATEASSIST');
       throw error;
     }
   }
 
-  // CRIAR USUARIO COM TODOS OS PERFIS DO SISTEMA - o mesmo é criado mediante empresa, contador de cracha e perfil criados
+  /*
+    CRIAR USUARIO COMO ADMINISTRADOR: 
+    - usuario de criação interna da empresa que usufrui do sistema.
+    - permitido criar usuario administradores, gestores e operacional.
+  */
   async createAdmin(
     autenticado: Auth,
     create: CreateUsuarioAdmin,
-  ): Promise<ResponseUsuarioDto> {
+  ): Promise<Usuario> {
     try {
-      const dadosSemRegistradoPorId = await ExtractRegisteredById(create);
-
       const criarUsuario = await this.prisma.$transaction(async (tx) => {
-        const senhaHash = this.generateHash(PasswordPin.password);
-        const pinHash = this.generateHash(PasswordPin.pin);
+        const senhaHash = await this.generateHash(PasswordPin.password);
+        const pinHash = await this.generateHash(PasswordPin.pin);
 
         const dadosContador: UpdateContadorCrachaDto = {
-          empresaId: create.empresaId,
-          registradoPorId: create.registradoPorId,
+          empresaId: autenticado.empresa,
+          registradoPorId: autenticado.userId,
         };
-        const novoCracha = await this.contadorCracha.update(dadosContador);
+        const criarCracha = await this.contadorCracha.update(dadosContador);
 
         const criar = await tx.usuario.create({
           data: {
-            ...dadosSemRegistradoPorId,
-            cracha: novoCracha.contador,
+            ...create,
+            cracha: criarCracha.contador,
             senha: senhaHash,
             pin: pinHash,
-            empresaId: create.empresaId,
           },
         });
 
@@ -159,37 +171,91 @@ export class UsuarioService {
           registroId: criar.id,
           acao: Acao.CREATE,
           dadosRegistrados: dados,
-          empresaId: create.empresaId,
-          registradoPorId: create.registradoPorId,
+          empresaId: autenticado.empresa,
+          registradoPorId: autenticado.userId,
         };
 
         await this.auditoria.create(dadosAuditoria);
+
         return criar;
       });
-      this.logger.log('Usuário cadastrado com sucesso.');
-      return plainToClass(ResponseUsuarioDto, criarUsuario);
+      this.logger.log(TYPES_NOTICES.CREATE);
+      return criarUsuario;
     } catch (error) {
-      this.logger.error('Falha ao cadastrar usuário.');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATEADMIN');
       throw error;
     }
   }
 
-  // CRIAR USUARIO OPERADOR - o autorizado apenas para o perfil de supervisor
-  createGestor() {}
+  /*
+    CRIAR USUARIO COMO GESTOR: 
+    - o autorizado apenas para o perfil de supervisor.
+    - apenas criar usuarios operacionais.
+  */
+  async createGestor(
+    autenticado: Auth,
+    create: CreateUsuarioGestor,
+  ): Promise<Usuario> {
+    try {
+      const criarUsuario = await this.prisma.$transaction(async (tx) => {
+        const senhaHash = await this.generateHash(PasswordPin.password);
+        const pinHash = await this.generateHash(PasswordPin.pin);
+
+        const dadosContador: UpdateContadorCrachaDto = {
+          empresaId: autenticado.empresa,
+          registradoPorId: autenticado.userId,
+        };
+        const criarCracha = await this.contadorCracha.update(dadosContador);
+
+        const perfil = await this.perfil.findDescription(ROLES.OPN1);
+
+        const criar = await tx.usuario.create({
+          data: {
+            ...create,
+            cracha: criarCracha.contador,
+            senha: senhaHash,
+            pin: pinHash,
+            perfilId: perfil.id,
+            empresaId: autenticado.empresa,
+          },
+        });
+
+        const dados = ExtractDataAuditoria(criar);
+
+        const dadosAuditoria: CreateAuditoriaDto = {
+          entidade: 'USUARIO',
+          registroId: criar.id,
+          acao: Acao.CREATE,
+          dadosRegistrados: dados,
+          empresaId: autenticado.empresa,
+          registradoPorId: autenticado.userId,
+        };
+
+        await this.auditoria.create(dadosAuditoria, tx);
+
+        return criar;
+      });
+
+      this.logger.log(TYPES_NOTICES.CREATE);
+      return criarUsuario;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATEGESTOR');
+      throw error;
+    }
+  }
 
   // LISTA OS USUARIOS
   async findAll(
-    queryUsuarioDto: QueryUsuarioDto,
+    query: QueryUsuarioDto,
     tx?: Prisma.TransactionClient,
-  ): Promise<ResponseUsuarioDto[]> {
+  ): Promise<Usuario[]> {
     try {
       const client = tx ?? this.prisma;
 
-      const { campos, ...filtros } = queryUsuarioDto;
+      const { campos, ...filtros } = query;
 
       const condicao: Prisma.UsuarioWhereInput = {};
 
-      if (filtros.id) condicao.id = filtros.id;
       if (filtros.cracha) condicao.cracha = filtros.cracha;
       if (filtros.nome)
         condicao.nome = { contains: filtros.nome, mode: 'insensitive' };
@@ -206,81 +272,53 @@ export class UsuarioService {
 
       const selecao = await this.buildSelect(campos);
 
-      this.logger.debug(
-        `Condição: ${condicao.perfilId} e Seleção: ${selecao}.`,
-      );
-
       const listarUsuarios = await client.usuario.findMany({
         where: condicao,
         select: selecao,
       });
 
-      this.logger.debug(`Total de registros: ${listarUsuarios.length}.`);
-      this.logger.log('Lista de usuário gerada com sucesso.');
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
 
-      return listarUsuarios.map((lista) =>
-        plainToClass(ResponseUsuarioDto, lista),
-      );
+      return listarUsuarios;
     } catch (error) {
-      this.logger.error('Falha ao listar usuários.');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
       throw error;
     }
   }
 
-  // LISTA OS USUARIO ATIVOS
-  async findAllActive(): Promise<ResponseActiveUsuario[]> {
-    try {
-      const listarAtivos = await this.prisma.usuario.findMany({
-        where: { status: true },
-        include: {
-          perfil: {
-            select: { descricao: true },
-          },
-        },
-      });
-      this.logger.log('Lista de usuários ativos gerada com sucesso.');
-      return listarAtivos.map((lista) =>
-        plainToClass(ResponseActiveUsuario, {
-          ...lista,
-          perfil: lista.perfil?.descricao || '',
-        }),
-      );
-    } catch (error) {
-      this.logger.error('Falha ao listar usuário ativos.');
-      throw error;
-    }
-  }
-
-  // BUSCA USUARIO PELO ID
-  async findOne(
-    id: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<ResponseUsuarioDto> {
+  /* 
+    BUSCA USUARIO PELO ID:
+    - busca apenas pelo id.
+  */
+  async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Usuario> {
     try {
       const client = tx ?? this.prisma;
 
-      const buscaUsuario = await client.usuario.findUnique({
+      const buscar = await client.usuario.findUnique({
         where: { id: id },
       });
 
-      if (!buscaUsuario) {
-        this.logger.warn(`Usuário id ${id} não encontrado.`);
-        throw new NotFoundException();
-      } else {
-        this.logger.log(`Usuário id ${id} gerado com sucesso.`);
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
       }
 
-      return plainToClass(ResponseUsuarioDto, buscaUsuario);
+      this.logger.log(TYPES_NOTICES.FIND_ONE);
+      return buscar;
     } catch (error) {
       this.logger.error('Falha na busca do usuário.');
       throw error;
     }
   }
 
+  /* 
+    BUSCA USUARIO PELO CRACHA E EMPRESA:
+    - busca apenas pelo cracha e empresa.
+  */
   async findOneBadgeAndEnterprice(
     query: QueryBagdeEnterpriceDto,
     tx?: Prisma.TransactionClient,
-  ) {
+  ): Promise<Usuario> {
     try {
       const client = tx ?? this.prisma;
 
@@ -293,39 +331,41 @@ export class UsuarioService {
       });
 
       if (!buscar) {
-        this.logger.warn(
-          `Usuário com as credenciais crachá ${query.cracha} e empresa id ${query.empresaId} não encontradas.`,
-        );
-        throw new NotFoundException();
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
       }
 
-      this.logger.log(`Usuário crachá ${query.cracha} encontrado com sucesso.`);
+      this.logger.log(TYPES_NOTICES.FIND_ONE);
 
-      return plainToClass(ResponseUsuarioDto, buscar);
+      return buscar;
     } catch (error) {
-      this.logger.error('Falha na busca do usuário');
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - findOneBadgeAndEnterprice',
+      );
       throw error;
     }
   }
 
   // ATUALIZA USUARIO PELO ID - atualiza todos os dados
   async update(
-    idUser: string,
-    updateUsuarioDto: UpdateUsuarioDto,
-  ): Promise<ResponseUsuarioDto> {
-    const { registradoPorId, empresaId, ...dados } = updateUsuarioDto;
+    id: string,
+    autenticado: Auth,
+    update: UpdateUsuarioDto,
+  ): Promise<Usuario> {
     try {
       const atualizarUsuario = await this.prisma.$transaction(async (tx) => {
-        const buscar = await this.findOne(idUser);
+        const buscar = await this.findOne(id, tx);
         if (!buscar) {
-          throw new NotFoundException();
+          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+          throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
         }
 
         const antes = ExtractDataAuditoria(buscar);
 
         const atualizar = await tx.usuario.update({
-          where: { id: idUser },
-          data: dados,
+          where: { id: id },
+          data: update,
         });
 
         const depois = ExtractDataAuditoria(atualizar);
@@ -336,16 +376,18 @@ export class UsuarioService {
           acao: 'UPDATE',
           antes: antes,
           depois: depois,
-          empresaId: empresaId,
-          registradoPorId: registradoPorId,
+          empresaId: autenticado.empresa,
+          registradoPorId: autenticado.userId,
         };
         await this.auditoria.update(dadosAuditoria);
+
         return atualizar;
       });
-      this.logger.log(`Usuário id ${idUser} atuaalizado com sucesso.`);
-      return plainToClass(ResponseUsuarioDto, atualizarUsuario);
+
+      this.logger.log(TYPES_NOTICES.UPDATE);
+      return atualizarUsuario;
     } catch (error) {
-      this.logger.error('Falha ao atualizar usuário.');
+      this.logger.error(TYPES_NOTICES.UPDATE);
       throw error;
     }
   }
