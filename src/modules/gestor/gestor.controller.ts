@@ -1,16 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Body, Patch, Param, Delete } from '@nestjs/common';
 import { GestorService } from './gestor.service';
-import { CreateGestorDto } from './dto/create-gestor.dto';
 import { UpdateGestorDto } from './dto/update-gestor.dto';
 
 @Controller('gestor')
 export class GestorController {
   constructor(private readonly gestorService: GestorService) {}
-
-  @Post()
-  create(@Body() createGestorDto: CreateGestorDto) {
-    return this.gestorService.create(createGestorDto);
-  }
 
   @Get()
   findAll() {

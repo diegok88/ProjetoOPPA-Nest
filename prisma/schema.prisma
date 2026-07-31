@@ -33,23 +33,23 @@ enum Acao {
 }
 
 model Usuario {
-  id                   String      @id @default(uuid())
-  cracha               Int?
-  nome                 String?
-  dataNascimento       DateTime?
-  dataAdmissao         DateTime?
-  dataDesligamento     DateTime?
-  senha                String
-  pin                  String
-  perfilId             String?
-  perfil               Perfil?     @relation("perfil", fields: [perfilId], references: [id])
-  turno                TipoTurno?
-  escala               TipoEscala?
-  empresaId            String?
-  empresa              Empresa?    @relation("empresa", fields: [empresaId], references: [id])
-  status               Boolean     @default(true)
-  gestorComoOperador   Gestor[]    @relation("operador")
-  gestorComoSupervisor Gestor[]    @relation("supervisor")
+  id                    String      @id @default(uuid())
+  cracha                Int?
+  nome                  String?
+  dataNascimento        DateTime?
+  dataAdmissao          DateTime?
+  dataDesligamento      DateTime?
+  senha                 String
+  pin                   String
+  perfilId              String?
+  perfil                Perfil?     @relation("perfil", fields: [perfilId], references: [id])
+  turno                 TipoTurno?
+  escala                TipoEscala?
+  empresaId             String?
+  empresa               Empresa?    @relation("empresa", fields: [empresaId], references: [id])
+  status                Boolean     @default(true)
+  gestorComoColaborador Gestor[]    @relation("colaborador")
+  gestorComoGestor      Gestor[]    @relation("gestor")
 
   @@map("usuario")
 }
@@ -89,12 +89,12 @@ model Perfil {
 }
 
 model Gestor {
-  id           String  @id @default(uuid())
-  operadorId   String
-  operador     Usuario @relation("operador", fields: [operadorId], references: [id])
-  supervisorId String
-  supervisor   Usuario @relation("supervisor", fields: [supervisorId], references: [id])
-  status       Boolean @default(true)
+  id            String  @id @default(uuid())
+  colaboradorId String
+  colaborador   Usuario @relation("colaborador", fields: [colaboradorId], references: [id])
+  gestorId      String
+  gestor        Usuario @relation("gestor", fields: [gestorId], references: [id])
+  status        Boolean @default(true)
 
   @@map("gestor")
 }

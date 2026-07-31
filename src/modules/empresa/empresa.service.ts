@@ -14,8 +14,6 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
-import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
-import { UpdateUsuarioDeactiveDto } from '../usuario/dto/update-usuario.dto';
 import { UsuarioService } from '../usuario/usuario.service';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
 import { QueryEmpresaFilterDto } from './dto/query-empresa.dto';
@@ -104,7 +102,7 @@ export class EmpresaService {
       });
       if (!buscar) {
         this.logger.warn(TYPES_NOTICES.NOT_FOUND);
-        throw new NotFoundException();
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
       }
       this.logger.log(TYPES_NOTICES.FIND_ONE);
       return buscar;
@@ -160,7 +158,7 @@ export class EmpresaService {
     }
   }
   // INATIVAR EMPRESA PELO ID
-  async deactive(id: string, usuarioId: string): Promise<Empresa> {
+  async deactive(id: string, autenticado: Auth): Promise<Empresa> {
     try {
       const inativarEmpresa = await this.prisma.$transaction(async (tx) => {
         const buscarEmpresa = await this.findOne(id, tx);
@@ -176,26 +174,17 @@ export class EmpresaService {
 
         const dadosAtualizados: UpdateAuditoriaDto = {
           entidade: 'EMPRESA',
-          registroId: id,
+          registroId: inativarEmpresa.id,
           acao: Acao.DEACTIVATE,
           antes: antes,
           depois: depois,
-          empresaId: id,
-          registradoPorId: usuarioId,
+          empresaId: inativarEmpresa.id,
+          registradoPorId: autenticado.userId,
         };
 
-        const inativarContador: UpdateContadorCrachaDto = {
-          empresaId: id,
-          registradoPorId: usuarioId,
-        };
+        await this.contadorCracha.deactive(id, autenticado, tx);
 
-        await this.contadorCracha.deactive(inativarContador, tx);
-
-        const inativarUsuario: UpdateUsuarioDeactiveDto = {
-          empresaId: id,
-          registradoPorId: usuarioId,
-        };
-        await this.usuario.deactiveAll(inativarUsuario, tx);
+        await this.usuario.deactiveAll(id, autenticado, tx);
 
         await this.auditoria.update(dadosAtualizados, tx);
 

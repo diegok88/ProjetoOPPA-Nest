@@ -7,6 +7,7 @@ import { UsuarioService } from '@/modules/usuario/usuario.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
@@ -16,6 +17,7 @@ import { JwtService } from '@nestjs/jwt';
 import { plainToClass } from 'class-transformer';
 import { LoginDto, LogoutDto } from './dto/create-auth.dto';
 import { ResponseAuthDto } from './dto/response-auth.dto';
+import { Auth } from './entities/auth.entity';
 
 @Injectable()
 export class AuthService {
@@ -29,10 +31,11 @@ export class AuthService {
   ) {}
 
   // GERADOR DE TOKEN
-  async generateToken(id: string, perfilId: string) {
+  async generateToken(token: Auth) {
     const payload = {
-      sub: id,
-      perfil: perfilId,
+      sub: token.userId,
+      perfil: token.perfil,
+      empresa: token.empresa,
     };
 
     return this.jwtService.sign(payload);
@@ -70,7 +73,18 @@ export class AuthService {
           this.logger.warn(`Usuário crachá ${login.cracha} não autorizado.`);
           throw new UnauthorizedException();
         }
-        const token = await this.generateToken(id, perfilId);
+
+        if (!perfilId) {
+          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+          throw new BadRequestException(TYPES_NOTICES.NOT_FOUND);
+        }
+
+        const dadosToken: Auth = {
+          userId: id,
+          perfil: perfilId,
+          empresa: empresaId,
+        };
+        const token = await this.generateToken(dadosToken);
         this.logger.log('Token gerado com sucesso!');
         const dadosAuditoria: CreateAuditoriaDto = {
           entidade: 'AUTH',

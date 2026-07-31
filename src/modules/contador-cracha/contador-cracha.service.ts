@@ -173,15 +173,14 @@ export class ContadorCrachaService {
   }
   // INATIVA O CONTADOR DE CRACHAS ATRAVES DA INATIVAÇÃO DA EMPRESA
   async deactive(
-    update: UpdateContadorCrachaDto,
+    empresaId: string,
+    autenticado: Auth,
     tx?: Prisma.TransactionClient,
   ): Promise<ContadorCracha> {
     try {
       const executar = async (
         client: Prisma.TransactionClient | PrismaService,
       ) => {
-        const { empresaId, registradoPorId } = update;
-
         const buscar = await this.findEnterprise(empresaId, client);
 
         const antes = ExtractDataAuditoria(buscar);
@@ -199,8 +198,8 @@ export class ContadorCrachaService {
           acao: Acao.UPDATE,
           antes: antes,
           depois: depois,
-          empresaId: empresaId,
-          registradoPorId: registradoPorId,
+          empresaId: autenticado.empresa,
+          registradoPorId: autenticado.userId,
         };
 
         await this.auditoria.update(dadosAtualizados, client);

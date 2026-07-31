@@ -1,12 +1,10 @@
 import { OmitType, PartialType, PickType } from '@nestjs/mapped-types';
 import {
   IsBoolean,
-  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
-  MaxLength,
   MinLength,
 } from 'class-validator';
 import { CreateUsuarioDto } from './create-usuario.dto';
@@ -36,8 +34,3 @@ export class UpdatePasswordPinDto {
   })
   nova!: string;
 }
-
-export class UpdateUsuarioDeactiveDto extends PickType(CreateUsuarioDto, [
-  'empresaId',
-  'registradoPorId',
-]) {}

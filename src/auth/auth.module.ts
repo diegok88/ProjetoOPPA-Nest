@@ -1,7 +1,7 @@
 import { AuditoriaModule } from '@/modules/auditoria/auditoria.module';
 import { PerfilModule } from '@/modules/perfil/perfil.module';
 import { UsuarioModule } from '@/modules/usuario/usuario.module';
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';

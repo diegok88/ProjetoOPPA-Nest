@@ -8,6 +8,8 @@ import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import {
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -19,7 +21,6 @@ import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
 import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
-import { PerfilService } from '../perfil/perfil.service';
 import {
   CreateUsuarioAdmin,
   CreateUsuarioAssistDto,
@@ -32,10 +33,11 @@ import {
 } from './dto/query-usuario.dto';
 import {
   UpdatePasswordPinDto,
-  UpdateUsuarioDeactiveDto,
   UpdateUsuarioDto,
 } from './dto/update-usuario.dto';
 import { Usuario, UsuarioMaster } from './entities/usuario.entity';
+import { PerfilService } from '../perfil/perfil.service';
+import { GestorService } from '../gestor/gestor.service';
 
 @Injectable()
 export class UsuarioService {
@@ -44,7 +46,9 @@ export class UsuarioService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly contadorCracha: ContadorCrachaService,
+    @Inject(forwardRef(() => PerfilService))
     private readonly perfil: PerfilService,
+    private readonly gestor: GestorService,
     private readonly auditoria: AuditoriaService,
   ) {}
 
@@ -104,6 +108,8 @@ export class UsuarioService {
             pin: pinHash,
           },
         });
+
+        await this.gestor.create(criar.id, autenticado);
 
         const dados = ExtractDataAuditoria(criar);
 
@@ -506,23 +512,20 @@ export class UsuarioService {
     - ação somente executada pela assistencia
   */
   async deactiveAll(
-    updateUsuarioDeactiveDto: UpdateUsuarioDeactiveDto,
+    empresaId: string,
+    autenticado: Auth,
     tx?: Prisma.TransactionClient,
   ): Promise<void> {
     try {
       const executar = async (
         client: Prisma.TransactionClient | PrismaService,
       ) => {
-        const { empresaId, registradoPorId } = updateUsuarioDeactiveDto;
-
         const listar = await client.usuario.findMany({
           where: { empresaId: empresaId },
         });
 
         if (listar.length === 0) {
-          this.logger.warn(
-            `Nenhum usuário encontrado para a empresa ${empresaId}`,
-          );
+          this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
           return;
         }
 
@@ -553,8 +556,8 @@ export class UsuarioService {
             acao: Acao.UPDATE,
             antes: antes[index],
             depois: depois[index],
-            empresaId: empresaId,
-            registradoPorId: registradoPorId,
+            empresaId: autenticado.empresa,
+            registradoPorId: autenticado.userId,
           }),
         );
 
@@ -570,9 +573,7 @@ export class UsuarioService {
         });
       }
 
-      this.logger.log(
-        `Todos usuários cadastrados na empresa id ${updateUsuarioDeactiveDto.empresaId} foram inativados com sucesso.`,
-      );
+      this.logger.log(TYPES_NOTICES);
     } catch (error) {
       this.logger.error('Falha ao inativar o conjunto de usuários.');
       throw error;
@@ -610,7 +611,7 @@ export class UsuarioService {
           registradoPorId: autenticado.userId,
         };
 
-        await this.auditoria.create(dadosAuditoria);
+        await this.auditoria.create(dadosAuditoria, tx);
         return deletar;
       });
 
@@ -637,7 +638,7 @@ export class UsuarioService {
         });
 
         if (listar.length === 0) {
-          this.logger.warn('Lista de usuário vazia.');
+          this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
           return;
         }
 
