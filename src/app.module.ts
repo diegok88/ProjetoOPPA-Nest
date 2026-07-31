@@ -10,6 +10,10 @@ import { GestorModule } from './modules/gestor/gestor.module';
 import { PerfilModule } from './modules/perfil/perfil.module';
 import { UsuarioModule } from './modules/usuario/usuario.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { TenantContextModule } from './auth/tenant-context/tenant-context.module';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { TenantContextInterceptor } from './auth/tenant-context/tenant-context.interceptor';
 
 @Module({
   imports: [
@@ -17,6 +21,7 @@ import { PrismaModule } from './prisma/prisma.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    TenantContextModule,
     PrismaModule,
     UsuarioModule,
     PerfilModule,
@@ -27,6 +32,10 @@ import { PrismaModule } from './prisma/prisma.module';
     ContadorCrachaModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
+  ],
 })
 export class AppModule {}

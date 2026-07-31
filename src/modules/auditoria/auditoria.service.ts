@@ -2,19 +2,29 @@ import { Auditoria, Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
 import {
   QueryAuditoriaFilterDto,
   QueryAuditoriaFindOneLastDto,
 } from './dto/query-auditoria.dto';
 import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
+import { PrismaModule } from '@/prisma/prisma.module';
 
 @Injectable()
 export class AuditoriaService {
   private logger = new Logger(AuditoriaService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(forwardRef(() => PrismaService))
+    private readonly prisma: PrismaService,
+  ) {}
 
   // SERVIÇO DE CALCULAR DIFERENÇAS ENTRE DOIS DADOS
   private calculateDifference<T extends Record<string, any>>(

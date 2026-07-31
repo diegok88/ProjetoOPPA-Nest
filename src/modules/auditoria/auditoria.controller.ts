@@ -24,7 +24,7 @@ export class AuditoriaController {
   constructor(private readonly auditoriaService: AuditoriaService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(ROLES.ASN1)
   async findAll(
     @Query() query: QueryAuditoriaFilterDto,
@@ -34,7 +34,7 @@ export class AuditoriaController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(RolesGuard)
   @Roles(ROLES.ASN1)
   async findOne(@Param('id') id: string): Promise<ResponseAuditoriaDto> {
     const dado = await this.auditoriaService.findOne(id);
@@ -42,8 +42,8 @@ export class AuditoriaController {
   }
 
   @Delete(':id')
+  @UseGuards(RolesGuard)
   @Roles(ROLES.ASN1)
-  @UseGuards(JwtAuthGuard)
   async remove(@Param('id') id: string): Promise<ResponseAuditoriaMessageDto> {
     const dado = await this.auditoriaService.remove(id);
     return plainToClass(ResponseAuditoriaMessageDto, {

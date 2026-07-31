@@ -109,7 +109,7 @@ export class UsuarioService {
           },
         });
 
-        await this.gestor.create(criar.id, autenticado);
+        await this.gestor.create(criar.id, autenticado, tx);
 
         const dados = ExtractDataAuditoria(criar);
 
@@ -163,6 +163,8 @@ export class UsuarioService {
             pin: pinHash,
           },
         });
+
+        await this.gestor.create(criar.id, autenticado, tx);
 
         const dados = await ExtractDataAuditoria(criar);
 
@@ -219,6 +221,8 @@ export class UsuarioService {
             empresaId: autenticado.empresa,
           },
         });
+
+        await this.gestor.create(criar.id, autenticado, tx);
 
         const dados = ExtractDataAuditoria(criar);
 
@@ -481,6 +485,9 @@ export class UsuarioService {
             status: false,
           },
         });
+
+        await this.gestor.deactive(inativar.id, autenticado, tx);
+
         const depois = ExtractDataAuditoria(inativar);
 
         const dados: UpdateAuditoriaDto = {
@@ -588,14 +595,19 @@ export class UsuarioService {
     try {
       const deletarUsuario = await this.prisma.$transaction(async (tx) => {
         const buscar = await this.findOne(id, tx);
+
         if (buscar.status === true) {
           this.logger.warn(TYPES_NOTICES.NOT_DEACTIVE);
           throw new UnauthorizedException(TYPES_NOTICES.NOT_DEACTIVE);
         }
+        
         if (buscar.empresaId !== autenticado.empresa) {
           this.logger.warn(TYPES_NOTICES.NOT_BELONG);
           throw new UnauthorizedException(TYPES_NOTICES.NOT_BELONG);
         }
+
+        await this.gestor.remove(buscar.id, autenticado, tx);
+
         const deletar = await this.prisma.usuario.delete({
           where: { id: id },
         });

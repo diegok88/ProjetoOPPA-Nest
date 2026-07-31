@@ -18,12 +18,15 @@ import {
 } from './dto/response-auth.dto';
 import type { AuthenticatedRequest } from './express/authenticated-request.interface';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { Public } from './guards/public.decorator';
 
 @Controller('auth')
+@UseGuards(JwtAuthGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
+  @Public()
   async login(
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) res: Response,
@@ -38,7 +41,6 @@ export class AuthController {
     return plainToClass(ResponseAuthMessageDto, TYPES_NOTICES.LOGIN);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('logout')
   async logout(
     @Res({ passthrough: true }) res: Response,
@@ -53,7 +55,6 @@ export class AuthController {
     return plainToClass(ResponseAuthMessageDto, TYPES_NOTICES.LOGOUT);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('profile')
   async getIt(@Req() req: AuthenticatedRequest): Promise<ResponseAuthDto> {
     return this.authService.findProfile(req.user.userId);

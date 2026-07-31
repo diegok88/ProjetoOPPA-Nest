@@ -16,11 +16,11 @@ import { QueryContadorCrachaFilterDto } from './dto/query-contador-cracha.dto';
 import { ResponseContadorCrachaDto } from './dto/response-contador-cracha.dto';
 
 @Controller('contador-cracha')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class ContadorCrachaController {
   constructor(private readonly contadorCrachaService: ContadorCrachaService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async findAll(
     @Query() query: QueryContadorCrachaFilterDto,
@@ -30,7 +30,6 @@ export class ContadorCrachaController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
