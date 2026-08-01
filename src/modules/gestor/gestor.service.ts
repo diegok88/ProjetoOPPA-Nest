@@ -8,16 +8,10 @@ import {
 import { Gestor } from './entities/gestor.entity';
 import { PrismaService } from '@/prisma/prisma.service';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
-import { Auth } from '@/auth/entities/auth.entity';
-import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { Acao } from '@/generated/prisma/enums';
-import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
-import { AuditoriaService } from '../auditoria/auditoria.service';
 import { Prisma, Usuario } from '@/generated/prisma/client';
 import { QueryGestorFilterDto } from './dto/query-gestor.dto';
-import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
-import { UsuarioService } from '../usuario/usuario.service';
 
 @Injectable()
 export class GestorService {
@@ -25,8 +19,6 @@ export class GestorService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly usuario: UsuarioService,
-    private readonly auditoria: AuditoriaService,
     private readonly tenantContext: TenantContextService,
   ) {}
 
@@ -45,48 +37,22 @@ export class GestorService {
     - somente autorizado para gestores de equipe
   */
   async create(
-    id: string,
-    autenticado: Auth,
+    usuarioid: string,
     tx?: Prisma.TransactionClient,
   ): Promise<Gestor> {
     try {
-      const executar = async (
-        client: Prisma.TransactionClient | PrismaService,
-      ) => {
-        const criar = await client.gestor.create({
-          data: {
-            colaboradorId: id,
-            gestorId: autenticado.userId,
-          },
-        });
+      const autenticado = this.getCurrentUser();
+      const client = tx ?? this.prisma.client;
 
-        const dados = ExtractDataAuditoria(criar);
-
-        const dadosAuditoria: CreateAuditoriaDto = {
-          entidade: 'GESTOR',
-          registroId: criar.id,
-          acao: Acao.CREATE,
-          dadosRegistrados: dados,
-          empresaId: autenticado.empresa,
-          registradoPorId: autenticado.userId,
-        };
-
-        await this.auditoria.create(dadosAuditoria, client);
-
-        return criar;
-      };
-
-      let criarGestor: any;
-      if (tx) {
-        criarGestor = await executar(tx);
-      } else {
-        criarGestor = await this.prisma.$transaction(async (novatx) => {
-          return executar(novatx);
-        });
-      }
+      const criar = await client.gestor.create({
+        data: {
+          colaboradorId: usuarioid,
+          gestorId: autenticado.user,
+        },
+      });
 
       this.logger.log(TYPES_NOTICES.CREATE);
-      return criarGestor;
+      return criar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - create');
       throw error;
@@ -127,7 +93,7 @@ export class GestorService {
   */
   async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Gestor> {
     try {
-      const client = tx ?? this.prisma;
+      const client = tx ?? this.prisma.client;
 
       const buscar = await client.gestor.findUnique({
         where: { id: id },
@@ -151,18 +117,17 @@ export class GestorService {
     - função interna
   */
   async findId(
-    colaboradorId: string,
-    gestorId: string,
+    colId: string,
+    gesId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<Gestor> {
     try {
-      const client = tx ?? this.prisma;
+      const client = tx ?? this.prisma.client;
 
       const buscar = await client.gestor.findFirst({
         where: {
-          colaboradorId: colaboradorId,
-          gestorId: gestorId,
-          status: true,
+          colaboradorId: colId,
+          gestorId: gesId,
         },
       });
 
@@ -185,7 +150,7 @@ export class GestorService {
   */
   async deactive(id: string, tx?: Prisma.TransactionClient): Promise<Gestor> {
     try {
-      const client = tx ?? this.prisma;
+      const client = tx ?? this.prisma.client;
 
       const autenticado = this.getCurrentUser();
       const buscar = await this.findId(id, autenticado.user, client);
@@ -220,7 +185,7 @@ export class GestorService {
     tx?: Prisma.TransactionClient,
   ): Promise<Prisma.BatchPayload> {
     try {
-      const client = tx ?? this.prisma;
+      const client = tx ?? this.prisma.client;
 
       if (ids.length === 0) {
         this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
@@ -248,21 +213,21 @@ export class GestorService {
   async remove(id: string, tx?: Prisma.TransactionClient): Promise<Gestor> {
     try {
       const autenticado = this.getCurrentUser();
-      const client = tx ?? this.prisma;
+      const client = tx ?? this.prisma.client;
       const buscar = await this.findId(id, autenticado.user, client);
-
-      if (!buscar) {
-        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
-        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
-      }
 
       if (buscar.status === true) {
         this.logger.warn(TYPES_NOTICES.NOT_DEACTIVE);
         throw new BadRequestException(TYPES_NOTICES.NOT_DEACTIVE);
       }
 
-      const remover = await client.gestor.delete({
-        where: { id: buscar.id },
+      if (buscar.gestorId !== autenticado.user) {
+        this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+        throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+      }
+
+      const remover = await client.gestor.deleteMany({
+        where: { colaboradorId: buscar.colaboradorId },
       });
 
       this.logger.log(TYPES_NOTICES.DELETE);
@@ -278,5 +243,30 @@ export class GestorService {
     - função interna.
     - usada em conjunto com a função de remoção de usuario, de acordo com a remoção da empresa.
   */
-  removeAll() {}
+  async removeAll(
+    usuarios: Array<Usuario>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Prisma.BatchPayload> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const ativos = usuarios.map((u) => u.status === true);
+      if (ativos) {
+        this.logger.warn(TYPES_NOTICES.NOT_DEACTIVE);
+        throw new BadRequestException(TYPES_NOTICES.NOT_DEACTIVE);
+      }
+
+      const ids = usuarios.map((u) => u.id);
+
+      const remover = await client.gestor.deleteMany({
+        where: { colaboradorId: { in: ids } },
+      });
+
+      this.logger.log(TYPES_NOTICES.DELETE_MANY);
+      return remover;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - removeall');
+      throw error;
+    }
+  }
 }

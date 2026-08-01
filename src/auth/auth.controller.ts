@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   Post,
   Req,
   Res,
@@ -19,11 +20,17 @@ import {
 import type { AuthenticatedRequest } from './express/authenticated-request.interface';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './guards/public.decorator';
+import { TenantContextService } from './tenant-context/tenant-context.service';
 
 @Controller('auth')
 @UseGuards(JwtAuthGuard)
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  private logger = new Logger(AuthController.name);
+
+  constructor(
+    private readonly authService: AuthService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
 
   @Post('login')
   @Public()
@@ -46,6 +53,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResponseAuthMessageDto> {
+    this.logger.debug(req.user);
     const usuario: LogoutDto = {
       usuarioId: req.user.userId,
       empresaId: req.user.empresa,
@@ -57,6 +65,9 @@ export class AuthController {
 
   @Get('profile')
   async getIt(@Req() req: AuthenticatedRequest): Promise<ResponseAuthDto> {
+    const user = this.tenantContext.getStore();
+    this.logger.debug(user?.empresa, 'getIt');
+    this.logger.debug(req.user, 'getIt');
     return this.authService.findProfile(req.user.userId);
   }
 }

@@ -58,7 +58,7 @@ export class AuditoriaService {
     try {
       const { dadosRegistrados, ...dados } = createAuditoriaDto;
       const formatString = JSON.stringify(dadosRegistrados);
-      const client = tx ?? this.prisma;
+      const client = tx ?? this.prisma.client;
 
       const criar = await client.auditoria.create({
         data: { ...dados, dadosRegistrados: formatString },
@@ -101,6 +101,8 @@ export class AuditoriaService {
   ): Promise<Auditoria> {
     try {
       const client = tx ?? this.prisma;
+
+      this.logger.debug(updateAuditoriaDto.empresaId);
 
       const { antes, depois, ...dados } = updateAuditoriaDto;
 

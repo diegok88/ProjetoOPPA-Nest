@@ -24,10 +24,10 @@ export class AuthService {
   private logger = new Logger(AuthService.name);
 
   constructor(
-    private readonly jwtService: JwtService,
     private readonly usuario: UsuarioService,
     private readonly auditoria: AuditoriaService,
     private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
   ) {}
 
   // GERADOR DE TOKEN
@@ -37,7 +37,7 @@ export class AuthService {
       perfil: token.perfil,
       empresa: token.empresa,
     };
-
+    this.logger.debug(payload, 'generateToken()');
     return this.jwtService.sign(payload);
   }
 
@@ -49,9 +49,10 @@ export class AuthService {
   }
 
   // LOGIN DO USUARIO
-  async login(login: LoginDto): Promise<string> {
+  async login(login: LoginDto) {
     try {
       const loginUsuario = await this.prisma.$transaction(async (tx) => {
+        this.logger.debug(login);
         const verificar: QueryUsuarioDto = {
           cracha: login.cracha,
           senha: login.senha,
@@ -84,14 +85,17 @@ export class AuthService {
           perfil: perfilId,
           empresa: empresaId,
         };
+        this.logger.debug(dadosToken, ' - login()');
         const token = await this.generateToken(dadosToken);
+
         this.logger.log('Token gerado com sucesso!');
+        
         const dadosAuditoria: CreateAuditoriaDto = {
           entidade: 'AUTH',
           registroId: id,
           acao: Acao.LOGIN,
           dadosRegistrados: token,
-          empresaId: login.empresaId,
+          empresaId: empresaId,
           registradoPorId: id,
         };
         await this.auditoria.create(dadosAuditoria, tx);

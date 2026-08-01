@@ -7,6 +7,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategyService } from './strategies/jwt.strategy.service';
+import { TenantContextModule } from './tenant-context/tenant-context.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { JwtStrategyService } from './strategies/jwt.strategy.service';
       secret: process.env.JWT_SECRET ?? 'projeto_oppa',
       signOptions: { expiresIn: '1d' },
     }),
+    TenantContextModule,
     UsuarioModule,
     AuditoriaModule,
     PerfilModule,

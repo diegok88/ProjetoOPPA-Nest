@@ -1,15 +1,5 @@
-import {
-  Controller,
-  Get,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { GestorService } from './gestor.service';
-import { UpdateGestorDto } from './dto/update-gestor.dto';
 import { QueryGestorFilterDto } from './dto/query-gestor.dto';
 import { ResponseGestorDto } from './dto/response-gestor.dto';
 import { plainToClass } from 'class-transformer';
@@ -19,11 +9,11 @@ import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
 
 @Controller('gestor')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class GestorController {
   constructor(private readonly gestorService: GestorService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async findAll(
     @Query() query: QueryGestorFilterDto,
@@ -33,7 +23,6 @@ export class GestorController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async findOne(@Param('id') id: string): Promise<ResponseGestorDto> {
     const dado = this.gestorService.findOne(id);

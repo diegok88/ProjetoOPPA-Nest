@@ -140,6 +140,8 @@ export class ContadorCrachaService {
     try {
       const atualizarContador = await this.prisma.$transaction(async (tx) => {
         const { empresaId, registradoPorId } = update;
+        this.logger.debug(empresaId);
+
         const buscar = await this.findEnterprise(empresaId, tx);
 
         const antes = ExtractDataAuditoria(buscar);

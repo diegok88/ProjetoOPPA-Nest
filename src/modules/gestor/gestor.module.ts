@@ -6,7 +6,7 @@ import { UsuarioModule } from '../usuario/usuario.module';
 import { PerfilModule } from '../perfil/perfil.module';
 
 @Module({
-  imports: [forwardRef(() => AuditoriaModule), forwardRef(() => PerfilModule)],
+  imports: [forwardRef(() => PerfilModule)],
   controllers: [GestorController],
   providers: [GestorService],
   exports: [GestorService],

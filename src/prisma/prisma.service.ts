@@ -4,10 +4,13 @@ import { AuditoriaService } from '@/modules/auditoria/auditoria.service';
 import { CreateAuditoriaDto } from '@/modules/auditoria/dto/create-auditoria.dto';
 import { UpdateAuditoriaDto } from '@/modules/auditoria/dto/update-auditoria.dto';
 import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import {
   forwardRef,
   Inject,
   Injectable,
+  Logger,
+  NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
@@ -20,8 +23,9 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
-  public extended: any;
+  private logger = new Logger(PrismaService.name);
   private auditoriaService!: AuditoriaService;
+  public extended: any;
 
   constructor(
     private readonly tenantContextService: TenantContextService,
@@ -33,6 +37,7 @@ export class PrismaService
     const adapter = new PrismaPg(pool);
     super({ adapter });
   }
+
   async onModuleInit() {
     await this.$connect();
 
@@ -54,7 +59,9 @@ export class PrismaService
             const user = tenantContext.getStore();
             const result = await query(args);
 
-            if (!user) return result;
+            if (!user) {
+              return result;
+            }
 
             const dados: CreateAuditoriaDto = {
               entidade: 'GESTOR',
@@ -64,8 +71,9 @@ export class PrismaService
               empresaId: user.empresa,
               registradoPorId: user.user,
             };
+            console.log('Dados de auditoria:', dados);
 
-            await getAuditoriaService().create(dados);
+            await getAuditoriaService().create(dados, prismaClient);
 
             return result;
           },
@@ -81,7 +89,7 @@ export class PrismaService
               delete dataAny._auditAction;
             }
 
-            const antes = await (this as any).gestor.findUnique({
+            const antes = await prismaClient.gestor.findUnique({
               where: args.where,
             });
 
@@ -91,13 +99,13 @@ export class PrismaService
               entidade: 'GESTOR',
               registroId: depois.id!,
               acao: acao,
-              antes: antes,
-              depois: depois,
+              antes: ExtractDataAuditoria(antes),
+              depois: ExtractDataAuditoria(depois),
               empresaId: user!.empresa,
               registradoPorId: user!.user,
             };
 
-            await getAuditoriaService().update(dados);
+            await getAuditoriaService().update(dados, prismaClient);
 
             return depois;
           },
@@ -119,7 +127,7 @@ export class PrismaService
 
             const resultado = await query(args);
 
-            const depois = await (this as any).gestor.findMany({
+            const depois = await prismaClient.gestor.findMany({
               where: args.where,
             });
 
@@ -148,9 +156,13 @@ export class PrismaService
             const user = tenantContext.getStore();
             if (!user) return query(args);
 
-            const dados = await (this as any).gestor.findUnique({
+            const dados = await prismaClient.gestor.findUnique({
               where: args.where,
             });
+
+            if (!dados) {
+              throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+            }
 
             const dadosAuditoria: CreateAuditoriaDto = {
               entidade: 'GESTOR',
@@ -161,7 +173,7 @@ export class PrismaService
               registradoPorId: user.user,
             };
 
-            await getAuditoriaService().create(dadosAuditoria);
+            await getAuditoriaService().create(dadosAuditoria, prismaClient);
 
             return dados;
           },
@@ -170,7 +182,7 @@ export class PrismaService
             const user = tenantContext.getStore();
             if (!user) return query(args);
 
-            const dados = await (this as any).gestor.findMany({
+            const dados = await prismaClient.gestor.findMany({
               where: args.where,
             });
 
@@ -181,13 +193,13 @@ export class PrismaService
                 entidade: 'GESTOR',
                 registroId: item.id,
                 acao: Acao.DELETE,
-                dadosRegistrados: ExtractDataAuditoria(item),
+                dadosRegistrados: JSON.stringify(ExtractDataAuditoria(item)),
                 empresaId: user.empresa,
                 registradoPorId: user.user,
               }),
             );
 
-            await getAuditoriaService().createAll(dadosAuditoria, this as any);
+            await getAuditoriaService().createAll(dadosAuditoria, prismaClient);
 
             return resultado;
           },
