@@ -24,7 +24,7 @@ export class PrismaService
   private auditoriaService!: AuditoriaService;
 
   constructor(
-    private readonly tenantContext: TenantContextService,
+    private readonly tenantContextService: TenantContextService,
     private readonly moduleRef: ModuleRef,
   ) {
     const pool = new Pool({
@@ -40,16 +40,18 @@ export class PrismaService
       strict: false,
     });
 
-    const tenantContextService = this.tenantContext;
+    const tenantContext = this.tenantContextService;
 
     const getAuditoriaService = () => this.auditoriaService;
+
+    const prismaClient = this;
 
     this.extended = this.$extends({
       query: {
         gestor: {
           // CRIAÇÃO - create
           async create({ args, query }) {
-            const user = tenantContextService.getStore();
+            const user = tenantContext.getStore();
             const result = await query(args);
 
             if (!user) return result;
@@ -69,7 +71,15 @@ export class PrismaService
           },
           // ATUALIZAÇÃO UNICA - update
           async update({ args, query }) {
-            const user = tenantContextService.getStore();
+            const user = tenantContext.getStore();
+            if (!user) return query(args);
+
+            let acao = Acao.UPDATE;
+            const dataAny = args.data as any;
+            if (dataAny && dataAny._auditAction) {
+              acao = dataAny._auditAction;
+              delete dataAny._auditAction;
+            }
 
             const antes = await (this as any).gestor.findUnique({
               where: args.where,
@@ -80,7 +90,7 @@ export class PrismaService
             const dados: UpdateAuditoriaDto = {
               entidade: 'GESTOR',
               registroId: depois.id!,
-              acao: Acao.UPDATE,
+              acao: acao,
               antes: antes,
               depois: depois,
               empresaId: user!.empresa,
@@ -93,11 +103,17 @@ export class PrismaService
           },
           // ATUALIZAÇÃO EM LOTE - update many
           async updateMany({ args, query }) {
-            const user = tenantContextService.getStore();
-
+            const user = tenantContext.getStore();
             if (!user) return query(args);
 
-            const antes = await (this as any).gestor.findMany({
+            let acao = Acao.UPDATE;
+            const dataAny = args.data as any;
+            if (dataAny && dataAny._auditAction) {
+              acao = dataAny._auditAction;
+              delete dataAny._auditAction;
+            }
+
+            const antes = await prismaClient.gestor.findMany({
               where: args.where,
             });
 
@@ -107,13 +123,13 @@ export class PrismaService
               where: args.where,
             });
 
-            const dadosAuditoria = antes.map((itemAntes: any) => {
+            const dadosAuditoria = antes.map((itemAntes) => {
               const itemDepois = depois.find((d: any) => d.id === itemAntes.id);
 
               const dados: UpdateAuditoriaDto = {
                 entidade: 'GESTOR',
                 registroId: itemAntes.id,
-                acao: Acao.UPDATE,
+                acao: acao,
                 antes: ExtractDataAuditoria(itemAntes),
                 depois: ExtractDataAuditoria(itemDepois),
                 empresaId: user.empresa,
@@ -123,13 +139,13 @@ export class PrismaService
               return dados;
             });
 
-            await getAuditoriaService().updateAll(dadosAuditoria, this as any);
+            await getAuditoriaService().updateAll(dadosAuditoria, prismaClient);
 
             return resultado;
           },
           // REMOÇÃO UNICA - delete
           async delete({ args, query }) {
-            const user = tenantContextService.getStore();
+            const user = tenantContext.getStore();
             if (!user) return query(args);
 
             const dados = await (this as any).gestor.findUnique({
@@ -151,7 +167,7 @@ export class PrismaService
           },
           // REMOÇÃO EM LOTE - delete many
           async deleteMany({ args, query }) {
-            const user = tenantContextService.getStore();
+            const user = tenantContext.getStore();
             if (!user) return query(args);
 
             const dados = await (this as any).gestor.findMany({
@@ -179,6 +195,11 @@ export class PrismaService
       },
     });
   }
+
+  public get client() {
+    return this.extended || this;
+  }
+
   async onModuleDestroy() {
     await this.$disconnect();
   }

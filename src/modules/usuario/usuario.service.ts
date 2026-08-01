@@ -486,7 +486,7 @@ export class UsuarioService {
           },
         });
 
-        await this.gestor.deactive(inativar.id, autenticado, tx);
+        await this.gestor.deactive(inativar.id, tx);
 
         const depois = ExtractDataAuditoria(inativar);
 
@@ -600,13 +600,13 @@ export class UsuarioService {
           this.logger.warn(TYPES_NOTICES.NOT_DEACTIVE);
           throw new UnauthorizedException(TYPES_NOTICES.NOT_DEACTIVE);
         }
-        
+
         if (buscar.empresaId !== autenticado.empresa) {
           this.logger.warn(TYPES_NOTICES.NOT_BELONG);
           throw new UnauthorizedException(TYPES_NOTICES.NOT_BELONG);
         }
 
-        await this.gestor.remove(buscar.id, autenticado, tx);
+        await this.gestor.remove(buscar.id, tx);
 
         const deletar = await this.prisma.usuario.delete({
           where: { id: id },

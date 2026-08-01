@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Gestor } from './entities/gestor.entity';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -12,9 +13,11 @@ import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { Acao } from '@/generated/prisma/enums';
 import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
 import { AuditoriaService } from '../auditoria/auditoria.service';
-import { Prisma } from '@/generated/prisma/client';
+import { Prisma, Usuario } from '@/generated/prisma/client';
 import { QueryGestorFilterDto } from './dto/query-gestor.dto';
 import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { UsuarioService } from '../usuario/usuario.service';
 
 @Injectable()
 export class GestorService {
@@ -22,8 +25,19 @@ export class GestorService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly usuario: UsuarioService,
     private readonly auditoria: AuditoriaService,
+    private readonly tenantContext: TenantContextService,
   ) {}
+
+  private getCurrentUser() {
+    const user = this.tenantContext.getStore();
+    if (!user) {
+      this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+      throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+    }
+    return user;
+  }
 
   /* 
     CRIAR GESTOR:
@@ -145,7 +159,11 @@ export class GestorService {
       const client = tx ?? this.prisma;
 
       const buscar = await client.gestor.findFirst({
-        where: { colaboradorId: colaboradorId, gestorId: gestorId },
+        where: {
+          colaboradorId: colaboradorId,
+          gestorId: gestorId,
+          status: true,
+        },
       });
 
       if (!buscar) {
@@ -165,106 +183,100 @@ export class GestorService {
     - função interna.
     - inativa o gestor em conjunto com a inativação do usuario.
   */
-  async deactive(
-    id: string,
-    autenticado: Auth,
-    tx?: Prisma.TransactionClient,
-  ): Promise<Gestor> {
+  async deactive(id: string, tx?: Prisma.TransactionClient): Promise<Gestor> {
     try {
-      const executar = async (
-        client: Prisma.TransactionClient | PrismaService,
-      ) => {
-        const buscar = await this.findId(id, autenticado.userId, client);
+      const client = tx ?? this.prisma;
 
-        const antes = ExtractDataAuditoria(buscar);
+      const autenticado = this.getCurrentUser();
+      const buscar = await this.findId(id, autenticado.user, client);
 
-        const inativar = await client.gestor.update({
-          where: { id: buscar.id },
-          data: {
-            status: false,
-          },
-        });
-
-        const depois = ExtractDataAuditoria(inativar);
-
-        const dadosAuditoria: UpdateAuditoriaDto = {
-          entidade: 'GESTOR',
-          registroId: inativar.id,
-          acao: Acao.DEACTIVATE,
-          antes: antes,
-          depois: depois,
-          empresaId: autenticado.empresa,
-          registradoPorId: autenticado.userId,
-        };
-
-        await this.auditoria.update(dadosAuditoria);
-
-        return inativar;
-      };
-
-      let inativarGestor: any;
-      if (tx) {
-        inativarGestor = await executar(tx);
-      } else {
-        inativarGestor = await this.prisma.$transaction(async (novaTx) => {
-          return executar(novaTx);
-        });
+      if (!buscar.status) {
+        this.logger.warn(TYPES_NOTICES.IS_DEACTIVE);
+        throw new BadRequestException(TYPES_NOTICES.IS_DEACTIVE);
       }
 
+      const inativar = await client.gestor.update({
+        where: { id: buscar.id },
+        data: {
+          status: false,
+          _auditAction: Acao.DEACTIVATE,
+        },
+      });
+
       this.logger.log(TYPES_NOTICES.DEACTIVE);
-      return inativarGestor;
+      return inativar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - deactive');
       throw error;
     }
   }
+
+  /* 
+    INATIVAR GESTORES:
+    - inativa todos os gestores de acordo com a empresa que os mesmos pertencem.
+  */
+  async deactiveAll(
+    ids: Array<string>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Prisma.BatchPayload> {
+    try {
+      const client = tx ?? this.prisma;
+
+      if (ids.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+        throw new BadRequestException(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      const inativar = await client.gestor.updateMany({
+        where: { colaboradorId: { in: ids } },
+        data: { status: false, _auditAction: Acao.DEACTIVATE },
+      });
+
+      this.logger.log(TYPES_NOTICES.DEACTIVE_MANY);
+      return inativar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - deactiveall');
+      throw error;
+    }
+  }
+
   /* 
     REMOVER GESTOR PELO ID:
     - função interna.
     - usada em conjunto com a função de remoção de usuario.
   */
-  async remove(
-    id: string,
-    autenticado: Auth,
-    tx?: Prisma.TransactionClient,
-  ): Promise<Gestor> {
+  async remove(id: string, tx?: Prisma.TransactionClient): Promise<Gestor> {
     try {
-      const executar = async (
-        client: Prisma.TransactionClient | PrismaService,
-      ) => {
-        const buscar = await this.findId(id, autenticado.userId, client);
+      const autenticado = this.getCurrentUser();
+      const client = tx ?? this.prisma;
+      const buscar = await this.findId(id, autenticado.user, client);
 
-        if (!buscar) {
-          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
-          throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
-        }
-
-        if (buscar.status === true) {
-          this.logger.warn(TYPES_NOTICES.NOT_DEACTIVE);
-          throw new BadRequestException(TYPES_NOTICES.NOT_DEACTIVE);
-        }
-
-        const remover = await client.gestor.delete({
-          where: { id: buscar.id },
-        });
-
-        return remover;
-      };
-
-      let removerGestor: any;
-      if (tx) {
-        removerGestor = await executar(tx);
-      } else {
-        removerGestor = await this.prisma.$transaction(async (novaTx) => {
-          return executar(novaTx);
-        });
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
       }
 
+      if (buscar.status === true) {
+        this.logger.warn(TYPES_NOTICES.NOT_DEACTIVE);
+        throw new BadRequestException(TYPES_NOTICES.NOT_DEACTIVE);
+      }
+
+      const remover = await client.gestor.delete({
+        where: { id: buscar.id },
+      });
+
       this.logger.log(TYPES_NOTICES.DELETE);
-      return removerGestor;
+      return remover;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - remove');
       throw error;
     }
   }
+
+  /* 
+    REMOVER TODOS OS GESTORES:
+    - função interna.
+    - usada em conjunto com a função de remoção de usuario, de acordo com a remoção da empresa.
+  */
+  removeAll() {}
 }
