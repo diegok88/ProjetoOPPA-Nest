@@ -13,9 +13,11 @@ import {
   NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { JsonNull } from '@prisma/client/runtime/client';
 import { Pool } from 'pg';
 
 @Injectable()
@@ -216,3 +218,68 @@ export class PrismaService
     await this.$disconnect();
   }
 }
+
+/*
+ 
+    FUNÇÃO DE CRIAÇÃO UNICA DE REGISTO DE AUDITORIA:
+    - função interna.
+    - dentro da propria execução do metodo prisma.
+    
+    async function auditCreate (params: any, next: any, entidade: string) => {
+      const usuario = tenantContext.getStore();
+      const resultado = await next(params);
+      if (!usuario || !resultado) return resultado;
+
+      const dadosAuditoria: CreateAuditoriaDto = {
+        entidade: entidade,
+        registroId: resultado.id,
+        acao: Acao.CREATE,
+        dadosRegistrados: JSON.stringify(ExtractDataAuditoria(resultado)),
+        empresaId: usuario.empresa,
+        registradoPorId: usuario.user,
+      };
+
+      await getAuditoriaService().create(dadosAuditoria, prismaClient);
+
+      return resultado;
+    };
+    
+    FUNÇÃO DE ATUALIZAÇÃO UNICA DE REGISTO DE AUDITORIA:
+    - função interna.
+    - dentro da propria execução do metodo prisma.
+    
+    const auditUpdate = async (params: any, next: any, entidade: string) => {
+      const usuario = tenantContext.getStore();
+      if (!usuario) {
+        throw new UnauthorizedException(TYPES_NOTICES.INVALID_CREDENTIAL);
+      }
+
+      let acao = Acao.UPDATE;
+      const dataAny = params.args.data as any;
+      if (dataAny && dataAny._auditAction) {
+        acao = dataAny._auditAction;
+        delete dataAny._auditAction;
+      }
+
+      const antes = await prismaClient[entidade.toLowerCase()].findUnique({
+        where: params.args.where,
+      });
+
+      const depois = await next(params.args);
+
+      const dadosAuditoria: UpdateAuditoriaDto = {
+        entidade: entidade,
+        registroId: depois.id,
+        acao: acao,
+        antes: JSON.stringify(ExtractDataAuditoria(antes)),
+        depois: JSON.stringify(ExtractDataAuditoria(depois)),
+        empresaId: usuario.empresa,
+        registradoPorId: usuario.user,
+      };
+
+      await getAuditoriaService().update(dadosAuditoria, prismaClient);
+
+      return depois;
+    };
+
+*/
