@@ -38,6 +38,7 @@ import {
 import { Usuario, UsuarioMaster } from './entities/usuario.entity';
 import { PerfilService } from '../perfil/perfil.service';
 import { GestorService } from '../gestor/gestor.service';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 
 @Injectable()
 export class UsuarioService {
@@ -49,6 +50,7 @@ export class UsuarioService {
     @Inject(forwardRef(() => PerfilService))
     private readonly perfil: PerfilService,
     private readonly gestor: GestorService,
+    private readonly tenantContext: TenantContextService,
     private readonly auditoria: AuditoriaService,
   ) {}
 
@@ -85,21 +87,18 @@ export class UsuarioService {
   - o mesmo é criado mediante empresa, contador de cracha e perfil criados.
   - perfil de usuario da empresa de gestão do sistema.
   */
-  async createAssist(
-    autenticado: Auth,
-    create: CreateUsuarioAssistDto,
-  ): Promise<Usuario> {
+  async createAssist(create: CreateUsuarioAssistDto): Promise<Usuario> {
     try {
       const criarUsuario = await this.prisma.client.$transaction(
         async (tx: any) => {
+          const usuario = this.tenantContext.getStore()!;
           const senhaHash = await this.generateHash(PasswordPin.password);
           const pinHash = await this.generateHash(PasswordPin.pin);
 
           const dadosContador: UpdateContadorCrachaDto = {
             empresaId: create.empresaId,
-            registradoPorId: autenticado.userId,
+            registradoPorId: usuario.user,
           };
-          this.logger.debug(autenticado.empresa, autenticado.userId);
 
           const criarCracha = await this.contadorCracha.update(dadosContador);
 
@@ -114,7 +113,8 @@ export class UsuarioService {
 
           await this.gestor.create(criar.id, tx);
 
-          const dados = ExtractDataAuditoria(criar);
+          /* AGUARDADO O FUNCIONAMENTO...
+            const dados = ExtractDataAuditoria(criar);
 
           const dadosAuditoria: CreateAuditoriaDto = {
             entidade: 'USUARIO',
@@ -126,6 +126,7 @@ export class UsuarioService {
           };
 
           await this.auditoria.create(dadosAuditoria, tx);
+          */
 
           return criar;
         },
@@ -144,32 +145,33 @@ export class UsuarioService {
     - usuario de criação interna da empresa que usufrui do sistema.
     - permitido criar usuario administradores, gestores e operacional.
   */
-  async createAdmin(
-    autenticado: Auth,
-    create: CreateUsuarioAdmin,
-  ): Promise<Usuario> {
+  async createAdmin(create: CreateUsuarioAdmin): Promise<Usuario> {
     try {
-      const criarUsuario = await this.prisma.$transaction(async (tx) => {
-        const senhaHash = await this.generateHash(PasswordPin.password);
-        const pinHash = await this.generateHash(PasswordPin.pin);
+      const criarUsuario = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const usuario = this.tenantContext.getStore()!;
 
-        const dadosContador: UpdateContadorCrachaDto = {
-          empresaId: autenticado.empresa,
-          registradoPorId: autenticado.userId,
-        };
-        const criarCracha = await this.contadorCracha.update(dadosContador);
+          const senhaHash = await this.generateHash(PasswordPin.password);
+          const pinHash = await this.generateHash(PasswordPin.pin);
 
-        const criar = await tx.usuario.create({
-          data: {
-            ...create,
-            cracha: criarCracha.contador,
-            senha: senhaHash,
-            pin: pinHash,
-          },
-        });
+          const dadosContador: UpdateContadorCrachaDto = {
+            empresaId: usuario.empresa,
+            registradoPorId: usuario.user,
+          };
+          const criarCracha = await this.contadorCracha.update(dadosContador);
 
-        await this.gestor.create(criar.id, tx);
+          const criar = await tx.usuario.create({
+            data: {
+              ...create,
+              cracha: criarCracha.contador,
+              senha: senhaHash,
+              pin: pinHash,
+            },
+          });
 
+          await this.gestor.create(criar.id, tx);
+
+          /* AGUARDADO O FUNCIONAMENTO...
         const dados = await ExtractDataAuditoria(criar);
 
         const dadosAuditoria: CreateAuditoriaDto = {
@@ -182,9 +184,11 @@ export class UsuarioService {
         };
 
         await this.auditoria.create(dadosAuditoria);
+        */
 
-        return criar;
-      });
+          return criar;
+        },
+      );
       this.logger.log(TYPES_NOTICES.CREATE);
       return criarUsuario;
     } catch (error) {
@@ -198,18 +202,17 @@ export class UsuarioService {
     - o autorizado apenas para o perfil de supervisor.
     - apenas criar usuarios operacionais.
   */
-  async createGestor(
-    autenticado: Auth,
-    create: CreateUsuarioGestor,
-  ): Promise<Usuario> {
+  async createGestor(create: CreateUsuarioGestor): Promise<Usuario> {
     try {
       const criarUsuario = await this.prisma.$transaction(async (tx) => {
+        const usuario = this.tenantContext.getStore()!;
+
         const senhaHash = await this.generateHash(PasswordPin.password);
         const pinHash = await this.generateHash(PasswordPin.pin);
 
         const dadosContador: UpdateContadorCrachaDto = {
-          empresaId: autenticado.empresa,
-          registradoPorId: autenticado.userId,
+          empresaId: usuario.empresa,
+          registradoPorId: usuario.user,
         };
         const criarCracha = await this.contadorCracha.update(dadosContador);
 
@@ -222,12 +225,13 @@ export class UsuarioService {
             senha: senhaHash,
             pin: pinHash,
             perfilId: perfil.id,
-            empresaId: autenticado.empresa,
+            empresaId: usuario.empresa,
           },
         });
 
         await this.gestor.create(criar.id, tx);
 
+        /*
         const dados = ExtractDataAuditoria(criar);
 
         const dadosAuditoria: CreateAuditoriaDto = {
@@ -240,6 +244,7 @@ export class UsuarioService {
         };
 
         await this.auditoria.create(dadosAuditoria, tx);
+        */
 
         return criar;
       });
@@ -258,7 +263,7 @@ export class UsuarioService {
     tx?: Prisma.TransactionClient,
   ): Promise<Usuario[]> {
     try {
-      const client = tx ?? this.prisma;
+      const client = tx ?? this.prisma.client;
 
       const { campos, ...filtros } = query;
 
@@ -300,7 +305,7 @@ export class UsuarioService {
   */
   async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Usuario> {
     try {
-      const client = tx ?? this.prisma;
+      const client = tx ?? this.prisma.client;
 
       const buscar = await client.usuario.findUnique({
         where: { id: id },
@@ -328,7 +333,7 @@ export class UsuarioService {
     tx?: Prisma.TransactionClient,
   ): Promise<Usuario> {
     try {
-      const client = tx ?? this.prisma;
+      const client = tx ?? this.prisma.client;
 
       const condicao: Prisma.UsuarioWhereInput = {};
       condicao.cracha = query.cracha;
@@ -356,25 +361,22 @@ export class UsuarioService {
   }
 
   // ATUALIZA USUARIO PELO ID - atualiza todos os dados
-  async update(
-    id: string,
-    autenticado: Auth,
-    update: UpdateUsuarioDto,
-  ): Promise<Usuario> {
+  async update(id: string, update: UpdateUsuarioDto): Promise<Usuario> {
     try {
-      const atualizarUsuario = await this.prisma.$transaction(async (tx) => {
-        const buscar = await this.findOne(id, tx);
-        if (!buscar) {
-          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
-          throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
-        }
+      const atualizarUsuario = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const buscar = await this.findOne(id, tx);
+          if (!buscar) {
+            this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+            throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+          }
 
+          const atualizar = await tx.usuario.update({
+            where: { id: id },
+            data: update,
+          });
+          /*
         const antes = ExtractDataAuditoria(buscar);
-
-        const atualizar = await tx.usuario.update({
-          where: { id: id },
-          data: update,
-        });
 
         const depois = ExtractDataAuditoria(atualizar);
 
@@ -388,9 +390,11 @@ export class UsuarioService {
           registradoPorId: autenticado.userId,
         };
         await this.auditoria.update(dadosAuditoria);
+        */
 
-        return atualizar;
-      });
+          return atualizar;
+        },
+      );
 
       this.logger.log(TYPES_NOTICES.UPDATE);
       return atualizarUsuario;
@@ -401,51 +405,54 @@ export class UsuarioService {
   }
 
   async updatePasswordPinUsuario(
-    autenticado: Auth,
     update: UpdatePasswordPinDto,
     tipo: string,
   ): Promise<Usuario> {
     try {
-      const atualizarUsuario = await this.prisma.$transaction(async (tx) => {
-        const buscar = await this.findOne(autenticado.userId, tx);
+      const atualizarUsuario = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const usuario = this.tenantContext.getStore()!;
 
+          const buscar = await this.findOne(usuario.user, tx);
+
+          if (!buscar) {
+            this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+            throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+          }
+
+          const { senha, pin } = buscar;
+          let credencial: string;
+
+          if (tipo === 'PAS') credencial = senha;
+          else credencial = pin;
+
+          const { atual, nova } = update;
+          const validada = await this.compareHash(atual, credencial);
+
+          if (!validada) {
+            this.logger.log(TYPES_NOTICES.INVALID_CREDENTIAL);
+            throw new UnauthorizedException(TYPES_NOTICES.INVALID_CREDENTIAL);
+          }
+
+          const igual = await this.compareHash(nova, credencial);
+
+          if (igual) {
+            this.logger.log(TYPES_NOTICES.EQUALS_CREDENTIAL);
+            throw new BadRequestException(TYPES_NOTICES.EQUALS_CREDENTIAL);
+          }
+
+          const novoHash = await this.generateHash(nova);
+          const dado: { senha?: string; pin?: string } = {};
+          if (tipo === 'PAS') dado.senha = novoHash;
+          else dado.pin = novoHash;
+
+          const atualizar = await tx.usuario.update({
+            where: { id: usuario.user },
+            data: dado,
+          });
+
+          /*
         const antes = ExtractDataAuditoria(buscar);
-
-        if (!buscar) {
-          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
-          throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
-        }
-
-        const { senha, pin } = buscar;
-        let credencial: string;
-
-        if (tipo === 'PAS') credencial = senha;
-        else credencial = pin;
-
-        const { atual, nova } = update;
-        const validada = await this.compareHash(atual, credencial);
-
-        if (!validada) {
-          this.logger.log(TYPES_NOTICES.INVALID_CREDENTIAL);
-          throw new UnauthorizedException(TYPES_NOTICES.INVALID_CREDENTIAL);
-        }
-
-        const igual = await this.compareHash(nova, credencial);
-
-        if (igual) {
-          this.logger.log(TYPES_NOTICES.EQUALS_CREDENTIAL);
-          throw new BadRequestException(TYPES_NOTICES.EQUALS_CREDENTIAL);
-        }
-
-        const novoHash = await this.generateHash(nova);
-        const dado: { senha?: string; pin?: string } = {};
-        if (tipo === 'PAS') dado.senha = novoHash;
-        else dado.pin = novoHash;
-
-        const atualizar = await tx.usuario.update({
-          where: { id: autenticado.userId },
-          data: dado,
-        });
 
         const depois = ExtractDataAuditoria(atualizar);
 
@@ -460,9 +467,11 @@ export class UsuarioService {
         };
 
         await this.auditoria.update(dadosAuditoria, tx);
+        */
 
-        return atualizar;
-      });
+          return atualizar;
+        },
+      );
       return atualizarUsuario;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE);
@@ -471,17 +480,17 @@ export class UsuarioService {
   }
 
   // INATIVAR USUARIO
-  async deactive(id: string, autenticado: Auth): Promise<Usuario> {
+  async deactive(id: string): Promise<Usuario> {
     try {
       const inativarUsuario = await this.prisma.client.$transaction(
         async (tx: any) => {
+          const usuario = this.tenantContext.getStore();
+
           const buscar = await this.findOne(id, tx);
           if (!buscar) {
             this.logger.warn(TYPES_NOTICES.NOT_FOUND);
             throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
           }
-
-          const antes = ExtractDataAuditoria(buscar);
 
           const inativar = await tx.usuario.update({
             where: { id: id },
@@ -493,6 +502,9 @@ export class UsuarioService {
 
           await this.gestor.deactive(inativar.id, tx);
 
+          /*
+          const antes = ExtractDataAuditoria(buscar);
+          
           const depois = ExtractDataAuditoria(inativar);
 
           const dados: UpdateAuditoriaDto = {
@@ -506,6 +518,7 @@ export class UsuarioService {
           };
 
           await this.auditoria.update(dados, tx);
+          */
 
           return inativar;
         },
@@ -597,10 +610,12 @@ export class UsuarioService {
     DELETA O USUARIO TRAVES DO ID:
     - serviço autorizado apenas para gestores e administradores 
   */
-  async remove(id: string, autenticado: Auth): Promise<Usuario> {
+  async remove(id: string): Promise<Usuario> {
     try {
       const deletarUsuario = await this.prisma.client.$transaction(
         async (tx: any) => {
+          const usuario = this.tenantContext.getStore()!;
+
           const buscar = await this.findOne(id, tx);
 
           if (buscar.status === true) {
@@ -608,7 +623,7 @@ export class UsuarioService {
             throw new UnauthorizedException(TYPES_NOTICES.NOT_DEACTIVE);
           }
 
-          if (buscar.empresaId !== autenticado.empresa) {
+          if (buscar.empresaId !== usuario.empresa) {
             this.logger.warn(TYPES_NOTICES.NOT_BELONG);
             throw new UnauthorizedException(TYPES_NOTICES.NOT_BELONG);
           }
@@ -619,6 +634,7 @@ export class UsuarioService {
             where: { id: id },
           });
 
+          /*
           const dados = ExtractDataAuditoria(deletar);
 
           const dadosAuditoria: CreateAuditoriaDto = {
@@ -631,6 +647,8 @@ export class UsuarioService {
           };
 
           await this.auditoria.create(dadosAuditoria, tx);
+          */
+
           return deletar;
         },
       );

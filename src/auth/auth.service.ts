@@ -15,9 +15,10 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { plainToClass } from 'class-transformer';
-import { LoginDto, LogoutDto } from './dto/create-auth.dto';
+import { LoginDto } from './dto/create-auth.dto';
 import { ResponseAuthDto } from './dto/response-auth.dto';
 import { Auth } from './entities/auth.entity';
+import { UserContext } from './tenant-context/user-context.interface';
 
 @Injectable()
 export class AuthService {
@@ -52,7 +53,7 @@ export class AuthService {
   async login(login: LoginDto) {
     try {
       const loginUsuario = await this.prisma.$transaction(async (tx) => {
-        this.logger.debug(login);
+        this.logger.log('login()');
         const verificar: QueryUsuarioDto = {
           cracha: login.cracha,
           senha: login.senha,
@@ -85,16 +86,15 @@ export class AuthService {
           perfil: perfilId,
           empresa: empresaId,
         };
-        this.logger.debug(dadosToken, ' - login()');
         const token = await this.generateToken(dadosToken);
 
         this.logger.log('Token gerado com sucesso!');
-        
+
         const dadosAuditoria: CreateAuditoriaDto = {
           entidade: 'AUTH',
           registroId: id,
           acao: Acao.LOGIN,
-          dadosRegistrados: token,
+          dadosRegistrados: JSON.stringify(token),
           empresaId: empresaId,
           registradoPorId: id,
         };
@@ -110,22 +110,23 @@ export class AuthService {
   }
 
   // LOGOUT DO USUARIO
-  async logout(logout: LogoutDto): Promise<void> {
+  async logout(usuario: UserContext): Promise<void> {
     try {
-      const buscar = await this.usuario.findOne(logout.usuarioId);
+      const buscar = await this.usuario.findOne(usuario.user);
       const queryAuditoria: QueryAuditoriaFindOneLastDto = {
         acao: Acao.LOGIN,
-        empresaId: logout.usuarioId,
-        registradoPorId: logout.usuarioId,
+        empresaId: usuario.empresa,
+        registradoPorId: usuario.user,
       };
       const auditoria = await this.auditoria.findOneLast(queryAuditoria);
+
       const dadosAuditoria: CreateAuditoriaDto = {
         entidade: 'AUTH',
         registroId: buscar.id,
         acao: Acao.LOGOUT,
         dadosRegistrados: auditoria.dadosRegistrados,
-        empresaId: logout.empresaId,
-        registradoPorId: logout.usuarioId,
+        empresaId: usuario.empresa,
+        registradoPorId: usuario.user,
       };
       await this.auditoria.create(dadosAuditoria);
       this.logger.log(TYPES_NOTICES.LOGOUT);

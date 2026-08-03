@@ -5,22 +5,21 @@ import {
   Get,
   Logger,
   Post,
-  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
-import { LoginDto, LogoutDto } from './dto/create-auth.dto';
+import { LoginDto } from './dto/create-auth.dto';
 import {
   ResponseAuthDto,
   ResponseAuthMessageDto,
 } from './dto/response-auth.dto';
-import type { AuthenticatedRequest } from './express/authenticated-request.interface';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './guards/public.decorator';
 import { TenantContextService } from './tenant-context/tenant-context.service';
+import { UserContext } from './tenant-context/user-context.interface';
 
 @Controller('auth')
 @UseGuards(JwtAuthGuard)
@@ -51,23 +50,17 @@ export class AuthController {
   @Post('logout')
   async logout(
     @Res({ passthrough: true }) res: Response,
-    @Req() req: AuthenticatedRequest,
   ): Promise<ResponseAuthMessageDto> {
-    this.logger.debug(req.user);
-    const usuario: LogoutDto = {
-      usuarioId: req.user.userId,
-      empresaId: req.user.empresa,
-    };
+    const usuario: UserContext = this.tenantContext.getStore()!;
     await this.authService.logout(usuario);
     res.clearCookie('jwt');
     return plainToClass(ResponseAuthMessageDto, TYPES_NOTICES.LOGOUT);
   }
 
   @Get('profile')
-  async getIt(@Req() req: AuthenticatedRequest): Promise<ResponseAuthDto> {
-    const user = this.tenantContext.getStore();
-    this.logger.debug(user?.empresa, 'getIt');
-    this.logger.debug(req.user, 'getIt');
-    return this.authService.findProfile(req.user.userId);
+  async getIt(): Promise<ResponseAuthDto> {
+    const usuario = this.tenantContext.getStore()!;
+    this.logger.log('getIt()');
+    return this.authService.findProfile(usuario.user);
   }
 }

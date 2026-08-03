@@ -12,10 +12,8 @@ import {
 import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
 import {
   QueryAuditoriaFilterDto,
-  QueryAuditoriaFindOneLastDto,
 } from './dto/query-auditoria.dto';
 import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
-import { PrismaModule } from '@/prisma/prisma.module';
 
 @Injectable()
 export class AuditoriaService {
@@ -56,12 +54,10 @@ export class AuditoriaService {
     tx?: Prisma.TransactionClient,
   ): Promise<Auditoria> {
     try {
-      const { dadosRegistrados, ...dados } = createAuditoriaDto;
-      const formatString = JSON.stringify(dadosRegistrados);
       const client = tx ?? this.prisma.client;
 
       const criar = await client.auditoria.create({
-        data: { ...dados, dadosRegistrados: formatString },
+        data: createAuditoriaDto,
       });
 
       this.logger.log(TYPES_NOTICES.CREATE);
@@ -219,7 +215,7 @@ export class AuditoriaService {
   }
 
   // SERVIÇO DE BUSCA DE DADOS SEM ID - função interna sem CONTROLLER
-  async findOneLast(query: QueryAuditoriaFindOneLastDto): Promise<Auditoria> {
+  async findOneLast(query: QueryAuditoriaFilterDto): Promise<Auditoria> {
     try {
       const condicao: Prisma.AuditoriaWhereInput = {};
       condicao.acao = query.acao;
@@ -228,9 +224,12 @@ export class AuditoriaService {
 
       const buscar = await this.prisma.auditoria.findFirst({
         where: condicao,
+        orderBy: { dataHora: 'desc' },
+        take: 1,
       });
 
       if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
         throw new NotFoundException();
       }
 

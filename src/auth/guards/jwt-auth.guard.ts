@@ -1,14 +1,18 @@
 import {
   ExecutionContext,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY } from './public.decorator';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
+  private logger = new Logger(JwtAuthGuard.name);
+
   constructor(private reflector: Reflector) {
     super();
   }
@@ -25,8 +29,14 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   handleRequest(error: any, user: any) {
-    if (error || !user) {
-      throw error || new UnauthorizedException('Token inválido ou ausente!');
+    this.logger.log('handleRequest()');
+    if (error) {
+      this.logger.error(TYPES_NOTICES.TOKEN_INVALID);
+      throw new UnauthorizedException(`Token inválido: ${error.message}`);
+    }
+    if (!user) {
+      this.logger.error(TYPES_NOTICES.UNAUTHORIZED);
+      throw error || new UnauthorizedException(`Usuário inválido`);
     }
     return user;
   }

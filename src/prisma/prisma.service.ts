@@ -49,14 +49,18 @@ export class PrismaService
     const getAuditoriaService = () => this.auditoriaService;
     const prismaClient = this;
 
-    const MODELOS_AUDITADOS = ['gestor'];
+    /* 
+    MODELOS QUE SERÃO PERMITIDOS SEREM AUDITADOS. 
+    - constante que determina quais modelos podem sofrer auditoria.
+    */
+    const MODELOS_AUDITADOS = ['Usuario', 'Gestor'];
 
     this.extended = this.$extends({
       query: {
         $allModels: {
           // CRIAÇÃO - create
           async create({ model, args, query }) {
-            const modeloNome = model.toUpperCase();
+            const modeloNome = model;
             const usuario = tenantContext.getStore();
             const resultado = await query(args);
 
@@ -64,7 +68,7 @@ export class PrismaService
             if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
 
             const dados: CreateAuditoriaDto = {
-              entidade: modeloNome,
+              entidade: modeloNome.toUpperCase(),
               registroId: resultado.id!,
               acao: Acao.CREATE,
               dadosRegistrados: JSON.stringify(ExtractDataAuditoria(resultado)),
@@ -77,9 +81,12 @@ export class PrismaService
           },
           // ATUALIZAÇÃO UNICA - update
           async update({ model, args, query }) {
-            const modeloNome = model.toUpperCase();
+            const modeloNome = model;
+            const resultado = query(args);
             const user = tenantContext.getStore();
-            if (!user) return query(args);
+
+            if (!user) return resultado;
+            if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
 
             let acao = Acao.UPDATE;
             const dataAny = args.data as any;
@@ -95,7 +102,7 @@ export class PrismaService
             const depois = await query(args);
 
             const dados: UpdateAuditoriaDto = {
-              entidade: 'GESTOR',
+              entidade: modeloNome.toUpperCase(),
               registroId: depois.id!,
               acao: acao,
               antes: ExtractDataAuditoria(antes),
@@ -106,12 +113,16 @@ export class PrismaService
 
             await getAuditoriaService().update(dados, prismaClient);
 
-            return depois;
+            return resultado;
           },
           // ATUALIZAÇÃO EM LOTE - update many
           async updateMany({ model, args, query }) {
+            const modeloNome = model;
             const user = tenantContext.getStore();
+            const resultado = await query(args);
+
             if (!user) return query(args);
+            if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
 
             let acao = Acao.UPDATE;
             const dataAny = args.data as any;
@@ -124,8 +135,6 @@ export class PrismaService
               where: args.where,
             });
 
-            const resultado = await query(args);
-
             const depois = await prismaClient[model].findMany({
               where: args.where,
             });
@@ -134,7 +143,7 @@ export class PrismaService
               const itemDepois = depois.find((d: any) => d.id === itemAntes.id);
 
               const dados: UpdateAuditoriaDto = {
-                entidade: 'GESTOR',
+                entidade: modeloNome.toUpperCase(),
                 registroId: itemAntes.id,
                 acao: acao,
                 antes: ExtractDataAuditoria(itemAntes),
@@ -152,8 +161,12 @@ export class PrismaService
           },
           // REMOÇÃO UNICA - delete
           async delete({ model, args, query }) {
+            const modeloNome = model;
             const user = tenantContext.getStore();
-            if (!user) return query(args);
+            const resultado = query(args);
+
+            if (!user) return resultado;
+            if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
 
             const dados = await prismaClient[model].findUnique({
               where: args.where,
@@ -164,7 +177,7 @@ export class PrismaService
             }
 
             const dadosAuditoria: CreateAuditoriaDto = {
-              entidade: 'GESTOR',
+              entidade: modeloNome.toUpperCase(),
               registroId: dados.id,
               acao: Acao.DELETE,
               dadosRegistrados: ExtractDataAuditoria(dados),
@@ -174,22 +187,24 @@ export class PrismaService
 
             await getAuditoriaService().create(dadosAuditoria, prismaClient);
 
-            return dados;
+            return resultado;
           },
           // REMOÇÃO EM LOTE - delete many
           async deleteMany({ model, args, query }) {
+            const modeloNome = model;
             const user = tenantContext.getStore();
+            const resultado = await query(args);
+
             if (!user) return query(args);
+            if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
 
             const dados = await prismaClient[model].findMany({
               where: args.where,
             });
 
-            const resultado = await query(args);
-
             const dadosAuditoria: CreateAuditoriaDto[] = dados.map(
               (item: any) => ({
-                entidade: 'GESTOR',
+                entidade: modeloNome.toUpperCase(),
                 registroId: item.id,
                 acao: Acao.DELETE,
                 dadosRegistrados: JSON.stringify(ExtractDataAuditoria(item)),

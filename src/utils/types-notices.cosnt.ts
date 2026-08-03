@@ -23,5 +23,6 @@ export const TYPES_NOTICES = {
   LOGIN: 'Login realizado com sucesso!',
   INVALID_CREDENTIAL: 'Credencial inválida!',
   EQUALS_CREDENTIAL: 'Credencial igual!',
+  TOKEN_INVALID: 'Token inválido!',
   NOT_BELONG: 'Registro não pertence!',
 } as const;

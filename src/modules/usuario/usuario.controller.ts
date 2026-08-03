@@ -46,11 +46,9 @@ export class UsuarioController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async createAssist(
-    @Req() req: AuthenticatedRequest,
     @Body() create: CreateUsuarioAdmin,
   ): Promise<ResponseUsuarioDto> {
-    const autenticado = req.user;
-    const dado = await this.usuarioService.createAssist(autenticado, create);
+    const dado = await this.usuarioService.createAssist(create);
     return plainToClass(ResponseUsuarioDto, dado);
   }
 
@@ -59,11 +57,19 @@ export class UsuarioController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async createAdmin(
-    @Req() req: AuthenticatedRequest,
     @Body() create: CreateUsuarioAdmin,
   ): Promise<ResponseUsuarioDto> {
-    const autenticado = req.user;
-    const dado = this.usuarioService.createAdmin(autenticado, create);
+    const dado = this.usuarioService.createAdmin(create);
+    return plainToClass(ResponseUsuarioDto, dado);
+  }
+
+  @Post('gestor')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ASN1)
+  async createGestor(
+    @Body() create: CreateUsuarioAdmin,
+  ): Promise<ResponseUsuarioDto> {
+    const dado = this.usuarioService.createGestor(create);
     return plainToClass(ResponseUsuarioDto, dado);
   }
 
@@ -114,11 +120,9 @@ export class UsuarioController {
   @Roles(ROLES.ASN1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: AuthenticatedRequest,
     @Body() update: UpdateUsuarioDto,
   ): Promise<ResponseUsuarioDto> {
-    const autenticado = req.user;
-    const dado = await this.usuarioService.update(id, autenticado, update);
+    const dado = await this.usuarioService.update(id, update);
     return plainToClass(ResponseUsuarioDto, dado);
   }
 
@@ -126,13 +130,11 @@ export class UsuarioController {
   @Patch('password')
   @UseGuards(JwtAuthGuard)
   async updatePassword(
-    @Req() req: AuthenticatedRequest,
     @Body() update: UpdatePasswordPinDto,
   ): Promise<ResponseUsuarioDto> {
-    const autenticado = req.user;
+    console.log(update);
     const tipo = 'PAS';
     const dado = await this.usuarioService.updatePasswordPinUsuario(
-      autenticado,
       update,
       tipo,
     );
@@ -143,13 +145,10 @@ export class UsuarioController {
   @Patch('pin')
   @UseGuards(JwtAuthGuard)
   async updatePin(
-    @Req() req: AuthenticatedRequest,
     @Body() update: UpdatePasswordPinDto,
   ): Promise<ResponseUsuarioDto> {
-    const autenticado = req.user;
     const tipo = 'PIN';
     const dado = await this.usuarioService.updatePasswordPinUsuario(
-      autenticado,
       update,
       tipo,
     );
@@ -162,10 +161,8 @@ export class UsuarioController {
   @Roles(ROLES.ASN1)
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: AuthenticatedRequest,
   ): Promise<ResponseUsuarioDto> {
-    const autenticado = req.user;
-    const dado = await this.usuarioService.deactive(id, autenticado);
+    const dado = await this.usuarioService.deactive(id);
     return plainToClass(ResponseUsuarioDto, dado);
   }
 
@@ -175,10 +172,8 @@ export class UsuarioController {
   @Roles(ROLES.ASN1)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: AuthenticatedRequest,
   ): Promise<ResponseUsuarioDto> {
-    const autenticado = req.user;
-    const dado = await this.usuarioService.remove(id, autenticado);
+    const dado = await this.usuarioService.remove(id);
     return plainToClass(ResponseUsuarioDto, dado);
   }
 }

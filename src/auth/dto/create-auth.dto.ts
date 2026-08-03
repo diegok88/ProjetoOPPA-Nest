@@ -25,13 +25,3 @@ export class LoginDto {
   @IsNotEmpty({ message: 'Empresa é um campo obrigatório.' })
   empresaId!: string;
 }
-
-export class LogoutDto {
-  @IsUUID('all', { message: 'Empresa id inválido.' })
-  @IsNotEmpty({ message: 'Empresa é um campo obrigatório.' })
-  usuarioId!: string;
-
-  @IsUUID('all', { message: 'Empresa id inválido.' })
-  @IsNotEmpty({ message: 'Empresa é um campo obrigatório.' })
-  empresaId!: string;
-}
