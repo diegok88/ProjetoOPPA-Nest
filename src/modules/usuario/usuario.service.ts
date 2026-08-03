@@ -1,5 +1,6 @@
 import { Auth } from '@/auth/entities/auth.entity';
 import { ROLES } from '@/auth/guards/roles.const';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 import { PasswordPin } from '@/constants/password-pin.const';
 import { Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
@@ -21,6 +22,8 @@ import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
 import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
+import { GestorService } from '../gestor/gestor.service';
+import { PerfilService } from '../perfil/perfil.service';
 import {
   CreateUsuarioAdmin,
   CreateUsuarioAssistDto,
@@ -32,13 +35,10 @@ import {
   QueryUsuarioDto,
 } from './dto/query-usuario.dto';
 import {
-  UpdatePasswordPinDto,
   UpdateUsuarioDto,
+  UpdateUsuarioPasswordDto,
 } from './dto/update-usuario.dto';
 import { Usuario, UsuarioMaster } from './entities/usuario.entity';
-import { PerfilService } from '../perfil/perfil.service';
-import { GestorService } from '../gestor/gestor.service';
-import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 
 @Injectable()
 export class UsuarioService {
@@ -113,21 +113,6 @@ export class UsuarioService {
 
           await this.gestor.create(criar.id, tx);
 
-          /* AGUARDADO O FUNCIONAMENTO...
-            const dados = ExtractDataAuditoria(criar);
-
-          const dadosAuditoria: CreateAuditoriaDto = {
-            entidade: 'USUARIO',
-            registroId: criar.id,
-            acao: Acao.CREATE,
-            dadosRegistrados: dados,
-            empresaId: autenticado.empresa,
-            registradoPorId: autenticado.userId,
-          };
-
-          await this.auditoria.create(dadosAuditoria, tx);
-          */
-
           return criar;
         },
       );
@@ -170,21 +155,6 @@ export class UsuarioService {
           });
 
           await this.gestor.create(criar.id, tx);
-
-          /* AGUARDADO O FUNCIONAMENTO...
-        const dados = await ExtractDataAuditoria(criar);
-
-        const dadosAuditoria: CreateAuditoriaDto = {
-          entidade: 'USUARIO',
-          registroId: criar.id,
-          acao: Acao.CREATE,
-          dadosRegistrados: dados,
-          empresaId: autenticado.empresa,
-          registradoPorId: autenticado.userId,
-        };
-
-        await this.auditoria.create(dadosAuditoria);
-        */
 
           return criar;
         },
@@ -230,21 +200,6 @@ export class UsuarioService {
         });
 
         await this.gestor.create(criar.id, tx);
-
-        /*
-        const dados = ExtractDataAuditoria(criar);
-
-        const dadosAuditoria: CreateAuditoriaDto = {
-          entidade: 'USUARIO',
-          registroId: criar.id,
-          acao: Acao.CREATE,
-          dadosRegistrados: dados,
-          empresaId: autenticado.empresa,
-          registradoPorId: autenticado.userId,
-        };
-
-        await this.auditoria.create(dadosAuditoria, tx);
-        */
 
         return criar;
       });
@@ -360,7 +315,11 @@ export class UsuarioService {
     }
   }
 
-  // ATUALIZA USUARIO PELO ID - atualiza todos os dados
+  /*
+  ATUALIZA USUARIO PELO ID: 
+  - atualiza todos os dados
+  - ajustar o mesmo de acordo com o perfil do usuario
+  */
   async update(id: string, update: UpdateUsuarioDto): Promise<Usuario> {
     try {
       const atualizarUsuario = await this.prisma.client.$transaction(
@@ -375,22 +334,6 @@ export class UsuarioService {
             where: { id: id },
             data: update,
           });
-          /*
-        const antes = ExtractDataAuditoria(buscar);
-
-        const depois = ExtractDataAuditoria(atualizar);
-
-        const dadosAuditoria: UpdateAuditoriaDto = {
-          entidade: 'USUARIO',
-          registroId: atualizar.id,
-          acao: 'UPDATE',
-          antes: antes,
-          depois: depois,
-          empresaId: autenticado.empresa,
-          registradoPorId: autenticado.userId,
-        };
-        await this.auditoria.update(dadosAuditoria);
-        */
 
           return atualizar;
         },
@@ -404,8 +347,13 @@ export class UsuarioService {
     }
   }
 
+  /*
+  ATUALIZA A SENHA E O PIN:
+  - função de atualização atraves das credenciais do token.
+  - operação feita apenas do usuario logado.
+  */
   async updatePasswordPinUsuario(
-    update: UpdatePasswordPinDto,
+    update: UpdateUsuarioPasswordDto,
     tipo: string,
   ): Promise<Usuario> {
     try {
@@ -426,22 +374,22 @@ export class UsuarioService {
           if (tipo === 'PAS') credencial = senha;
           else credencial = pin;
 
-          const { atual, nova } = update;
+          const { atual, novo } = update;
           const validada = await this.compareHash(atual, credencial);
 
           if (!validada) {
-            this.logger.log(TYPES_NOTICES.INVALID_CREDENTIAL);
+            this.logger.warn(TYPES_NOTICES.INVALID_CREDENTIAL);
             throw new UnauthorizedException(TYPES_NOTICES.INVALID_CREDENTIAL);
           }
 
-          const igual = await this.compareHash(nova, credencial);
+          const igual = await this.compareHash(novo, credencial);
 
           if (igual) {
             this.logger.log(TYPES_NOTICES.EQUALS_CREDENTIAL);
             throw new BadRequestException(TYPES_NOTICES.EQUALS_CREDENTIAL);
           }
 
-          const novoHash = await this.generateHash(nova);
+          const novoHash = await this.generateHash(novo);
           const dado: { senha?: string; pin?: string } = {};
           if (tipo === 'PAS') dado.senha = novoHash;
           else dado.pin = novoHash;
@@ -451,27 +399,10 @@ export class UsuarioService {
             data: dado,
           });
 
-          /*
-        const antes = ExtractDataAuditoria(buscar);
-
-        const depois = ExtractDataAuditoria(atualizar);
-
-        const dadosAuditoria: UpdateAuditoriaDto = {
-          entidade: 'USUARIO',
-          registroId: atualizar.id,
-          acao: Acao.UPDATE,
-          antes: antes,
-          depois: depois,
-          empresaId: autenticado.empresa,
-          registradoPorId: autenticado.userId,
-        };
-
-        await this.auditoria.update(dadosAuditoria, tx);
-        */
-
           return atualizar;
         },
       );
+      this.logger.log('Credencial atualizado com sucesso');
       return atualizarUsuario;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE);
@@ -479,7 +410,11 @@ export class UsuarioService {
     }
   }
 
-  // INATIVAR USUARIO
+  /*
+  INATIVAR USUARIO:
+  - inativa o usuario de forma de requisição.
+  - inativa juntamente com o gestor.
+  */
   async deactive(id: string): Promise<Usuario> {
     try {
       const inativarUsuario = await this.prisma.client.$transaction(
@@ -501,24 +436,6 @@ export class UsuarioService {
           });
 
           await this.gestor.deactive(inativar.id, tx);
-
-          /*
-          const antes = ExtractDataAuditoria(buscar);
-          
-          const depois = ExtractDataAuditoria(inativar);
-
-          const dados: UpdateAuditoriaDto = {
-            entidade: 'USUARIO',
-            registroId: id,
-            acao: Acao.UPDATE,
-            antes: antes,
-            depois: depois,
-            empresaId: autenticado.empresa,
-            registradoPorId: autenticado.userId,
-          };
-
-          await this.auditoria.update(dados, tx);
-          */
 
           return inativar;
         },
@@ -599,7 +516,7 @@ export class UsuarioService {
         });
       }
 
-      this.logger.log(TYPES_NOTICES);
+      this.logger.log(TYPES_NOTICES.DEACTIVE_MANY);
     } catch (error) {
       this.logger.error('Falha ao inativar o conjunto de usuários.');
       throw error;
@@ -608,7 +525,8 @@ export class UsuarioService {
 
   /* 
     DELETA O USUARIO TRAVES DO ID:
-    - serviço autorizado apenas para gestores e administradores 
+    - serviço autorizado apenas para gestores e administradores.
+    - elimina os dados do gestor. 
   */
   async remove(id: string): Promise<Usuario> {
     try {
@@ -633,21 +551,6 @@ export class UsuarioService {
           const deletar = await tx.usuario.delete({
             where: { id: id },
           });
-
-          /*
-          const dados = ExtractDataAuditoria(deletar);
-
-          const dadosAuditoria: CreateAuditoriaDto = {
-            entidade: 'USUARIO',
-            registroId: id,
-            acao: Acao.DELETE,
-            dadosRegistrados: dados,
-            empresaId: autenticado.empresa,
-            registradoPorId: autenticado.userId,
-          };
-
-          await this.auditoria.create(dadosAuditoria, tx);
-          */
 
           return deletar;
         },
@@ -721,7 +624,7 @@ export class UsuarioService {
   }
 
   // METODO DE COMPARAÇÃO DE HASH
-  async compareHash(atualHash: string, novoHash: string): Promise<boolean> {
+  async compareHash(novoHash: string, atualHash: string): Promise<boolean> {
     const vadidadorHash = await bcrypt.compare(novoHash, atualHash);
     return vadidadorHash;
   }

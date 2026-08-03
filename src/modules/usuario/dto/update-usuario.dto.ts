@@ -1,9 +1,10 @@
-import { OmitType, PartialType, PickType } from '@nestjs/mapped-types';
+import { OmitType, PartialType } from '@nestjs/mapped-types';
 import {
   IsBoolean,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Length,
   Matches,
   MinLength,
 } from 'class-validator';
@@ -17,8 +18,8 @@ export class UpdateUsuarioDto extends PartialType(
   status?: boolean;
 }
 
-export class UpdatePasswordPinDto {
-  @IsString({ message: 'Nome não é do tipo String.' })
+export class UpdateUsuarioPasswordDto {
+  @IsString({ message: 'Senha não é do tipo String.' })
   @MinLength(6, { message: 'Senha deve conter no minimo 6 caracteres.' })
   @IsNotEmpty({ message: 'Senha é um campo obrigatório.' })
   @Matches(/^[a-zA-Z0-9]+$/, {
@@ -26,11 +27,29 @@ export class UpdatePasswordPinDto {
   })
   atual!: string;
 
-  @IsString({ message: 'Nome não é do tipo String.' })
+  @IsString({ message: 'Senha não é do tipo String.' })
   @MinLength(6, { message: 'Senha deve conter no minimo 6 caracteres.' })
   @IsNotEmpty({ message: 'Senha é um campo obrigatório.' })
   @Matches(/^[a-zA-Z0-9]+$/, {
     message: 'Senha deve conter apenas letras e números',
   })
-  nova!: string;
+  novo!: string;
+}
+
+export class UpdateUsuarioPinDto {
+  @IsString({ message: 'Pin não é do tipo String.' })
+  @Length(4, 4, { message: 'Pin deve conter no minimo 4 caracteres.' })
+  @IsNotEmpty({ message: 'Pin é um campo obrigatório.' })
+  @Matches(/^\d+$/, {
+    message: 'Pin deve conter apenas números',
+  })
+  atual!: string;
+
+  @IsString({ message: 'Pin não é do tipo String.' })
+  @Length(4, 4, { message: 'Pin deve conter no minimo 4 caracteres.' })
+  @IsNotEmpty({ message: 'Pin é um campo obrigatório.' })
+  @Matches(/^\d+$/, {
+    message: 'Pin deve conter apenas números',
+  })
+  novo!: string;
 }

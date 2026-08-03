@@ -1,5 +1,6 @@
 import type { AuthenticatedRequest } from '@/auth/express/authenticated-request.interface';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
+import { Public } from '@/auth/guards/public.decorator';
 import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
@@ -24,16 +25,19 @@ import {
 import { QueryAdminDto, QueryUsuarioDto } from './dto/query-usuario.dto';
 import { ResponseUsuarioDto } from './dto/response-usuario.dto';
 import {
-  UpdatePasswordPinDto,
   UpdateUsuarioDto,
+  UpdateUsuarioPasswordDto,
+  UpdateUsuarioPinDto,
 } from './dto/update-usuario.dto';
 import { UsuarioService } from './usuario.service';
 
 @Controller('usuario')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class UsuarioController {
   constructor(private readonly usuarioService: UsuarioService) {}
   // CRIAR USUARIO MASTER
   @Post('master')
+  @Public()
   async createMaster(
     @Body() createUsuarioMaster: CreateUsuarioMaster,
   ): Promise<ResponseUsuarioDto> {
@@ -43,7 +47,6 @@ export class UsuarioController {
 
   // CRIAR USUARIO COMO ASSISTENCIA
   @Post('assist')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async createAssist(
     @Body() create: CreateUsuarioAdmin,
@@ -54,7 +57,6 @@ export class UsuarioController {
 
   // CRIAR USUARIO COMO ADMINISTRADOR
   @Post('admin')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async createAdmin(
     @Body() create: CreateUsuarioAdmin,
@@ -64,7 +66,6 @@ export class UsuarioController {
   }
 
   @Post('gestor')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async createGestor(
     @Body() create: CreateUsuarioAdmin,
@@ -75,7 +76,6 @@ export class UsuarioController {
 
   // LISTA OS USUARIOS
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async findAll(
     @Query() queryUsuarioDto: QueryUsuarioDto,
@@ -86,7 +86,6 @@ export class UsuarioController {
 
   // LISTA OS USUARIOS COM PARAMETROS ESPECIFICOS, MAIS USANDO O MESMO SERVIÇO
   @Get('admin')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async findAllAdmin(
     @Req() req: AuthenticatedRequest,
@@ -106,7 +105,6 @@ export class UsuarioController {
 
   // BUSCA USUARIO PELO ID
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseUsuarioDto> {
@@ -116,7 +114,6 @@ export class UsuarioController {
 
   // ATUALIZA USUARIO PELO ID
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -127,25 +124,23 @@ export class UsuarioController {
   }
 
   // ATUALIZA O SENHA DO USUARIO
-  @Patch('password')
-  @UseGuards(JwtAuthGuard)
+  @Post('password')
   async updatePassword(
-    @Body() update: UpdatePasswordPinDto,
+    @Body() updatePassword: UpdateUsuarioPasswordDto,
   ): Promise<ResponseUsuarioDto> {
-    console.log(update);
+    console.log(updatePassword);
     const tipo = 'PAS';
     const dado = await this.usuarioService.updatePasswordPinUsuario(
-      update,
+      updatePassword,
       tipo,
     );
     return plainToClass(ResponseUsuarioDto, dado);
   }
 
   // ATUALIZA O PIN DO USUARIO
-  @Patch('pin')
-  @UseGuards(JwtAuthGuard)
+  @Post('pin')
   async updatePin(
-    @Body() update: UpdatePasswordPinDto,
+    @Body() update: UpdateUsuarioPinDto,
   ): Promise<ResponseUsuarioDto> {
     const tipo = 'PIN';
     const dado = await this.usuarioService.updatePasswordPinUsuario(
@@ -157,7 +152,6 @@ export class UsuarioController {
 
   // INATIVAR USUARIO
   @Patch('deactive/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
@@ -168,7 +162,6 @@ export class UsuarioController {
 
   // DELETA O USUARIO
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,

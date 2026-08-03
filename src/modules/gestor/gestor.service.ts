@@ -1,3 +1,8 @@
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { Prisma, Usuario } from '@/generated/prisma/client';
+import { Acao } from '@/generated/prisma/enums';
+import { PrismaService } from '@/prisma/prisma.service';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import {
   BadRequestException,
   Injectable,
@@ -5,13 +10,8 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Gestor } from './entities/gestor.entity';
-import { PrismaService } from '@/prisma/prisma.service';
-import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
-import { Acao } from '@/generated/prisma/enums';
-import { Prisma, Usuario } from '@/generated/prisma/client';
 import { QueryGestorFilterDto } from './dto/query-gestor.dto';
-import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { Gestor } from './entities/gestor.entity';
 
 @Injectable()
 export class GestorService {

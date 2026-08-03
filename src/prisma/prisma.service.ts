@@ -180,7 +180,7 @@ export class PrismaService
               entidade: modeloNome.toUpperCase(),
               registroId: dados.id,
               acao: Acao.DELETE,
-              dadosRegistrados: ExtractDataAuditoria(dados),
+              dadosRegistrados: JSON.stringify(ExtractDataAuditoria(dados)),
               empresaId: user.empresa,
               registradoPorId: user.user,
             };
