@@ -38,7 +38,7 @@ export class AuthService {
       perfil: token.perfil,
       empresa: token.empresa,
     };
-    this.logger.debug(payload, 'generateToken()');
+    this.logger.debug('generateToken()');
     return this.jwtService.sign(payload);
   }
 
@@ -77,6 +77,11 @@ export class AuthService {
         }
 
         if (!perfilId) {
+          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+          throw new BadRequestException(TYPES_NOTICES.NOT_FOUND);
+        }
+
+        if (!empresaId) {
           this.logger.warn(TYPES_NOTICES.NOT_FOUND);
           throw new BadRequestException(TYPES_NOTICES.NOT_FOUND);
         }

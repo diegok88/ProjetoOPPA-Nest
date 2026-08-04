@@ -5,7 +5,7 @@ import { AuditoriaModule } from '../auditoria/auditoria.module';
 import { PerfilModule } from '../perfil/perfil.module';
 
 @Module({
-  imports: [forwardRef(() => AuditoriaModule), forwardRef(() => PerfilModule)],
+  imports: [forwardRef(() => PerfilModule)],
   controllers: [ContadorCrachaController],
   providers: [ContadorCrachaService],
   exports: [ContadorCrachaService],

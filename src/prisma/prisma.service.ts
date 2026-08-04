@@ -53,7 +53,13 @@ export class PrismaService
     MODELOS QUE SERÃO PERMITIDOS SEREM AUDITADOS. 
     - constante que determina quais modelos podem sofrer auditoria.
     */
-    const MODELOS_AUDITADOS = ['Usuario', 'Gestor'];
+    const MODELOS_AUDITADOS = [
+      'Usuario',
+      'Gestor',
+      'Empresa',
+      'ContadorDeCracha',
+      'Perfil',
+    ];
 
     this.extended = this.$extends({
       query: {

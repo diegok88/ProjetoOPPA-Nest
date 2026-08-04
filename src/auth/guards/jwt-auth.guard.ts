@@ -30,7 +30,6 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
   handleRequest(error: any, user: any) {
     this.logger.log('handleRequest()');
-    this.logger.debug(user);
     if (error) {
       this.logger.error(TYPES_NOTICES.TOKEN_INVALID);
       throw new UnauthorizedException(`Token inválido: ${error.message}`);

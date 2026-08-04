@@ -5,7 +5,7 @@ import { AuditoriaModule } from '../auditoria/auditoria.module';
 import { UsuarioModule } from '../usuario/usuario.module';
 
 @Module({
-  imports: [forwardRef(() => UsuarioModule), forwardRef(() => AuditoriaModule)],
+  imports: [forwardRef(() => UsuarioModule)],
   controllers: [PerfilController],
   providers: [PerfilService],
   exports: [PerfilService],

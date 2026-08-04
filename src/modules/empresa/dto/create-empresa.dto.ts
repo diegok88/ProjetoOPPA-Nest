@@ -3,7 +3,6 @@ import {
   IsEmail,
   IsNotEmpty,
   IsString,
-  IsUUID,
   Length,
   Matches,
   MaxLength,

@@ -1,11 +1,9 @@
-import { Auth } from '@/auth/entities/auth.entity';
 import { ROLES } from '@/auth/guards/roles.const';
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 import { PasswordPin } from '@/constants/password-pin.const';
 import { Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
-import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import {
   BadRequestException,
@@ -17,9 +15,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { AuditoriaService } from '../auditoria/auditoria.service';
-import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
-import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
 import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
 import { GestorService } from '../gestor/gestor.service';
@@ -51,7 +46,6 @@ export class UsuarioService {
     private readonly perfil: PerfilService,
     private readonly gestor: GestorService,
     private readonly tenantContext: TenantContextService,
-    private readonly auditoria: AuditoriaService,
   ) {}
 
   /* 
@@ -91,16 +85,17 @@ export class UsuarioService {
     try {
       const criarUsuario = await this.prisma.client.$transaction(
         async (tx: any) => {
-          const usuario = this.tenantContext.getStore()!;
           const senhaHash = await this.generateHash(PasswordPin.password);
           const pinHash = await this.generateHash(PasswordPin.pin);
 
           const dadosContador: UpdateContadorCrachaDto = {
             empresaId: create.empresaId,
-            registradoPorId: usuario.user,
           };
 
-          const criarCracha = await this.contadorCracha.update(dadosContador);
+          const criarCracha = await this.contadorCracha.update(
+            dadosContador,
+            tx,
+          );
 
           const criar = await tx.usuario.create({
             data: {
@@ -141,9 +136,11 @@ export class UsuarioService {
 
           const dadosContador: UpdateContadorCrachaDto = {
             empresaId: usuario.empresa,
-            registradoPorId: usuario.user,
           };
-          const criarCracha = await this.contadorCracha.update(dadosContador);
+          const criarCracha = await this.contadorCracha.update(
+            dadosContador,
+            tx,
+          );
 
           const criar = await tx.usuario.create({
             data: {
@@ -182,9 +179,8 @@ export class UsuarioService {
 
         const dadosContador: UpdateContadorCrachaDto = {
           empresaId: usuario.empresa,
-          registradoPorId: usuario.user,
         };
-        const criarCracha = await this.contadorCracha.update(dadosContador);
+        const criarCracha = await this.contadorCracha.update(dadosContador, tx);
 
         const perfil = await this.perfil.findDescription(ROLES.OPN1);
 
@@ -455,68 +451,23 @@ export class UsuarioService {
     - ação somente executada pela assistencia
   */
   async deactiveAll(
-    empresaId: string,
-    autenticado: Auth,
+    ids: Array<string>,
     tx?: Prisma.TransactionClient,
-  ): Promise<void> {
+  ): Promise<Prisma.BatchPayload> {
     try {
-      const executar = async (
-        client: Prisma.TransactionClient | PrismaService,
-      ) => {
-        const listar = await client.usuario.findMany({
-          where: { empresaId: empresaId },
-        });
+      const client = tx ?? this.prisma.client;
 
-        if (listar.length === 0) {
-          this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
-          return;
-        }
-
-        const antes = listar.map((usuario) => ExtractDataAuditoria(usuario));
-
-        const ids = listar.map((usuario) => usuario.id);
-
-        await client.usuario.updateMany({
-          where: { id: { in: ids } },
-          data: {
-            dataDesligamento: new Date(),
-            status: false,
-          },
-        });
-
-        const listarAtualizados = await client.usuario.findMany({
-          where: { empresaId: empresaId },
-        });
-
-        const depois = listarAtualizados.map((usuario) =>
-          ExtractDataAuditoria(usuario),
-        );
-
-        const listarAuditorias: UpdateAuditoriaDto[] = listar.map(
-          (usuario, index) => ({
-            entidade: 'USUARIO',
-            registroId: usuario.id,
-            acao: Acao.UPDATE,
-            antes: antes[index],
-            depois: depois[index],
-            empresaId: autenticado.empresa,
-            registradoPorId: autenticado.userId,
-          }),
-        );
-
-        await this.auditoria.updateAll(listarAuditorias, client);
-      };
-
-      let inativarUsuario: any;
-      if (tx) {
-        inativarUsuario = await executar(tx);
-      } else {
-        inativarUsuario = await this.prisma.$transaction(async (novatx) => {
-          return executar(novatx);
-        });
-      }
+      const inativar = await client.usuario.updateMany({
+        where: { id: { in: ids } },
+        data: {
+          dataDesligamento: new Date(),
+          status: false,
+          _auditAction: Acao.DEACTIVATE,
+        },
+      });
 
       this.logger.log(TYPES_NOTICES.DEACTIVE_MANY);
+      return inativar;
     } catch (error) {
       this.logger.error('Falha ao inativar o conjunto de usuários.');
       throw error;
@@ -564,59 +515,25 @@ export class UsuarioService {
     }
   }
 
-  // DELETA TODOS USUARIOS MEDIANTE O DELETE DE UMA EMPRESA
+  /*
+  DELETA TODOS USUARIOS MEDIANTE O DELETE DE UMA EMPRESA:
+  - serviço interno.
+  - remoção em lote atraves da remoção da empresa.
+  -sem requisição http.
+  */
   async removeAll(
-    empresaId: string,
-    autenticado: Auth,
+    ids: Array<string>,
     tx?: Prisma.TransactionClient,
-  ): Promise<void> {
+  ): Promise<Prisma.BatchPayload> {
     try {
-      const executar = async (
-        client: Prisma.TransactionClient | PrismaService,
-      ) => {
-        const listar = await client.usuario.findMany({
-          where: { empresaId: empresaId },
-        });
+      const client = tx ?? this.prisma.client;
 
-        if (listar.length === 0) {
-          this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
-          return;
-        }
-
-        const ids = listar.map((usuario) => usuario.id);
-
-        await client.usuario.deleteMany({
-          where: { id: { in: ids } },
-        });
-
-        const dados = listar.map((usuario) => {
-          ExtractDataAuditoria(usuario);
-        });
-
-        const dadosAuditoria: CreateAuditoriaDto[] = listar.map(
-          (usuario, index) => ({
-            entidade: 'USUARIO',
-            registroId: usuario.id,
-            acao: Acao.DELETE,
-            dadosRegistrados: dados[index],
-            empresaId: autenticado.empresa,
-            registradoPorId: autenticado.userId,
-          }),
-        );
-
-        await this.auditoria.createAll(dadosAuditoria, client);
-      };
-
-      let removerUsuarios: any;
-      if (tx) {
-        removerUsuarios = await executar(tx);
-      } else {
-        removerUsuarios = await this.prisma.$transaction(async (novatx) => {
-          return executar(novatx);
-        });
-      }
+      const remover = await client.usuario.deleteMany({
+        where: { id: { in: ids } },
+      });
 
       this.logger.log(TYPES_NOTICES.DELETE_MANY);
+      return remover;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - removeAll');
       throw error;

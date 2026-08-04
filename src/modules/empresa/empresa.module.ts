@@ -5,9 +5,10 @@ import { PerfilModule } from '../perfil/perfil.module';
 import { UsuarioModule } from '../usuario/usuario.module';
 import { EmpresaController } from './empresa.controller';
 import { EmpresaService } from './empresa.service';
+import { GestorModule } from '../gestor/gestor.module';
 
 @Module({
-  imports: [UsuarioModule, AuditoriaModule, ContadorCrachaModule, PerfilModule],
+  imports: [UsuarioModule, GestorModule, ContadorCrachaModule, PerfilModule],
   controllers: [EmpresaController],
   providers: [EmpresaService],
   exports: [EmpresaService],

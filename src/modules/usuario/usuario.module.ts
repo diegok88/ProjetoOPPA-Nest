@@ -9,7 +9,6 @@ import { GestorModule } from '../gestor/gestor.module';
 
 @Module({
   imports: [
-    forwardRef(() => AuditoriaModule),
     forwardRef(() => PerfilModule),
     forwardRef(() => GestorModule),
     ContadorCrachaModule,

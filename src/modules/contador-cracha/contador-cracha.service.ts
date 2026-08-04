@@ -1,14 +1,8 @@
-import { Auth } from '@/auth/entities/auth.entity';
-import { Prisma } from '@/generated/prisma/client';
-import { Acao } from '@/generated/prisma/enums';
+import { Acao, Prisma } from '@/generated/prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
-import { AuditoriaService } from '../auditoria/auditoria.service';
-import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
-import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 import { CreateContadorCrachaDto } from './dto/create-contador-cracha.dto';
 import { QueryContadorCrachaFilterDto } from './dto/query-contador-cracha.dto';
 import { ResponseContadorEnterpriseDto } from './dto/response-contador-cracha.dto';
@@ -19,60 +13,38 @@ import { ContadorCracha } from './entities/contador-cracha.entity';
 export class ContadorCrachaService {
   private logger = new Logger(ContadorCrachaService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly auditoria: AuditoriaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  // CRIA UM NOVO CONTADOR A CADA CRIAÇÃO DE EMPRESA - serviço executado dentro do sistema
+  /*
+  CRIA UM NOVO CONTADOR A CADA CRIAÇÃO DE EMPRESA: 
+  - serviço executado dentro do sistema
+  - sem requisição http.
+  - vinculada a criação da empresa.
+  */
   async create(
     create: CreateContadorCrachaDto,
     tx?: Prisma.TransactionClient,
   ): Promise<ContadorCracha> {
     try {
-      const executar = async (
-        client: Prisma.TransactionClient | PrismaService,
-      ) => {
-        const { registradoPorId, ...dadosContador } = create;
+      const client = tx ?? this.prisma.client;
 
-        const criar = await client.contadorDeCracha.create({
-          data: dadosContador,
-        });
-
-        const dados = ExtractDataAuditoria(criar);
-
-        const dadosAuditoria: CreateAuditoriaDto = {
-          entidade: 'CONTADOR_CRACHA',
-          registroId: criar.id,
-          acao: Acao.CREATE,
-          dadosRegistrados: dados,
-          empresaId: create.empresaId,
-          registradoPorId: registradoPorId,
-        };
-
-        await this.auditoria.create(dadosAuditoria, client);
-
-        return criar;
-      };
-
-      let criarContador: any;
-      if (tx) {
-        criarContador = await executar(tx);
-      } else {
-        criarContador = await this.prisma.$transaction(async (novaTx) => {
-          return executar(novaTx);
-        });
-      }
+      const criar = await client.contadorDeCracha.create({
+        data: create,
+      });
 
       this.logger.log(TYPES_NOTICES.CREATE);
-      return criarContador;
+      return criar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
       throw error;
     }
   }
 
-  // LISTAGEM DE CONTADORES DE CRACHAS
+  /*
+  LISTAGEM DE CONTADORES DE CRACHAS:
+  - apenas listagem com filtro.
+  - apenas por requisição.
+  */
   async findAll(
     query: QueryContadorCrachaFilterDto,
   ): Promise<ContadorCracha[]> {
@@ -97,7 +69,11 @@ export class ContadorCrachaService {
       throw error;
     }
   }
-  // BUSCAR DE CONTADORES DE CRACHAS
+  /*
+  BUSCAR DE CONTADORES DE CRACHAS:
+  - busca atraves do id. 
+  - apenas por requisição.
+  */
   async findOne(id: string): Promise<ContadorCracha> {
     try {
       const buscar = await this.prisma.contadorDeCracha.findUnique({
@@ -117,154 +93,103 @@ export class ContadorCrachaService {
     }
   }
 
-  // BUSCAR CONTADOR DE CRACHA POR ID EMPRESA
+  /*
+  BUSCAR CONTADOR DE CRACHA POR ID EMPRESA:
+  - serviço de busca interna.
+  - sem requisição http.
+  - busca atravez do id da empresa.
+  */
   async findEnterprise(
     id: string,
     tx?: Prisma.TransactionClient,
-  ): Promise<ResponseContadorEnterpriseDto> {
+  ): Promise<ContadorCracha> {
     try {
-      const client = tx ?? this.prisma;
+      const client = tx ?? this.prisma.client;
       const buscar = await client.contadorDeCracha.findFirst({
         where: { empresaId: id },
       });
 
-      return plainToClass(ResponseContadorEnterpriseDto, buscar);
+      return buscar;
     } catch (error) {
       this.logger.error('Falha na busca do contador de cracha.');
       throw error;
     }
   }
 
-  // ATUALIZA O ATRIBUTO CONTADOR A CADA CADASTRO DE UM NOVO USUARIO DA EMPRESA CADASTRANTE
-  async update(update: UpdateContadorCrachaDto): Promise<ContadorCracha> {
+  /*
+  ATUALIZA O ATRIBUTO CONTADOR A CADA CADASTRO DE UM NOVO USUARIO DA EMPRESA CADASTRANTE:
+  - serviço de atualização interna.
+  - sem requisição http.
+  */
+  async update(
+    update: UpdateContadorCrachaDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ContadorCracha> {
     try {
-      const atualizarContador = await this.prisma.$transaction(async (tx) => {
-        const { empresaId, registradoPorId } = update;
-        this.logger.debug(empresaId);
+      const client = tx ?? this.prisma.client;
 
-        const buscar = await this.findEnterprise(empresaId, tx);
+      const buscar = await this.findEnterprise(update.empresaId, tx);
 
-        const antes = ExtractDataAuditoria(buscar);
-
-        const atualizar = await tx.contadorDeCracha.update({
-          where: { id: buscar.id },
-          data: { contador: { increment: 1 } },
-        });
-
-        const depois = await ExtractDataAuditoria(atualizar);
-        const dadosAuditoria: UpdateAuditoriaDto = {
-          entidade: 'CONTADOR_CRACHA',
-          registroId: buscar.id,
-          acao: Acao.UPDATE,
-          antes: antes,
-          depois: depois,
-          empresaId: empresaId,
-          registradoPorId: registradoPorId,
-        };
-        await this.auditoria.update(dadosAuditoria, tx);
-
-        return atualizar;
+      const atualizar = await client.contadorDeCracha.update({
+        where: { id: buscar.id },
+        data: { contador: buscar.contador + 1 },
       });
 
       this.logger.log(TYPES_NOTICES.UPDATE);
-      return atualizarContador;
+      return atualizar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
       throw error;
     }
   }
-  // INATIVA O CONTADOR DE CRACHAS ATRAVES DA INATIVAÇÃO DA EMPRESA
+  /*
+  INATIVA O CONTADOR DE CRACHAS ATRAVES DA INATIVAÇÃO DA EMPRESA:
+  - serviço inativação interno.
+  - sem requisição http.
+  - vinculada a inativação da empresa.
+  */
   async deactive(
     empresaId: string,
-    autenticado: Auth,
     tx?: Prisma.TransactionClient,
   ): Promise<ContadorCracha> {
     try {
-      const executar = async (
-        client: Prisma.TransactionClient | PrismaService,
-      ) => {
-        const buscar = await this.findEnterprise(empresaId, client);
+      const client = tx ?? this.prisma.client;
 
-        const antes = ExtractDataAuditoria(buscar);
+      const buscar = await this.findEnterprise(empresaId, client);
 
-        const inativar = await client.contadorDeCracha.update({
-          where: { id: buscar.id },
-          data: { status: false },
-        });
-
-        const depois = ExtractDataAuditoria(inativar);
-
-        const dadosAtualizados: UpdateAuditoriaDto = {
-          entidade: 'CONTADOR_CRACHA',
-          registroId: empresaId,
-          acao: Acao.UPDATE,
-          antes: antes,
-          depois: depois,
-          empresaId: autenticado.empresa,
-          registradoPorId: autenticado.userId,
-        };
-
-        await this.auditoria.update(dadosAtualizados, client);
-
-        return inativar;
-      };
-
-      let inativarContador: any;
-      if (tx) {
-        inativarContador = await executar(tx);
-      } else {
-        inativarContador = await this.prisma.$transaction(async (novaTx) => {
-          return executar(novaTx);
-        });
-      }
+      const inativar = await client.contadorDeCracha.update({
+        where: { id: buscar.id },
+        data: { status: false, _auditAction: Acao.DEACTIVATE },
+      });
 
       this.logger.log(TYPES_NOTICES.UPDATE);
-      return inativarContador;
+      return inativar;
     } catch (error) {
       this.logger.error('Falha ao inativar o contador de cracha.');
       throw error;
     }
   }
-  // REMOVER DADO DO BANCO PELO ID
+  /*
+  REMOVER DADO DO BANCO PELO ID: 
+  - serviço de remoção interno.
+  - sem requisição http.
+  - vinculado a remoção de empresa.
+  */
   async remove(
     empresaId: string,
-    autenticado: Auth,
     tx?: Prisma.TransactionClient,
   ): Promise<ContadorCracha> {
     try {
-      const executar = async (
-        client: Prisma.TransactionClient | PrismaService,
-      ) => {
-        const buscar = await this.findEnterprise(empresaId, client);
+      const client = tx ?? this.prisma.client;
 
-        const remover = await client.contadorDeCracha.delete({
-          where: { id: buscar.id },
-        });
+      const buscar = await this.findEnterprise(empresaId, client);
 
-        const dados = ExtractDataAuditoria(remover);
+      const remover = await client.contadorDeCracha.delete({
+        where: { id: buscar.id },
+      });
 
-        const dadosAuditoria: CreateAuditoriaDto = {
-          entidade: 'CONTADOR_CRACHA',
-          registroId: buscar.id,
-          acao: Acao.DELETE,
-          dadosRegistrados: dados,
-          empresaId: empresaId,
-          registradoPorId: autenticado.userId,
-        };
-
-        await this.auditoria.create(dadosAuditoria, client);
-      };
-
-      let removerContador: any;
-      if (tx) {
-        removerContador = await executar(tx);
-      } else {
-        removerContador = await this.prisma.$transaction(async (novatx) => {
-          return executar(novatx);
-        });
-      }
-
-      return removerContador;
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return remover;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
       throw error;

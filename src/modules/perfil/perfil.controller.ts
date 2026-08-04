@@ -25,25 +25,22 @@ import { Auth } from '@/auth/entities/auth.entity';
 import { QueryPerfilFilterDto } from './dto/query-perfil.dto';
 
 @Controller('perfil')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class PerfilController {
   constructor(private readonly perfilService: PerfilService) {}
 
   // CRIAR PERFIL
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async create(
-    @Req() req: AuthenticatedRequest,
     @Body() createPerfilDto: CreatePerfilDto,
   ): Promise<ResponsePerfilDto> {
-    const autenticado: Auth = req.user;
-    const dado = await this.perfilService.create(autenticado, createPerfilDto);
+    const dado = await this.perfilService.create(createPerfilDto);
     return plainToClass(ResponsePerfilDto, dado);
   }
 
   // LISTAR PERFIS
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async findAll(
     @Query() query: QueryPerfilFilterDto,
@@ -54,7 +51,6 @@ export class PerfilController {
 
   // BUSCAR PERFIL PELO ID
   @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
@@ -65,45 +61,32 @@ export class PerfilController {
 
   // ATUALIZAÇÃO DO PERFIL PELO ID
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: AuthenticatedRequest,
     @Body() updatePerfilDto: UpdatePerfilDto,
   ): Promise<ResponsePerfilDto> {
-    const autenticado: Auth = req.user;
-    const dado = await this.perfilService.update(
-      id,
-      autenticado,
-      updatePerfilDto,
-    );
+    const dado = await this.perfilService.update(id, updatePerfilDto);
     return plainToClass(ResponsePerfilDto, dado);
   }
 
   // INATIVAÇÃO DO PERFIL PELO ID
   @Patch('deactive/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: AuthenticatedRequest,
   ): Promise<ResponsePerfilDto> {
-    const autenticado: Auth = req.user;
-    const dado = await this.perfilService.deactive(id, autenticado);
+    const dado = await this.perfilService.deactive(id);
     return plainToClass(ResponsePerfilDto, dado);
   }
 
   // DELETE DO PERFIL PELO ID
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.ASN1)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: AuthenticatedRequest,
   ): Promise<ResponsePerfilDto> {
-    const autenticado: Auth = req.user;
-    const dado = await this.perfilService.remove(id, autenticado);
+    const dado = await this.perfilService.remove(id);
     return plainToClass(ResponsePerfilDto, dado);
   }
 }

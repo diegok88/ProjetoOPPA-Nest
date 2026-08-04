@@ -1,7 +1,6 @@
 import { Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
-import { ExtractDataAuditoria } from '@/utils/extract-data-auditoria.util';
 import {
   Injectable,
   Logger,
@@ -9,13 +8,10 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuditoriaService } from '../auditoria/auditoria.service';
-import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
-import { UpdateAuditoriaDto } from '../auditoria/dto/update-auditoria.dto';
 import { QueryUsuarioDto } from '../usuario/dto/query-usuario.dto';
 import { UsuarioService } from '../usuario/usuario.service';
 import { CreatePerfilDto } from './dto/create-perfil.dto';
 import { UpdatePerfilDto } from './dto/update-perfil.dto';
-import { Auth } from '@/auth/entities/auth.entity';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import { Perfil } from './entities/perfil.entity';
 import { QueryPerfilFilterDto } from './dto/query-perfil.dto';
@@ -27,39 +23,17 @@ export class PerfilService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly usuario: UsuarioService,
-    private readonly auditoria: AuditoriaService,
   ) {}
 
   // CRIAR PERFIL
-  async create(
-    autenticado: Auth,
-    createPerfilDto: CreatePerfilDto,
-  ): Promise<Perfil> {
+  async create(createPerfilDto: CreatePerfilDto): Promise<Perfil> {
     try {
-      const criarPerfil = await this.prisma.$transaction(async (tx) => {
-        const { userId, empresa } = autenticado;
-        const criar = await tx.perfil.create({
-          data: createPerfilDto,
-        });
-
-        const dados = ExtractDataAuditoria(criar);
-
-        const dadosAuditoria: CreateAuditoriaDto = {
-          entidade: 'PERFIL',
-          registroId: criar.id,
-          acao: Acao.CREATE,
-          dadosRegistrados: dados,
-          empresaId: empresa,
-          registradoPorId: userId,
-        };
-
-        await this.auditoria.create(dadosAuditoria, tx);
-
-        return criar;
+      const criar = await this.prisma.client.perfil.create({
+        data: createPerfilDto,
       });
 
       this.logger.log(TYPES_NOTICES.CREATE);
-      return criarPerfil;
+      return criar;
     } catch (error) {
       this.logger.log(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
       throw error;
@@ -74,16 +48,16 @@ export class PerfilService {
       if (query.descricao) condicao.descricao = query.descricao;
       if (query.status) condicao.status = query.status;
 
-      const listarPerfis = await this.prisma.perfil.findMany({
+      const listar = await this.prisma.client.perfil.findMany({
         where: condicao,
       });
 
-      if (listarPerfis.length === 0) {
+      if (listar.length === 0) {
         this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
       }
 
       this.logger.log(TYPES_NOTICES.FIND_ALL);
-      return listarPerfis;
+      return listar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
       throw error;
@@ -93,17 +67,17 @@ export class PerfilService {
   // BUSCAR PERFIL PELO ID
   async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Perfil> {
     try {
-      const client = tx ?? this.prisma;
-      const buscarPerfil = await client.perfil.findUnique({
+      const client = tx ?? this.prisma.client;
+      const buscar = await client.perfil.findUnique({
         where: { id: id },
       });
-      if (!buscarPerfil) {
+      if (!buscar) {
         this.logger.warn(TYPES_NOTICES.NOT_FOUND);
         throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
       }
 
       this.logger.log(TYPES_NOTICES.FIND_ONE);
-      return buscarPerfil;
+      return buscar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
       throw error;
@@ -135,40 +109,15 @@ export class PerfilService {
   }
 
   // ATUALIZAÇÃO DO PERFIL PELO ID
-  async update(
-    id: string,
-    autenticado: Auth,
-    updatePerfilDto: UpdatePerfilDto,
-  ): Promise<Perfil> {
+  async update(id: string, updatePerfilDto: UpdatePerfilDto): Promise<Perfil> {
     try {
       const atualizarPerfil = await this.prisma.$transaction(async (tx) => {
-        const buscar = await this.findOne(id, tx);
-
-        const antes = ExtractDataAuditoria(buscar);
+        await this.findOne(id, tx);
 
         const atualizar = await tx.perfil.update({
           where: { id: id },
           data: updatePerfilDto,
         });
-
-        if (!atualizar) {
-          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
-          throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
-        }
-
-        const depois = ExtractDataAuditoria(atualizar);
-
-        const dadosAuditoria: UpdateAuditoriaDto = {
-          entidade: 'PERFIL',
-          registroId: id,
-          acao: Acao.UPDATE,
-          antes: antes,
-          depois: depois,
-          empresaId: autenticado.empresa,
-          registradoPorId: autenticado.userId,
-        };
-
-        await this.auditoria.update(dadosAuditoria, tx);
 
         return atualizar;
       });
@@ -182,51 +131,28 @@ export class PerfilService {
   }
 
   // INATIVAÇÃO DO PERFIL PELO ID
-  async deactive(id: string, autenticado: Auth): Promise<Perfil> {
+  async deactive(id: string): Promise<Perfil> {
     try {
-      const inativarPerfil = await this.prisma.$transaction(async (tx) => {
-        const dadosVerificar: QueryUsuarioDto = {
-          perfilId: id,
-          campos: 'perfilId',
-        };
+      const inativarPerfil = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const dadosVerificar: QueryUsuarioDto = { perfilId: id };
+          const verificar = await this.usuario.findAll(dadosVerificar, tx);
 
-        const verificar = await this.usuario.findAll(dadosVerificar, tx);
+          if (verificar.length > 0) {
+            this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+            throw new UnauthorizedException(TYPES_NOTICES.EMPTY_LIST);
+          }
 
-        if (verificar.length > 0) {
-          this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
-          throw new UnauthorizedException(TYPES_NOTICES.EMPTY_LIST);
-        }
+          await this.findOne(id, tx);
 
-        const buscar = await this.findOne(id, tx);
+          const inativar = await tx.perfil.update({
+            where: { id: id },
+            data: { status: false, _auditAction: Acao.DEACTIVATE },
+          });
 
-        const antes = ExtractDataAuditoria(buscar);
-
-        const inativar = await tx.perfil.update({
-          where: { id: id },
-          data: { status: false },
-        });
-
-        if (!inativar) {
-          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
-          throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
-        }
-
-        const depois = ExtractDataAuditoria(inativar);
-
-        const dadosAuditoria: UpdateAuditoriaDto = {
-          entidade: 'PERFIL',
-          registroId: id,
-          acao: Acao.DEACTIVATE,
-          antes: antes,
-          depois: depois,
-          empresaId: autenticado.empresa,
-          registradoPorId: autenticado.userId,
-        };
-
-        await this.auditoria.update(dadosAuditoria, tx);
-
-        return inativar;
-      });
+          return inativar;
+        },
+      );
 
       this.logger.log(TYPES_NOTICES.DEACTIVE);
       return inativarPerfil;
@@ -237,39 +163,24 @@ export class PerfilService {
   }
 
   // DELETE DO PERFIL PELO ID
-  async remove(id: string, autenticado: Auth): Promise<Perfil> {
+  async remove(id: string): Promise<Perfil> {
     try {
-      const deletarPerfil = await this.prisma.$transaction(async (tx) => {
-        const verificar = await this.findOne(id, tx);
+      const deletarPerfil = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
 
-        const dados = ExtractDataAuditoria(verificar);
+          if (verificar.status === true) {
+            this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+            throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+          }
 
-        if (verificar.status === true) {
-          this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
-          throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
-        }
+          const deletar = await tx.perfil.delete({
+            where: { id: id },
+          });
 
-        const deletar = await tx.perfil.delete({
-          where: { id: id },
-        });
-
-        if (!deletarPerfil) {
-          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
-        }
-
-        const dadosAuditoria: CreateAuditoriaDto = {
-          entidade: 'PERFIL',
-          registroId: id,
-          acao: Acao.DELETE,
-          dadosRegistrados: dados,
-          empresaId: autenticado.empresa,
-          registradoPorId: autenticado.userId,
-        };
-
-        await this.auditoria.create(dadosAuditoria, tx);
-
-        return deletar;
-      });
+          return deletar;
+        },
+      );
 
       this.logger.log(TYPES_NOTICES.DELETE);
       return deletarPerfil;

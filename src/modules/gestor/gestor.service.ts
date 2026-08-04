@@ -1,5 +1,5 @@
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
-import { Prisma, Usuario } from '@/generated/prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
@@ -187,11 +187,6 @@ export class GestorService {
     try {
       const client = tx ?? this.prisma.client;
 
-      if (ids.length === 0) {
-        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
-        throw new BadRequestException(TYPES_NOTICES.EMPTY_LIST);
-      }
-
       const inativar = await client.gestor.updateMany({
         where: { colaboradorId: { in: ids } },
         data: { status: false, _auditAction: Acao.DEACTIVATE },
@@ -210,24 +205,15 @@ export class GestorService {
     - função interna.
     - usada em conjunto com a função de remoção de usuario.
   */
-  async remove(id: string, tx?: Prisma.TransactionClient): Promise<Gestor> {
+  async remove(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Prisma.BatchPayload> {
     try {
-      const autenticado = this.getCurrentUser();
       const client = tx ?? this.prisma.client;
-      const buscar = await this.findId(id, autenticado.user, client);
-
-      if (buscar.status === true) {
-        this.logger.warn(TYPES_NOTICES.NOT_DEACTIVE);
-        throw new BadRequestException(TYPES_NOTICES.NOT_DEACTIVE);
-      }
-
-      if (buscar.gestorId !== autenticado.user) {
-        this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
-        throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
-      }
 
       const remover = await client.gestor.deleteMany({
-        where: { colaboradorId: buscar.colaboradorId },
+        where: { colaboradorId: id },
       });
 
       this.logger.log(TYPES_NOTICES.DELETE);
@@ -244,19 +230,11 @@ export class GestorService {
     - usada em conjunto com a função de remoção de usuario, de acordo com a remoção da empresa.
   */
   async removeAll(
-    usuarios: Array<Usuario>,
+    ids: Array<string>,
     tx?: Prisma.TransactionClient,
   ): Promise<Prisma.BatchPayload> {
     try {
       const client = tx ?? this.prisma.client;
-
-      const ativos = usuarios.map((u) => u.status === true);
-      if (ativos) {
-        this.logger.warn(TYPES_NOTICES.NOT_DEACTIVE);
-        throw new BadRequestException(TYPES_NOTICES.NOT_DEACTIVE);
-      }
-
-      const ids = usuarios.map((u) => u.id);
 
       const remover = await client.gestor.deleteMany({
         where: { colaboradorId: { in: ids } },

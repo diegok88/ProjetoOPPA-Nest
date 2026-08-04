@@ -9,8 +9,4 @@ export class CreateContadorCrachaDto {
   @Min(0, { message: 'Contador não pode ser negativo.' })
   @IsNotEmpty({ message: 'Contador é um campo obrigatório.' })
   contador!: number;
-
-  @IsUUID('all', { message: 'Usuário com id inválido' })
-  @IsNotEmpty({ message: 'RegistradoPorId é um campo obrigatório.' })
-  registradoPorId!: string;
 }
