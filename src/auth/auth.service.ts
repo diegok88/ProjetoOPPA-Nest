@@ -2,6 +2,8 @@ import { Acao } from '@/generated/prisma/enums';
 import { AuditoriaService } from '@/modules/auditoria/auditoria.service';
 import { CreateAuditoriaDto } from '@/modules/auditoria/dto/create-auditoria.dto';
 import { QueryAuditoriaFindOneLastDto } from '@/modules/auditoria/dto/query-auditoria.dto';
+import { QueryEmpresaFilterDto } from '@/modules/empresa/dto/query-empresa.dto';
+import { EmpresaService } from '@/modules/empresa/empresa.service';
 import { QueryUsuarioDto } from '@/modules/usuario/dto/query-usuario.dto';
 import { UsuarioService } from '@/modules/usuario/usuario.service';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -26,6 +28,7 @@ export class AuthService {
 
   constructor(
     private readonly usuario: UsuarioService,
+    private readonly empresa: EmpresaService,
     private readonly auditoria: AuditoriaService,
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -54,10 +57,12 @@ export class AuthService {
     try {
       const loginUsuario = await this.prisma.$transaction(async (tx) => {
         this.logger.log('login()');
+        const filtro: QueryEmpresaFilterDto = { codigo: login.codEmpresa };
+        const empresa = await this.empresa.findEnterpriceOne(filtro);
         const verificar: QueryUsuarioDto = {
           cracha: login.cracha,
           senha: login.senha,
-          empresaId: login.empresaId,
+          empresaId: empresa.id,
         };
         const validarUsuario =
           await this.usuario.findOneBadgeAndEnterprice(verificar);

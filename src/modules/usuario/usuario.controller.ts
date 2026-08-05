@@ -4,6 +4,7 @@ import { Public } from '@/auth/guards/public.decorator';
 import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 import {
   Body,
   Controller,
@@ -19,7 +20,9 @@ import {
 } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
 import {
-  CreateUsuarioAdmin,
+  CreateUsuarioAdminDto,
+  CreateUsuarioAssistDto,
+  CreateUsuarioGestorDto,
   CreateUsuarioMaster,
 } from './dto/create-usuario.dto';
 import { QueryAdminDto, QueryUsuarioDto } from './dto/query-usuario.dto';
@@ -34,7 +37,10 @@ import { UsuarioService } from './usuario.service';
 @Controller('usuario')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsuarioController {
-  constructor(private readonly usuarioService: UsuarioService) {}
+  constructor(
+    private readonly usuarioService: UsuarioService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
   // CRIAR USUARIO MASTER
   @Post('master')
   @Public()
@@ -49,7 +55,7 @@ export class UsuarioController {
   @Post('assist')
   @Roles(ROLES.ASN1)
   async createAssist(
-    @Body() create: CreateUsuarioAdmin,
+    @Body() create: CreateUsuarioAssistDto,
   ): Promise<ResponseUsuarioDto> {
     const dado = await this.usuarioService.createAssist(create);
     return plainToClass(ResponseUsuarioDto, dado);
@@ -57,9 +63,9 @@ export class UsuarioController {
 
   // CRIAR USUARIO COMO ADMINISTRADOR
   @Post('admin')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ADN1)
   async createAdmin(
-    @Body() create: CreateUsuarioAdmin,
+    @Body() create: CreateUsuarioAdminDto,
   ): Promise<ResponseUsuarioDto> {
     const dado = this.usuarioService.createAdmin(create);
     return plainToClass(ResponseUsuarioDto, dado);
@@ -68,7 +74,7 @@ export class UsuarioController {
   @Post('gestor')
   @Roles(ROLES.ASN1)
   async createGestor(
-    @Body() create: CreateUsuarioAdmin,
+    @Body() create: CreateUsuarioGestorDto,
   ): Promise<ResponseUsuarioDto> {
     const dado = this.usuarioService.createGestor(create);
     return plainToClass(ResponseUsuarioDto, dado);
@@ -86,14 +92,15 @@ export class UsuarioController {
 
   // LISTA OS USUARIOS COM PARAMETROS ESPECIFICOS, MAIS USANDO O MESMO SERVIÇO
   @Get('admin')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ADN1)
   async findAllAdmin(
     @Req() req: AuthenticatedRequest,
     @Query() query: QueryAdminDto,
   ): Promise<ResponseUsuarioDto[]> {
+    const usuario = this.tenantContext.getStore()!;
     const queryAdmin: QueryUsuarioDto = {
       ...query,
-      empresaId: req.user.empresa,
+      empresaId: usuario.empresa,
       status: query.status ?? true,
       campos: query.campos ?? 'id,nome,cracha',
     };
@@ -152,7 +159,7 @@ export class UsuarioController {
 
   // INATIVAR USUARIO
   @Patch('deactive/:id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseUsuarioDto> {
@@ -162,7 +169,7 @@ export class UsuarioController {
 
   // DELETA O USUARIO
   @Delete(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseUsuarioDto> {

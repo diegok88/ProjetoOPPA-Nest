@@ -66,7 +66,7 @@ export class PrismaService
         $allModels: {
           // CRIAÇÃO - create
           async create({ model, args, query }) {
-            const modeloNome = model.toLowerCase();
+            const modeloNome = model;
             const usuario = tenantContext.getStore();
             const resultado = await query(args);
 
@@ -87,7 +87,7 @@ export class PrismaService
           },
           // ATUALIZAÇÃO UNICA - update
           async update({ model, args, query }) {
-            const modeloNome = model.toLowerCase();
+            const modeloNome = model;
             const user = tenantContext.getStore()!;
 
             let acao = Acao.UPDATE;
@@ -101,7 +101,7 @@ export class PrismaService
             if (!user) return resultado;
             if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
 
-            const antes = await this[model].findUnique({
+            const antes = await prismaClient[model].findUnique({
               where: args.where,
             });
 
@@ -123,7 +123,7 @@ export class PrismaService
           },
           // ATUALIZAÇÃO EM LOTE - update many
           async updateMany({ model, args, query }) {
-            const modeloNome = model.toLowerCase();
+            const modeloNome = model;
             const user = tenantContext.getStore();
 
             let acao = Acao.UPDATE;
@@ -133,7 +133,7 @@ export class PrismaService
               delete dataAny._auditAction;
             }
 
-            const antes = await this[model].findMany({
+            const antes = await prismaClient[model].findMany({
               where: args.where,
             });
 
@@ -141,18 +141,15 @@ export class PrismaService
             if (!user) return resultado;
             if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
 
-            const depois = await this[model].findMany({
-              where: args.where,
-            });
+            const depois = resultado;
 
             const dadosAuditoria = antes.map((itemAntes: any) => {
-              const itemDepois = depois.find((d: any) => d.id === itemAntes.id);
               const dados: UpdateAuditoriaDto = {
                 entidade: modeloNome.toUpperCase(),
                 registroId: itemAntes.id,
                 acao: acao,
                 antes: ExtractDataAuditoria(itemAntes),
-                depois: ExtractDataAuditoria(itemDepois),
+                depois: ExtractDataAuditoria(depois),
                 empresaId: user.empresa,
                 registradoPorId: user.user,
               };
@@ -165,14 +162,14 @@ export class PrismaService
           },
           // REMOÇÃO UNICA - delete
           async delete({ model, args, query }) {
-            const modeloNome = model.toLowerCase();
+            const modeloNome = model;
             const user = tenantContext.getStore();
             const resultado = await query(args);
 
             if (!user) return resultado;
             if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
 
-            const dados = await this[model].findUnique({
+            const dados = await prismaClient[model].findUnique({
               where: args.where,
             });
 
@@ -195,10 +192,10 @@ export class PrismaService
           },
           // REMOÇÃO EM LOTE - delete many
           async deleteMany({ model, args, query }) {
-            const modeloNome = model.toLowerCase();
+            const modeloNome = model;
             const user = tenantContext.getStore();
 
-            const dados = await this[model].findMany({
+            const dados = await prismaClient[model].findMany({
               where: args.where,
             });
 

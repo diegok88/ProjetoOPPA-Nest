@@ -20,9 +20,9 @@ import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-
 import { GestorService } from '../gestor/gestor.service';
 import { PerfilService } from '../perfil/perfil.service';
 import {
-  CreateUsuarioAdmin,
+  CreateUsuarioAdminDto,
   CreateUsuarioAssistDto,
-  CreateUsuarioGestor,
+  CreateUsuarioGestorDto,
   CreateUsuarioMaster,
 } from './dto/create-usuario.dto';
 import {
@@ -125,7 +125,7 @@ export class UsuarioService {
     - usuario de criação interna da empresa que usufrui do sistema.
     - permitido criar usuario administradores, gestores e operacional.
   */
-  async createAdmin(create: CreateUsuarioAdmin): Promise<Usuario> {
+  async createAdmin(create: CreateUsuarioAdminDto): Promise<Usuario> {
     try {
       const criarUsuario = await this.prisma.client.$transaction(
         async (tx: any) => {
@@ -148,6 +148,7 @@ export class UsuarioService {
               cracha: criarCracha.contador,
               senha: senhaHash,
               pin: pinHash,
+              empresaId: usuario.empresa,
             },
           });
 
@@ -169,7 +170,7 @@ export class UsuarioService {
     - o autorizado apenas para o perfil de supervisor.
     - apenas criar usuarios operacionais.
   */
-  async createGestor(create: CreateUsuarioGestor): Promise<Usuario> {
+  async createGestor(create: CreateUsuarioGestorDto): Promise<Usuario> {
     try {
       const criarUsuario = await this.prisma.$transaction(async (tx) => {
         const usuario = this.tenantContext.getStore()!;

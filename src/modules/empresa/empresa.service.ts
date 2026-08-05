@@ -1,3 +1,4 @@
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 import { Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -8,17 +9,14 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { AuditoriaService } from '../auditoria/auditoria.service';
-import { CreateAuditoriaDto } from '../auditoria/dto/create-auditoria.dto';
 import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
+import { GestorService } from '../gestor/gestor.service';
+import { QueryUsuarioDto } from '../usuario/dto/query-usuario.dto';
 import { UsuarioService } from '../usuario/usuario.service';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
 import { QueryEmpresaFilterDto } from './dto/query-empresa.dto';
 import { UpdateEmpresaDto } from './dto/update-empresa.dto';
 import { Empresa } from './entities/empresa.entity';
-import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
-import { QueryUsuarioDto } from '../usuario/dto/query-usuario.dto';
-import { GestorService } from '../gestor/gestor.service';
 
 @Injectable()
 export class EmpresaService {
@@ -104,6 +102,49 @@ export class EmpresaService {
       return buscar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
+      throw error;
+    }
+  }
+  /*
+  SERVIÇO DE BUSCA DE EMPRESA:
+  - busca da empresa de acordo com os paramentros de filtro.
+  - serviço interno
+  */
+  async findEnterpriceOne(
+    query: QueryEmpresaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Empresa> {
+    try {
+      const client = tx ?? this.prisma;
+
+      const condicao: Prisma.EmpresaWhereInput = {};
+      if (query.codigo) condicao.codigo = query.codigo;
+      if (query.bairro) condicao.bairro = query.bairro;
+      if (query.cep) condicao.cep = query.cep;
+      if (query.cidade) condicao.cidade = query.cidade;
+      if (query.cnpj) condicao.cnpj = query.cnpj;
+      if (query.contato) condicao.contato = query.contato;
+      if (query.email) condicao.email = query.email;
+      if (query.estado) condicao.estado = query.estado;
+      if (query.nomeFantasia) condicao.nomeFantasia = query.nomeFantasia;
+      if (query.numero) condicao.numero = query.numero;
+      if (query.razaoSocial) condicao.razaoSocial = query.razaoSocial;
+      if (query.rua) condicao.rua = query.rua;
+
+      const buscar = await client.empresa.findFirst({
+        where: condicao,
+        take: 1,
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ONE);
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findEnterpriceOne');
       throw error;
     }
   }

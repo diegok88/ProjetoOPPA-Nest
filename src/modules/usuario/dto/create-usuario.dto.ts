@@ -97,15 +97,16 @@ export class CreateUsuarioAssistDto extends OmitType(CreateUsuarioDto, [
   'registradoPorId',
 ]) {}
 
-export class CreateUsuarioAdmin extends OmitType(CreateUsuarioDto, [
+export class CreateUsuarioAdminDto extends OmitType(CreateUsuarioDto, [
   'cracha',
   'senha',
   'pin',
+  'empresaId',
   'dataDesligamento',
   'registradoPorId',
 ]) {}
 
-export class CreateUsuarioGestor extends OmitType(CreateUsuarioDto, [
+export class CreateUsuarioGestorDto extends OmitType(CreateUsuarioDto, [
   'cracha',
   'senha',
   'pin',

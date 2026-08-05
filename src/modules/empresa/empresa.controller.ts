@@ -73,7 +73,7 @@ export class EmpresaController {
 
   // CONTROLLER INATIVAR EMPRESA PELO ID
   @Patch('deactive/:id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseEmpresaDto> {
