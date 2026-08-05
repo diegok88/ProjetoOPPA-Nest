@@ -10,9 +10,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
-import {
-  QueryAuditoriaFilterDto,
-} from './dto/query-auditoria.dto';
+import { QueryAuditoriaFilterDto } from './dto/query-auditoria.dto';
 import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
 
 @Injectable()
@@ -134,8 +132,9 @@ export class AuditoriaService {
     tx?: Prisma.TransactionClient,
   ): Promise<Prisma.BatchPayload> {
     try {
-      const client = tx || this.prisma;
+      const client = tx || this.prisma.client;
 
+      this.logger.debug('items: ', items);
       const dadosAtualizados = items.map((item) => {
         const mudancas = this.calculateDifference(item.antes, item.depois);
         const camposAlterados = Object.keys(mudancas);
@@ -147,12 +146,13 @@ export class AuditoriaService {
         return {
           entidade: item.entidade,
           registroId: item.registroId,
-          acao: Acao.UPDATE,
+          acao: item.acao,
           dadosRegistrados: JSON.stringify(dados),
           empresaId: item.empresaId,
           registradoPorId: item.registradoPorId,
         };
       });
+      this.logger.debug(dadosAtualizados);
       const atualizar = await client.auditoria.createMany({
         data: dadosAtualizados,
       });

@@ -428,6 +428,7 @@ export class UsuarioService {
             data: {
               dataDesligamento: new Date(),
               status: false,
+              _auditAction: Acao.DEACTIVATE,
             },
           });
 
@@ -492,7 +493,7 @@ export class UsuarioService {
             throw new UnauthorizedException(TYPES_NOTICES.NOT_DEACTIVE);
           }
 
-          if (buscar.empresaId !== usuario.empresa) {
+          if (buscar.empresaId === usuario.empresa) {
             this.logger.warn(TYPES_NOTICES.NOT_BELONG);
             throw new UnauthorizedException(TYPES_NOTICES.NOT_BELONG);
           }

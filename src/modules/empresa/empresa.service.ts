@@ -118,7 +118,7 @@ export class EmpresaService {
   ): Promise<Empresa> {
     try {
       const atualizarEmpresa = await this.prisma.client.$transaction(
-        async (tx) => {
+        async (tx: any) => {
           const usuario = this.tenantContext.getStore()!;
           const buscarUsuario = await this.usuario.findOne(usuario.user, tx);
           if (id !== buscarUsuario.empresaId) {
@@ -152,7 +152,7 @@ export class EmpresaService {
   async deactive(id: string): Promise<Empresa> {
     try {
       const inativarEmpresa = await this.prisma.client.$transaction(
-        async (tx) => {
+        async (tx: any) => {
           await this.findOne(id, tx);
 
           const consultarUsuario: QueryUsuarioDto = { empresaId: id };

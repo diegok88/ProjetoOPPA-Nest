@@ -66,7 +66,7 @@ export class PrismaService
         $allModels: {
           // CRIAÇÃO - create
           async create({ model, args, query }) {
-            const modeloNome = model;
+            const modeloNome = model.toLowerCase();
             const usuario = tenantContext.getStore();
             const resultado = await query(args);
 
@@ -87,12 +87,8 @@ export class PrismaService
           },
           // ATUALIZAÇÃO UNICA - update
           async update({ model, args, query }) {
-            const modeloNome = model;
-            const resultado = query(args);
-            const user = tenantContext.getStore();
-
-            if (!user) return resultado;
-            if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
+            const modeloNome = model.toLowerCase();
+            const user = tenantContext.getStore()!;
 
             let acao = Acao.UPDATE;
             const dataAny = args.data as any;
@@ -101,7 +97,11 @@ export class PrismaService
               delete dataAny._auditAction;
             }
 
-            const antes = await prismaClient[model].findUnique({
+            const resultado = await query(args);
+            if (!user) return resultado;
+            if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
+
+            const antes = await this[model].findUnique({
               where: args.where,
             });
 
@@ -113,8 +113,8 @@ export class PrismaService
               acao: acao,
               antes: ExtractDataAuditoria(antes),
               depois: ExtractDataAuditoria(depois),
-              empresaId: user!.empresa,
-              registradoPorId: user!.user,
+              empresaId: user.empresa,
+              registradoPorId: user.user,
             };
 
             await getAuditoriaService().update(dados, prismaClient);
@@ -123,12 +123,8 @@ export class PrismaService
           },
           // ATUALIZAÇÃO EM LOTE - update many
           async updateMany({ model, args, query }) {
-            const modeloNome = model;
+            const modeloNome = model.toLowerCase();
             const user = tenantContext.getStore();
-            const resultado = await query(args);
-
-            if (!user) return query(args);
-            if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
 
             let acao = Acao.UPDATE;
             const dataAny = args.data as any;
@@ -137,17 +133,20 @@ export class PrismaService
               delete dataAny._auditAction;
             }
 
-            const antes = await prismaClient[model].findMany({
+            const antes = await this[model].findMany({
               where: args.where,
             });
 
-            const depois = await prismaClient[model].findMany({
+            const resultado = await query(args);
+            if (!user) return resultado;
+            if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
+
+            const depois = await this[model].findMany({
               where: args.where,
             });
 
             const dadosAuditoria = antes.map((itemAntes: any) => {
               const itemDepois = depois.find((d: any) => d.id === itemAntes.id);
-
               const dados: UpdateAuditoriaDto = {
                 entidade: modeloNome.toUpperCase(),
                 registroId: itemAntes.id,
@@ -157,24 +156,23 @@ export class PrismaService
                 empresaId: user.empresa,
                 registradoPorId: user.user,
               };
-
               return dados;
             });
-
+            console.log(dadosAuditoria);
             await getAuditoriaService().updateAll(dadosAuditoria, prismaClient);
 
             return resultado;
           },
           // REMOÇÃO UNICA - delete
           async delete({ model, args, query }) {
-            const modeloNome = model;
+            const modeloNome = model.toLowerCase();
             const user = tenantContext.getStore();
-            const resultado = query(args);
+            const resultado = await query(args);
 
             if (!user) return resultado;
             if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
 
-            const dados = await prismaClient[model].findUnique({
+            const dados = await this[model].findUnique({
               where: args.where,
             });
 
@@ -197,16 +195,17 @@ export class PrismaService
           },
           // REMOÇÃO EM LOTE - delete many
           async deleteMany({ model, args, query }) {
-            const modeloNome = model;
+            const modeloNome = model.toLowerCase();
             const user = tenantContext.getStore();
-            const resultado = await query(args);
 
-            if (!user) return query(args);
-            if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
-
-            const dados = await prismaClient[model].findMany({
+            const dados = await this[model].findMany({
               where: args.where,
             });
+
+            const resultado = await query(args);
+
+            if (!user) return resultado;
+            if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
 
             const dadosAuditoria: CreateAuditoriaDto[] = dados.map(
               (item: any) => ({
