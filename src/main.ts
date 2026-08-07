@@ -41,7 +41,7 @@ async function bootstrap() {
   // CONTROLA A PORTA DE ACESSO
   app.enableCors({
     origin: 'http://localhost:4200',
-    Credentials: true,
+    credentials: true,
   });
   await app.listen(process.env.PORT ?? 3000);
 }

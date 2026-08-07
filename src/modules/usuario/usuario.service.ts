@@ -34,6 +34,7 @@ import {
   UpdateUsuarioPasswordDto,
 } from './dto/update-usuario.dto';
 import { Usuario, UsuarioMaster } from './entities/usuario.entity';
+import { Empresa } from '../empresa/entities/empresa.entity';
 
 @Injectable()
 export class UsuarioService {
@@ -254,6 +255,7 @@ export class UsuarioService {
   /* 
     BUSCA USUARIO PELO ID:
     - busca apenas pelo id.
+    - retorna os dados completos com as chaves.
   */
   async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Usuario> {
     try {
@@ -261,6 +263,10 @@ export class UsuarioService {
 
       const buscar = await client.usuario.findUnique({
         where: { id: id },
+        include: {
+          perfil: true,
+          empresa: true,
+        },
       });
 
       if (!buscar) {

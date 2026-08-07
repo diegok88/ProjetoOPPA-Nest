@@ -45,7 +45,7 @@ export class AuthService {
     return this.jwtService.sign(payload);
   }
 
-  // OBTER O PERFIL - criar entidade usuario para tipar o retorno
+  // OBTER O PERFIL - criar entidade usuario para tipar o retorno -
   async findProfile(id: string): Promise<ResponseAuthDto> {
     const usuario = await this.usuario.findOne(id);
     if (!usuario) throw new UnauthorizedException();

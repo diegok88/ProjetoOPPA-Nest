@@ -44,7 +44,9 @@ export class AuthController {
       sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000,
     });
-    return plainToClass(ResponseAuthMessageDto, TYPES_NOTICES.LOGIN);
+    return plainToClass(ResponseAuthMessageDto, {
+      message: TYPES_NOTICES.LOGIN,
+    });
   }
 
   @Post('logout')
