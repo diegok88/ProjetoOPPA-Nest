@@ -19,9 +19,7 @@ import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
-import type { AuthenticatedRequest } from '@/auth/express/authenticated-request.interface';
 import { plainToClass } from 'class-transformer';
-import { Auth } from '@/auth/entities/auth.entity';
 import { QueryPerfilFilterDto } from './dto/query-perfil.dto';
 
 @Controller('perfil')
