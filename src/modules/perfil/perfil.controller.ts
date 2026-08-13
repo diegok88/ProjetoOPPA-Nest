@@ -1,3 +1,7 @@
+import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
+import { RolesGuard } from '@/auth/guards/roles-auth.guard';
+import { ROLES } from '@/auth/guards/roles.const';
+import { Roles } from '@/auth/guards/roles.decorator';
 import {
   Body,
   Controller,
@@ -8,19 +12,14 @@ import {
   Patch,
   Post,
   Query,
-  Req,
   UseGuards,
 } from '@nestjs/common';
+import { plainToClass } from 'class-transformer';
 import { CreatePerfilDto } from './dto/create-perfil.dto';
+import { QueryPerfilFilterDto } from './dto/query-perfil.dto';
 import { ResponsePerfilDto } from './dto/response-perfil.dto';
 import { UpdatePerfilDto } from './dto/update-perfil.dto';
 import { PerfilService } from './perfil.service';
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
-import { ROLES } from '@/auth/guards/roles.const';
-import { Roles } from '@/auth/guards/roles.decorator';
-import { plainToClass } from 'class-transformer';
-import { QueryPerfilFilterDto } from './dto/query-perfil.dto';
 
 @Controller('perfil')
 @UseGuards(JwtAuthGuard, RolesGuard)
