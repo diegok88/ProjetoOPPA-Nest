@@ -1,5 +1,7 @@
-import { OmitType, PartialType, PickType } from '@nestjs/mapped-types';
-import { IsDate, IsOptional, IsUUID } from 'class-validator';
+import { Acao } from '@/generated/prisma/enums';
+import { OmitType, PickType } from '@nestjs/mapped-types';
+import { Type } from 'class-transformer';
+import { IsDate, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { CreateAuditoriaDto } from './create-auditoria.dto';
 
 export class QueryAuditoriaRegisteredByIdDto extends OmitType(
@@ -17,10 +19,29 @@ export class QueryAuditoriaFindOneLastDto extends PickType(CreateAuditoriaDto, [
   'registradoPorId',
 ]) {}
 
-export class QueryAuditoriaFilterDto extends PartialType(
-  OmitType(CreateAuditoriaDto, ['dadosRegistrados']),
-) {
-  @IsDate({ message: 'Data e hora não é do tipo Date!' })
+export class QueryAuditoriaFilterDto {
   @IsOptional()
+  @IsString()
+  entidade?: string;
+
+  @IsOptional()
+  @IsString()
+  registroId?: string;
+
+  @IsOptional()
+  @IsEnum(Acao)
+  acao?: Acao;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
   dataHora?: Date;
+
+  @IsOptional()
+  @IsString()
+  empresaId?: string;
+
+  @IsOptional()
+  @IsString()
+  registradoPorId?: string;
 }
