@@ -1,4 +1,3 @@
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
