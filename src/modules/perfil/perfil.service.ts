@@ -111,16 +111,18 @@ export class PerfilService {
   // ATUALIZAÇÃO DO PERFIL PELO ID
   async update(id: string, updatePerfilDto: UpdatePerfilDto): Promise<Perfil> {
     try {
-      const atualizarPerfil = await this.prisma.$transaction(async (tx) => {
-        await this.findOne(id, tx);
+      const atualizarPerfil = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          await this.findOne(id, tx);
 
-        const atualizar = await tx.perfil.update({
-          where: { id: id },
-          data: updatePerfilDto,
-        });
+          const atualizar = await tx.perfil.update({
+            where: { id: id },
+            data: updatePerfilDto,
+          });
 
-        return atualizar;
-      });
+          return atualizar;
+        },
+      );
 
       this.logger.log(TYPES_NOTICES.UPDATE);
       return atualizarPerfil;
