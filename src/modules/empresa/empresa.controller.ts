@@ -35,9 +35,9 @@ export class EmpresaController {
   @Roles(ROLES.ASN1)
   async create(
     @Body() createEmpresaDto: CreateEmpresaDto,
-  ): Promise<ResponseEmpresaMessageDto> {
-    await this.empresaService.create(createEmpresaDto);
-    return plainToClass(ResponseEmpresaMessageDto, TYPES_NOTICES.CREATE);
+  ): Promise<ResponseEmpresaDto> {
+    const dados = await this.empresaService.create(createEmpresaDto);
+    return plainToClass(ResponseEmpresaDto, dados);
   }
 
   // CONTROLLER LISTAR EMPRESAS
