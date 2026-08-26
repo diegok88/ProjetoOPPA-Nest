@@ -26,7 +26,10 @@ import {
   CreateUsuarioMaster,
 } from './dto/create-usuario.dto';
 import { QueryAdminDto, QueryUsuarioDto } from './dto/query-usuario.dto';
-import { ResponseUsuarioDto } from './dto/response-usuario.dto';
+import {
+  ResponseUsuarioAssistDto,
+  ResponseUsuarioDto,
+} from './dto/response-usuario.dto';
 import {
   UpdateUsuarioDto,
   UpdateUsuarioPasswordDto,
@@ -85,9 +88,9 @@ export class UsuarioController {
   @Roles(ROLES.ASN1)
   async findAll(
     @Query() queryUsuarioDto: QueryUsuarioDto,
-  ): Promise<ResponseUsuarioDto[]> {
+  ): Promise<ResponseUsuarioAssistDto[]> {
     const dados = await this.usuarioService.findAll(queryUsuarioDto);
-    return dados.map((lista) => plainToClass(ResponseUsuarioDto, lista));
+    return dados.map((lista) => plainToClass(ResponseUsuarioAssistDto, lista));
   }
 
   // LISTA OS USUARIOS COM PARAMETROS ESPECIFICOS, MAIS USANDO O MESMO SERVIÇO

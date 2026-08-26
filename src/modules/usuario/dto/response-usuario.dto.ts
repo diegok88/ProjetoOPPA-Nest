@@ -1,5 +1,8 @@
+import { ResponseEmpresaDto } from '@/modules/empresa/dto/response-empresa.dto';
+import { ResponsePerfilDto } from '@/modules/perfil/dto/response-perfil.dto';
 import { FormatDate } from '@/utils/fromat-date.util';
-import { Expose } from 'class-transformer';
+import { PartialType } from '@nestjs/mapped-types';
+import { Exclude, Expose, Type } from 'class-transformer';
 
 export class ResponseUsuarioDto {
   @Expose()
@@ -23,10 +26,10 @@ export class ResponseUsuarioDto {
   @FormatDate()
   dataDesligamento?: Date | null;
 
-  @Expose()
+  @Exclude()
   senha!: string;
 
-  @Expose()
+  @Exclude()
   pin!: string;
 
   @Expose()
@@ -43,4 +46,22 @@ export class ResponseUsuarioDto {
 
   @Expose()
   status!: boolean;
+}
+
+export class ResponseUsuarioAssistDto extends PartialType(ResponseUsuarioDto) {
+  @Type(() => ResponsePerfilDto)
+  perfil?: ResponsePerfilDto;
+
+  @Type(() => ResponseEmpresaDto)
+  empresa?: ResponseEmpresaDto;
+
+  @Expose()
+  get desPerfil(): string | null {
+    return this.perfil?.descricao || null;
+  }
+
+  @Expose()
+  get desEmpresa(): string | null {
+    return this.empresa?.nomeFantasia || null;
+  }
 }
