@@ -241,6 +241,10 @@ export class UsuarioService {
       const listarUsuarios = await client.usuario.findMany({
         where: condicao,
         select: selecao,
+        include: {
+          perfil: true,
+          empresa: true,
+        },
       });
 
       this.logger.log(TYPES_NOTICES.FIND_ALL);
