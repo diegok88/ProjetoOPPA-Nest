@@ -67,6 +67,16 @@ export class PerfilController {
     return plainToClass(ResponsePerfilDto, dado);
   }
 
+  // ATIVAÇÃO DO PERFIL PELO ID
+  @Patch('active/:id')
+  @Roles(ROLES.ASN1)
+  async active(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponsePerfilDto> {
+    const dado = await this.perfilService.deactive(id);
+    return plainToClass(ResponsePerfilDto, dado);
+  }
+
   // INATIVAÇÃO DO PERFIL PELO ID
   @Patch('deactive/:id')
   @Roles(ROLES.ASN1)

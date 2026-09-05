@@ -132,6 +132,38 @@ export class PerfilService {
     }
   }
 
+  // ATIVAÇÃO DO PERFIL PELO ID
+  async active(id: string): Promise<Perfil> {
+    try {
+      const ativarPerfil = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const dadosVerificar: QueryUsuarioDto = { perfilId: id };
+          const verificar = await this.usuario.findAll(dadosVerificar, tx);
+
+          if (verificar.length > 0) {
+            this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+            throw new UnauthorizedException(TYPES_NOTICES.EMPTY_LIST);
+          }
+
+          await this.findOne(id, tx);
+
+          const ativar = await tx.perfil.update({
+            where: { id: id },
+            data: { status: true, _auditAction: Acao.ACTIVE },
+          });
+
+          return ativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.ACTIVE);
+      return ativarPerfil;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - ACTIVE');
+      throw error;
+    }
+  }
+
   // INATIVAÇÃO DO PERFIL PELO ID
   async deactive(id: string): Promise<Perfil> {
     try {

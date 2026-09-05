@@ -26,6 +26,7 @@ model Auditoria {
 enum Acao {
   CREATE
   UPDATE
+  ACTIVE
   DEACTIVATE
   DELETE
   LOGIN

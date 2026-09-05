@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "Acao" ADD VALUE 'ACTIVE';
