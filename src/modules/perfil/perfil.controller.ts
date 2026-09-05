@@ -73,7 +73,7 @@ export class PerfilController {
   async active(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponsePerfilDto> {
-    const dado = await this.perfilService.deactive(id);
+    const dado = await this.perfilService.active(id);
     return plainToClass(ResponsePerfilDto, dado);
   }
 
