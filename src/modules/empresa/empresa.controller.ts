@@ -15,7 +15,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { plainToClass } from 'class-transformer';
+import { plainToClass, plainToInstance } from 'class-transformer';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
 import { QueryEmpresaFilterDto } from './dto/query-empresa.dto';
 import {
@@ -37,7 +37,7 @@ export class EmpresaController {
     @Body() createEmpresaDto: CreateEmpresaDto,
   ): Promise<ResponseEmpresaDto> {
     const dados = await this.empresaService.create(createEmpresaDto);
-    return plainToClass(ResponseEmpresaDto, dados);
+    return plainToInstance(ResponseEmpresaDto, dados);
   }
 
   // CONTROLLER LISTAR EMPRESAS
@@ -47,7 +47,7 @@ export class EmpresaController {
     @Query() query: QueryEmpresaFilterDto,
   ): Promise<ResponseEmpresaDto[]> {
     const dados = await this.empresaService.findAll(query);
-    return dados.map((lista) => plainToClass(ResponseEmpresaDto, lista));
+    return plainToInstance(ResponseEmpresaDto, dados);
   }
 
   // CONTROLLER BUSCAR EMPRESA PELO ID
@@ -57,7 +57,7 @@ export class EmpresaController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseEmpresaDto> {
     const dado = await this.empresaService.findOne(id);
-    return plainToClass(ResponseEmpresaDto, dado);
+    return plainToInstance(ResponseEmpresaDto, dado);
   }
 
   // CONTROLLER ATUALIZAR EMPRESA PELO ID
@@ -68,7 +68,17 @@ export class EmpresaController {
     @Body() updateEmpresaDto: UpdateEmpresaDto,
   ): Promise<ResponseEmpresaDto> {
     const dado = await this.empresaService.update(id, updateEmpresaDto);
-    return plainToClass(ResponseEmpresaDto, dado);
+    return plainToInstance(ResponseEmpresaDto, dado);
+  }
+
+  // CONTROLLER ATIVAR EMPRESA PELO ID
+  @Patch('active/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async active(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseEmpresaDto> {
+    const dado = await this.empresaService.active(id);
+    return plainToInstance(ResponseEmpresaDto, dado);
   }
 
   // CONTROLLER INATIVAR EMPRESA PELO ID
@@ -78,7 +88,7 @@ export class EmpresaController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseEmpresaDto> {
     const dado = await this.empresaService.deactive(id);
-    return plainToClass(ResponseEmpresaDto, dado);
+    return plainToInstance(ResponseEmpresaDto, dado);
   }
 
   // CONTROLLER DELETAR EMPRESA PELO ID
@@ -88,6 +98,6 @@ export class EmpresaController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseEmpresaDto> {
     const dado = await this.empresaService.remove(id);
-    return plainToClass(ResponseEmpresaDto, dado);
+    return plainToInstance(ResponseEmpresaDto, dado);
   }
 }

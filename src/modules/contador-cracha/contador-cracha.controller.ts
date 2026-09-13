@@ -10,7 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { plainToClass } from 'class-transformer';
+import { plainToInstance } from 'class-transformer';
 import { ContadorCrachaService } from './contador-cracha.service';
 import { QueryContadorCrachaFilterDto } from './dto/query-contador-cracha.dto';
 import { ResponseContadorCrachaDto } from './dto/response-contador-cracha.dto';
@@ -26,7 +26,7 @@ export class ContadorCrachaController {
     @Query() query: QueryContadorCrachaFilterDto,
   ): Promise<ResponseContadorCrachaDto[]> {
     const dados = await this.contadorCrachaService.findAll(query);
-    return dados.map((lista) => plainToClass(ResponseContadorCrachaDto, lista));
+    return plainToInstance(ResponseContadorCrachaDto, dados);
   }
 
   @Get(':id')
@@ -35,6 +35,6 @@ export class ContadorCrachaController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseContadorCrachaDto> {
     const dado = await this.contadorCrachaService.findOne(id);
-    return plainToClass(ResponseContadorCrachaDto, dado);
+    return plainToInstance(ResponseContadorCrachaDto, dado);
   }
 }

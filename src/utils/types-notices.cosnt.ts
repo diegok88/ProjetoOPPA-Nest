@@ -8,6 +8,7 @@ export const TYPES_NOTICES = {
   UPDATE: 'Registro atualizado com sucesso!',
   UPDATE_MANY: 'Registros atualizados com sucesso!',
   ACTIVE: 'Registro ativado com sucesso!',
+  ACTIVE_MANY: 'Registros ativados com sucesso!',
   DEACTIVE: 'Registro inativado com sucesso!',
   DEACTIVE_MANY: 'Registros inativados com sucesso!',
   NOT_DEACTIVE: 'Registro não está inativo!',

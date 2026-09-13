@@ -1,8 +1,12 @@
+import { ResponseContadorCrachaDto } from '@/modules/contador-cracha/dto/response-contador-cracha.dto';
+import { ContadorCracha } from '@/modules/contador-cracha/entities/contador-cracha.entity';
+import { ResponseUsuarioDto } from '@/modules/usuario/dto/response-usuario.dto';
+import { Usuario } from '@/modules/usuario/entities/usuario.entity';
 import { FormatCep } from '@/utils/format-cep.util';
 import { FormatCNPJ } from '@/utils/format-cnpj.util';
 import { FormatFone } from '@/utils/format-fone.util';
 import { OmitType } from '@nestjs/mapped-types';
-import { Expose } from 'class-transformer';
+import { Expose, Type } from 'class-transformer';
 
 export class ResponseEmpresaDto {
   @Expose()
@@ -46,6 +50,25 @@ export class ResponseEmpresaDto {
 
   @Expose()
   status!: boolean;
+
+  @Type(() => ResponseUsuarioDto)
+  usuario?: Usuario[];
+
+  @Expose()
+  get desNome(): string[] {
+    return (
+      this.usuario?.map((u) => u.nome).filter((n): n is string => n !== null) ??
+      []
+    );
+  }
+
+  @Type(() => ResponseContadorCrachaDto)
+  contadorCracha?: ResponseContadorCrachaDto;
+
+  @Expose()
+  get qtdCracha(): number | null {
+    return this.contadorCracha?.contador ?? null;
+  }
 }
 
 export class ResponseEmpresaAdminDto extends OmitType(ResponseEmpresaDto, [

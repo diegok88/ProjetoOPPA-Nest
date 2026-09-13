@@ -77,6 +77,10 @@ export class EmpresaService {
 
       const listarEmpresas = await this.prisma.empresa.findMany({
         where: condicao,
+        include: {
+          usuario: true,
+          contadorCracha: true,
+        },
       });
       this.logger.log(TYPES_NOTICES.FIND_ALL);
       return listarEmpresas;
@@ -182,6 +186,47 @@ export class EmpresaService {
       return atualizarEmpresa;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
+      throw error;
+    }
+  }
+  /*
+  ATIVAR EMPRESA PELO ID:
+  - serviço de ativação.
+  - vinculado com contador de cracha, gestor e usuario.
+  - falta apenas conectar as outras classes
+  */
+  async active(id: string): Promise<Empresa> {
+    try {
+      const ativarEmpresa = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          await this.findOne(id, tx);
+
+          const consultarUsuario: QueryUsuarioDto = { empresaId: id };
+          const listarUsuario = await this.usuario.findAll(
+            consultarUsuario,
+            tx,
+          );
+          const ids = listarUsuario.map((usuario) => usuario.id);
+
+          await this.contadorCracha.active(id, tx);
+
+          if (listarUsuario.length > 0) {
+            await this.gestor.activeAll(ids, tx);
+            await this.usuario.activeAll(ids, tx);
+          }
+
+          const ativar = await tx.empresa.update({
+            where: { id: id },
+            data: { status: true, _auditAction: Acao.ACTIVE },
+          });
+
+          return ativar;
+        },
+      );
+      this.logger.log(TYPES_NOTICES.ACTIVE);
+      return ativarEmpresa;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - ACTIVE');
       throw error;
     }
   }

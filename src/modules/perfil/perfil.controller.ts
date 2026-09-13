@@ -14,7 +14,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { plainToClass } from 'class-transformer';
+import { plainToInstance } from 'class-transformer';
 import { CreatePerfilDto } from './dto/create-perfil.dto';
 import { QueryPerfilFilterDto } from './dto/query-perfil.dto';
 import { ResponsePerfilDto } from './dto/response-perfil.dto';
@@ -33,7 +33,7 @@ export class PerfilController {
     @Body() createPerfilDto: CreatePerfilDto,
   ): Promise<ResponsePerfilDto> {
     const dado = await this.perfilService.create(createPerfilDto);
-    return plainToClass(ResponsePerfilDto, dado);
+    return plainToInstance(ResponsePerfilDto, dado);
   }
 
   // LISTAR PERFIS
@@ -43,7 +43,7 @@ export class PerfilController {
     @Query() query: QueryPerfilFilterDto,
   ): Promise<ResponsePerfilDto[]> {
     const dados = await this.perfilService.findAll(query);
-    return dados.map((lista) => plainToClass(ResponsePerfilDto, lista));
+    return plainToInstance(ResponsePerfilDto, dados);
   }
 
   // BUSCAR PERFIL PELO ID
@@ -53,7 +53,7 @@ export class PerfilController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponsePerfilDto> {
     const dado = await this.perfilService.findOne(id);
-    return plainToClass(ResponsePerfilDto, dado);
+    return plainToInstance(ResponsePerfilDto, dado);
   }
 
   // ATUALIZAÇÃO DO PERFIL PELO ID
@@ -64,7 +64,7 @@ export class PerfilController {
     @Body() updatePerfilDto: UpdatePerfilDto,
   ): Promise<ResponsePerfilDto> {
     const dado = await this.perfilService.update(id, updatePerfilDto);
-    return plainToClass(ResponsePerfilDto, dado);
+    return plainToInstance(ResponsePerfilDto, dado);
   }
 
   // ATIVAÇÃO DO PERFIL PELO ID
@@ -74,7 +74,7 @@ export class PerfilController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponsePerfilDto> {
     const dado = await this.perfilService.active(id);
-    return plainToClass(ResponsePerfilDto, dado);
+    return plainToInstance(ResponsePerfilDto, dado);
   }
 
   // INATIVAÇÃO DO PERFIL PELO ID
@@ -84,7 +84,7 @@ export class PerfilController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponsePerfilDto> {
     const dado = await this.perfilService.deactive(id);
-    return plainToClass(ResponsePerfilDto, dado);
+    return plainToInstance(ResponsePerfilDto, dado);
   }
 
   // DELETE DO PERFIL PELO ID
@@ -94,6 +94,6 @@ export class PerfilController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponsePerfilDto> {
     const dado = await this.perfilService.remove(id);
-    return plainToClass(ResponsePerfilDto, dado);
+    return plainToInstance(ResponsePerfilDto, dado);
   }
 }

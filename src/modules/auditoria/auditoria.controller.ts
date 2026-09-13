@@ -10,7 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { plainToClass } from 'class-transformer';
+import { plainToInstance } from 'class-transformer';
 import { AuditoriaService } from './auditoria.service';
 import { QueryAuditoriaFilterDto } from './dto/query-auditoria.dto';
 import {
@@ -29,7 +29,7 @@ export class AuditoriaController {
     @Query() query: QueryAuditoriaFilterDto,
   ): Promise<ResponseAuditoriaDto[]> {
     const dados = await this.auditoriaService.findAll(query);
-    return dados.map((lista) => plainToClass(ResponseAuditoriaDto, lista));
+    return plainToInstance(ResponseAuditoriaDto, dados);
   }
 
   @Get(':id')
@@ -37,7 +37,7 @@ export class AuditoriaController {
   @Roles(ROLES.ASN1)
   async findOne(@Param('id') id: string): Promise<ResponseAuditoriaDto> {
     const dado = await this.auditoriaService.findOne(id);
-    return plainToClass(ResponseAuditoriaDto, dado);
+    return plainToInstance(ResponseAuditoriaDto, dado);
   }
 
   @Delete(':id')
@@ -45,7 +45,7 @@ export class AuditoriaController {
   @Roles(ROLES.ASN1)
   async remove(@Param('id') id: string): Promise<ResponseAuditoriaMessageDto> {
     const dado = await this.auditoriaService.remove(id);
-    return plainToClass(ResponseAuditoriaMessageDto, {
+    return plainToInstance(ResponseAuditoriaMessageDto, {
       message: TYPES_NOTICES.DELETE,
     });
   }

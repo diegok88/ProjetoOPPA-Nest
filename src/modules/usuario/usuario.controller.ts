@@ -18,7 +18,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { plainToClass } from 'class-transformer';
+import { plainToClass, plainToInstance } from 'class-transformer';
 import {
   CreateUsuarioAdminDto,
   CreateUsuarioAssistDto,
@@ -51,7 +51,7 @@ export class UsuarioController {
     @Body() createUsuarioMaster: CreateUsuarioMaster,
   ): Promise<ResponseUsuarioDto> {
     const dado = await this.usuarioService.createMaster(createUsuarioMaster);
-    return plainToClass(ResponseUsuarioDto, dado);
+    return plainToInstance(ResponseUsuarioDto, dado);
   }
 
   // CRIAR USUARIO COMO ASSISTENCIA
@@ -61,7 +61,7 @@ export class UsuarioController {
     @Body() create: CreateUsuarioAssistDto,
   ): Promise<ResponseUsuarioDto> {
     const dado = await this.usuarioService.createAssist(create);
-    return plainToClass(ResponseUsuarioDto, dado);
+    return plainToInstance(ResponseUsuarioDto, dado);
   }
 
   // CRIAR USUARIO COMO ADMINISTRADOR
@@ -71,7 +71,7 @@ export class UsuarioController {
     @Body() create: CreateUsuarioAdminDto,
   ): Promise<ResponseUsuarioDto> {
     const dado = this.usuarioService.createAdmin(create);
-    return plainToClass(ResponseUsuarioDto, dado);
+    return plainToInstance(ResponseUsuarioDto, dado);
   }
 
   @Post('gestor')
@@ -80,7 +80,7 @@ export class UsuarioController {
     @Body() create: CreateUsuarioGestorDto,
   ): Promise<ResponseUsuarioDto> {
     const dado = this.usuarioService.createGestor(create);
-    return plainToClass(ResponseUsuarioDto, dado);
+    return plainToInstance(ResponseUsuarioDto, dado);
   }
 
   // LISTA OS USUARIOS
@@ -90,14 +90,13 @@ export class UsuarioController {
     @Query() queryUsuarioDto: QueryUsuarioDto,
   ): Promise<ResponseUsuarioAssistDto[]> {
     const dados = await this.usuarioService.findAll(queryUsuarioDto);
-    return dados.map((lista) => plainToClass(ResponseUsuarioAssistDto, lista));
+    return plainToInstance(ResponseUsuarioAssistDto, dados);
   }
 
   // LISTA OS USUARIOS COM PARAMETROS ESPECIFICOS, MAIS USANDO O MESMO SERVIÇO
   @Get('admin')
   @Roles(ROLES.ADN1)
   async findAllAdmin(
-    @Req() req: AuthenticatedRequest,
     @Query() query: QueryAdminDto,
   ): Promise<ResponseUsuarioDto[]> {
     const usuario = this.tenantContext.getStore()!;
@@ -110,7 +109,7 @@ export class UsuarioController {
 
     const dados = await this.usuarioService.findAll(queryAdmin);
 
-    return dados.map((lista) => plainToClass(ResponseUsuarioDto, lista));
+    return plainToInstance(ResponseUsuarioDto, dados);
   }
 
   // BUSCA USUARIO PELO ID
@@ -119,7 +118,7 @@ export class UsuarioController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseUsuarioDto> {
     const dado = await this.usuarioService.findOne(id);
-    return plainToClass(ResponseUsuarioDto, dado);
+    return plainToInstance(ResponseUsuarioDto, dado);
   }
 
   // ATUALIZA USUARIO PELO ID
@@ -130,7 +129,7 @@ export class UsuarioController {
     @Body() update: UpdateUsuarioDto,
   ): Promise<ResponseUsuarioDto> {
     const dado = await this.usuarioService.update(id, update);
-    return plainToClass(ResponseUsuarioDto, dado);
+    return plainToInstance(ResponseUsuarioDto, dado);
   }
 
   // ATUALIZA O SENHA DO USUARIO
@@ -144,7 +143,7 @@ export class UsuarioController {
       updatePassword,
       tipo,
     );
-    return plainToClass(ResponseUsuarioDto, dado);
+    return plainToInstance(ResponseUsuarioDto, dado);
   }
 
   // ATUALIZA O PIN DO USUARIO
@@ -157,7 +156,7 @@ export class UsuarioController {
       update,
       tipo,
     );
-    return plainToClass(ResponseUsuarioDto, dado);
+    return plainToInstance(ResponseUsuarioDto, dado);
   }
 
   // INATIVAR USUARIO
@@ -167,7 +166,7 @@ export class UsuarioController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseUsuarioDto> {
     const dado = await this.usuarioService.deactive(id);
-    return plainToClass(ResponseUsuarioDto, dado);
+    return plainToInstance(ResponseUsuarioDto, dado);
   }
 
   // DELETA O USUARIO
@@ -177,6 +176,6 @@ export class UsuarioController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseUsuarioDto> {
     const dado = await this.usuarioService.remove(id);
-    return plainToClass(ResponseUsuarioDto, dado);
+    return plainToInstance(ResponseUsuarioDto, dado);
   }
 }

@@ -142,6 +142,35 @@ export class ContadorCrachaService {
       throw error;
     }
   }
+
+  /*
+  ATIVA O CONTADOR DE CRACHAS ATRAVES DA INATIVAÇÃO DA EMPRESA:
+  - serviço ativação interno.
+  - sem requisição http.
+  - vinculada a ativação da empresa.
+  */
+  async active(
+    empresaId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ContadorCracha> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const buscar = await this.findEnterprise(empresaId, client);
+
+      const ativar = await client.contadorDeCracha.update({
+        where: { id: buscar.id },
+        data: { status: true, _auditAction: Acao.ACTIVE },
+      });
+
+      this.logger.log(TYPES_NOTICES.ACTIVE);
+      return ativar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - ACTIVE');
+      throw error;
+    }
+  }
+
   /*
   INATIVA O CONTADOR DE CRACHAS ATRAVES DA INATIVAÇÃO DA EMPRESA:
   - serviço inativação interno.
@@ -162,10 +191,10 @@ export class ContadorCrachaService {
         data: { status: false, _auditAction: Acao.DEACTIVATE },
       });
 
-      this.logger.log(TYPES_NOTICES.UPDATE);
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
       return inativar;
     } catch (error) {
-      this.logger.error('Falha ao inativar o contador de cracha.');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE');
       throw error;
     }
   }

@@ -177,6 +177,30 @@ export class GestorService {
   }
 
   /* 
+    ATIVAR GESTORES:
+    - ativa todos os gestores de acordo com a empresa que os mesmos pertencem.
+  */
+  async activeAll(
+    ids: Array<string>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Prisma.BatchPayload> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const ativar = await client.gestor.updateMany({
+        where: { colaboradorId: { in: ids } },
+        data: { status: true, _auditAction: Acao.ACTIVE },
+      });
+
+      this.logger.log(TYPES_NOTICES.ACTIVE_MANY);
+      return ativar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - activeall');
+      throw error;
+    }
+  }
+
+  /* 
     INATIVAR GESTORES:
     - inativa todos os gestores de acordo com a empresa que os mesmos pertencem.
   */

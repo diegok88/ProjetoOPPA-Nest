@@ -462,6 +462,35 @@ export class UsuarioService {
     - serviço interno elimina todos os usuarios de uma empresa.
     - ação somente executada pela assistencia
   */
+  async activeAll(
+    ids: Array<string>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Prisma.BatchPayload> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const ativar = await client.usuario.updateMany({
+        where: { id: { in: ids } },
+        data: {
+          dataDesligamento: new Date(),
+          status: true,
+          _auditAction: Acao.ACTIVE,
+        },
+      });
+
+      this.logger.log(TYPES_NOTICES.ACTIVE_MANY);
+      return ativar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - ACTIVEALL');
+      throw error;
+    }
+  }
+
+  /* 
+    INATIVA TODOS OS USUARIO ATRAVES DA INATIVAÇÃO DA EMPRESA:
+    - serviço interno elimina todos os usuarios de uma empresa.
+    - ação somente executada pela assistencia
+  */
   async deactiveAll(
     ids: Array<string>,
     tx?: Prisma.TransactionClient,
