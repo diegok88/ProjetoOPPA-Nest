@@ -244,12 +244,33 @@ export class UsuarioService {
         include: {
           perfil: true,
           empresa: true,
+          gestorComoColaborador: {
+            where: { status: true },
+            select: {
+              gestor: {
+                select: {
+                  nome: true,
+                  cracha: true,
+                },
+              },
+            },
+          },
         },
       });
 
       this.logger.log(TYPES_NOTICES.FIND_ALL);
 
-      return listarUsuarios;
+      return listarUsuarios.map(({ gestorComoColaborador, ...usuario }) => {
+        const ligacao = gestorComoColaborador[0];
+
+        return {
+          ...usuario,
+          gestor: {
+            nome: ligacao?.gestor?.nome ?? null,
+            cracha: ligacao?.gestor?.cracha ?? null,
+          },
+        };
+      }) as Usuario[];
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
       throw error;
@@ -418,6 +439,46 @@ export class UsuarioService {
   }
 
   /*
+  ATIVAR USUARIO:
+  - ativa o usuario de forma de requisição.
+  - ativa juntamente com o gestor.
+  */
+  async active(id: string): Promise<Usuario> {
+    try {
+      const ativarUsuario = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const usuario = this.tenantContext.getStore();
+
+          const buscar = await this.findOne(id, tx);
+          if (!buscar) {
+            this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+            throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+          }
+
+          const ativar = await tx.usuario.update({
+            where: { id: id },
+            data: {
+              dataDesligamento: null,
+              status: true,
+              _auditAction: Acao.ACTIVE,
+            },
+          });
+
+          await this.gestor.active(ativar.id, tx);
+
+          return ativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.ACTIVE);
+      return ativarUsuario;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - active');
+      throw error;
+    }
+  }
+
+  /*
   INATIVAR USUARIO:
   - inativa o usuario de forma de requisição.
   - inativa juntamente com o gestor.
@@ -458,8 +519,8 @@ export class UsuarioService {
   }
 
   /* 
-    INATIVA TODOS OS USUARIO ATRAVES DA INATIVAÇÃO DA EMPRESA:
-    - serviço interno elimina todos os usuarios de uma empresa.
+    ATIVA TODOS OS USUARIO ATRAVES DA INATIVAÇÃO DA EMPRESA:
+    - serviço interno ativa todos os usuarios de uma empresa.
     - ação somente executada pela assistencia
   */
   async activeAll(
@@ -472,7 +533,7 @@ export class UsuarioService {
       const ativar = await client.usuario.updateMany({
         where: { id: { in: ids } },
         data: {
-          dataDesligamento: new Date(),
+          dataDesligamento: null,
           status: true,
           _auditAction: Acao.ACTIVE,
         },
@@ -488,7 +549,7 @@ export class UsuarioService {
 
   /* 
     INATIVA TODOS OS USUARIO ATRAVES DA INATIVAÇÃO DA EMPRESA:
-    - serviço interno elimina todos os usuarios de uma empresa.
+    - serviço interno inativa todos os usuarios de uma empresa.
     - ação somente executada pela assistencia
   */
   async deactiveAll(
@@ -533,7 +594,7 @@ export class UsuarioService {
             throw new UnauthorizedException(TYPES_NOTICES.NOT_DEACTIVE);
           }
 
-          if (buscar.empresaId === usuario.empresa) {
+          if (buscar.empresaId !== usuario.empresa) {
             this.logger.warn(TYPES_NOTICES.NOT_BELONG);
             throw new UnauthorizedException(TYPES_NOTICES.NOT_BELONG);
           }

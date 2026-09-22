@@ -36,10 +36,20 @@ export class PerfilController {
     return plainToInstance(ResponsePerfilDto, dado);
   }
 
-  // LISTAR PERFIS
+  // LISTAR TODOS OS PERFIS
   @Get()
   @Roles(ROLES.ASN1)
   async findAll(
+    @Query() query: QueryPerfilFilterDto,
+  ): Promise<ResponsePerfilDto[]> {
+    const dados = await this.perfilService.findAll(query);
+    return plainToInstance(ResponsePerfilDto, dados);
+  }
+
+  // LISTAR TODOS OS PERFIS PARA TABELA LIST - RETORNA APENAS id, descrição e nivel
+  @Get()
+  @Roles(ROLES.ASN1)
+  async findAllList(
     @Query() query: QueryPerfilFilterDto,
   ): Promise<ResponsePerfilDto[]> {
     const dados = await this.perfilService.findAll(query);

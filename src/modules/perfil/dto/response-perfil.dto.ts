@@ -11,5 +11,19 @@ export class ResponsePerfilDto {
   descricao!: string;
 
   @Expose()
+  nivel!: string;
+
+  @Expose()
   status!: boolean;
+}
+
+export class ResponsePerfilListDto {
+  @Expose()
+  id!: string;
+
+  @Expose()
+  descricao!: string;
+
+  @Expose()
+  nivel!: string;
 }

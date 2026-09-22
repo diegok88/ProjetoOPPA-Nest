@@ -148,6 +148,38 @@ export class GestorService {
     - função interna.
     - inativa o gestor em conjunto com a inativação do usuario.
   */
+  async active(id: string, tx?: Prisma.TransactionClient): Promise<Gestor> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const autenticado = this.getCurrentUser();
+      const buscar = await this.findId(id, autenticado.user, client);
+
+      if (!buscar.status) {
+        this.logger.warn(TYPES_NOTICES.IS_ACTIVE);
+        throw new BadRequestException(TYPES_NOTICES.IS_ACTIVE);
+      }
+
+      const ativar = await client.gestor.update({
+        where: { id: buscar.id },
+        data: {
+          status: true,
+          _auditAction: Acao.ACTIVE,
+        },
+      });
+
+      this.logger.log(TYPES_NOTICES.ACTIVE);
+      return ativar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - active');
+      throw error;
+    }
+  }
+  /* 
+    INATIVAR GESTOR PELO ID: 
+    - função interna.
+    - inativa o gestor em conjunto com a inativação do usuario.
+  */
   async deactive(id: string, tx?: Prisma.TransactionClient): Promise<Gestor> {
     try {
       const client = tx ?? this.prisma.client;

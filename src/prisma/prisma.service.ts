@@ -59,6 +59,8 @@ export class PrismaService
       'Empresa',
       'ContadorDeCracha',
       'Perfil',
+      'Setores',
+      'Alocacao',
     ];
 
     this.extended = this.$extends({

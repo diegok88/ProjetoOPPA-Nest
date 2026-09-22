@@ -1,5 +1,6 @@
 import { TipoEscala, TipoTurno } from '@/generated/prisma/enums';
 import { Empresa } from '@/modules/empresa/entities/empresa.entity';
+import { Gestor } from '@/modules/gestor/entities/gestor.entity';
 import { Perfil } from '@/modules/perfil/entities/perfil.entity';
 
 export class Usuario {
@@ -18,6 +19,7 @@ export class Usuario {
   status!: boolean;
   perfil?: Perfil;
   empresa?: Empresa;
+  gestor?: Gestor;
 }
 
 export class UsuarioMaster {

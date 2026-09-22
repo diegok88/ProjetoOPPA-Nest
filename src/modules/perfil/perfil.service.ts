@@ -7,14 +7,14 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { AuditoriaService } from '../auditoria/auditoria.service';
 import { QueryUsuarioDto } from '../usuario/dto/query-usuario.dto';
 import { UsuarioService } from '../usuario/usuario.service';
 import { CreatePerfilDto } from './dto/create-perfil.dto';
 import { UpdatePerfilDto } from './dto/update-perfil.dto';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
-import { Perfil } from './entities/perfil.entity';
+import { MAPA_VISIBILIDADE, Perfil } from './entities/perfil.entity';
 import { QueryPerfilFilterDto } from './dto/query-perfil.dto';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 
 @Injectable()
 export class PerfilService {
@@ -23,6 +23,7 @@ export class PerfilService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly usuario: UsuarioService,
+    private readonly tennant: TenantContextService,
   ) {}
 
   // CRIAR PERFIL
@@ -43,13 +44,25 @@ export class PerfilService {
   // LISTAR PERFIS
   async findAll(query: QueryPerfilFilterDto): Promise<Perfil[]> {
     try {
-      const condicao: Prisma.PerfilWhereInput = {};
-      if (query.codigo) condicao.codigo = query.codigo;
-      if (query.descricao) condicao.descricao = query.descricao;
-      if (query.status) condicao.status = query.status;
+      const ctx = this.tennant.getStore()!;
+
+      const desPerfil = await this.findOne(ctx.perfil);
+      const permitidos = desPerfil
+        ? MAPA_VISIBILIDADE[desPerfil.descricao]
+        : undefined;
+
+      const condicao: Prisma.PerfilWhereInput = {
+        AND: [
+          { descricao: { in: permitidos } },
+          query.codigo ? { codigo: query.codigo } : {},
+          query.descricao ? { descricao: { contains: query.descricao } } : {},
+          query.status !== undefined ? { status: query.status } : {},
+        ],
+      };
 
       const listar = await this.prisma.client.perfil.findMany({
         where: condicao,
+        orderBy: { codigo: 'asc' },
       });
 
       if (listar.length === 0) {
@@ -203,7 +216,7 @@ export class PerfilService {
         async (tx: any) => {
           const verificar = await this.findOne(id, tx);
 
-          if (verificar.status === true) {
+          if (verificar.status) {
             this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
             throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
           }

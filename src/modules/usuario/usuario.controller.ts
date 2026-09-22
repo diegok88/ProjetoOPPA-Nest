@@ -160,6 +160,16 @@ export class UsuarioController {
   }
 
   // INATIVAR USUARIO
+  @Patch('active/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async active(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseUsuarioDto> {
+    const dado = await this.usuarioService.active(id);
+    return plainToInstance(ResponseUsuarioDto, dado);
+  }
+
+  // INATIVAR USUARIO
   @Patch('deactive/:id')
   @Roles(ROLES.ASN1, ROLES.ADN1)
   async deactive(

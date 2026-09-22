@@ -34,23 +34,38 @@ enum Acao {
 }
 
 model Usuario {
-  id                    String      @id @default(uuid())
-  cracha                Int?
-  nome                  String?
-  dataNascimento        DateTime?
-  dataAdmissao          DateTime?
-  dataDesligamento      DateTime?
-  senha                 String
-  pin                   String
-  perfilId              String?
-  perfil                Perfil?     @relation("perfil", fields: [perfilId], references: [id])
-  turno                 TipoTurno?
-  escala                TipoEscala?
-  empresaId             String?
-  empresa               Empresa?    @relation("empresa", fields: [empresaId], references: [id])
-  status                Boolean     @default(true)
-  gestorComoColaborador Gestor[]    @relation("colaborador")
-  gestorComoGestor      Gestor[]    @relation("gestor")
+  id               String      @id @default(uuid())
+  cracha           Int?
+  nome             String?
+  dataNascimento   DateTime?
+  dataAdmissao     DateTime?
+  dataDesligamento DateTime?
+  senha            String
+  pin              String
+  perfilId         String?
+  perfil           Perfil?     @relation("perfil", fields: [perfilId], references: [id])
+  turno            TipoTurno?
+  escala           TipoEscala?
+  empresaId        String?
+  empresa          Empresa?    @relation("empresa", fields: [empresaId], references: [id])
+  status           Boolean     @default(true)
+
+  gestorComoColaborador       Gestor[]                 @relation("colaborador")
+  gestorComoGestor            Gestor[]                 @relation("gestor")
+  penalidadeComoColaborador   Penalidade[]             @relation("colaborador")
+  penalidadeComoGestor        Penalidade[]             @relation("gestor")
+  dispensaComoColaborador     Dispensa[]               @relation("colaborador")
+  dispensaComoGestor          Dispensa[]               @relation("gestor")
+  controleJornada             ControleJornada[]        @relation("colaborador")
+  gestorComoCompetencia       CompetenciaSetorial[]    @relation("competencia")
+  solicitacoesComoSolicitante Solicitacoes[]           @relation("solicitante")
+  solicitacoesComoSolicitado  Solicitacoes[]           @relation("solicitado")
+  ocorrenciaUsuario           Ocorrencia[]             @relation("usuario")
+  fluxoUsuario                FluxoOcorrencia[]        @relation("usuario")
+  competenciaComoGestor       CompetenciaOperacional[] @relation("gestor")
+  competenciaComoOperador     CompetenciaOperacional[] @relation("operador")
+  alocacaoComoOperador        AlocacaoOperacional[]    @relation("operador")
+  alocacaoComoGestor          AlocacaoOperacional[]    @relation("gestor")
 
   @@map("usuario")
 }
@@ -79,12 +94,20 @@ enum TipoTurno {
   COMERCIAL
 }
 
+/**
+ * ENTIDADE FORTE
+ */
 model Perfil {
-  id        String    @id @default(uuid())
-  codigo    Int       @default(autoincrement())
+  id        String  @id @default(uuid())
+  codigo    Int     @default(autoincrement())
   descricao String
-  status    Boolean   @default(true)
-  usuarios  Usuario[] @relation("perfil")
+  nivel     String
+  status    Boolean @default(true)
+
+  usuarios      Usuario[]         @relation("perfil")
+  falhaPerfil   Falhas[]          @relation("perfil")
+  solucaoPerfil Solucoes[]        @relation("perfil")
+  fluxoPerfil   FluxoOcorrencia[] @relation("perfil")
 
   @@map("perfil")
 }
@@ -100,23 +123,310 @@ model Gestor {
   @@map("gestor")
 }
 
+model Penalidade {
+  id             String         @id @default(uuid())
+  usuarioId      String
+  colaborador    Usuario        @relation("colaborador", fields: [usuarioId], references: [id])
+  gestorId       String
+  gestor         Usuario        @relation("gestor", fields: [gestorId], references: [id])
+  tipoPenalidade TipoPenalidade
+  dataInicial    DateTime
+  dataFinal      DateTime
+  justificativa  String?
+  status         Boolean
+
+  @@map("penalidade")
+}
+
+enum TipoPenalidade {
+  ORIENTACAO
+  ADVERTENCIA
+  SUSPENCAO
+}
+
+model Dispensa {
+  id           String       @id @default(uuid())
+  usuarioId    String
+  colaborador  Usuario      @relation("colaborador", fields: [usuarioId], references: [id])
+  gestorId     String
+  gestor       Usuario      @relation("gestor", fields: [gestorId], references: [id])
+  tipoDispensa TipoDispensa
+  dataInicial  DateTime
+  dataFinal    DateTime
+  status       Boolean
+
+  @@map("dispensa")
+}
+
+enum TipoDispensa {
+  BANCO_DE_HORAS
+  FERIAS
+  ATESTADO
+}
+
+model ControleJornada {
+  id            String            @id @default(uuid())
+  usuarioId     String
+  colaborador   Usuario           @relation("colaborador", fields: [usuarioId], references: [id])
+  tipoJornada   TipoJornada
+  estadoJornada TipoEstadoJornada
+  dataRegistro  DateTime
+  tagAtivoId    String
+  status        Boolean
+
+  @@map("controle_jornada")
+}
+
+enum TipoJornada {
+  ENTRADA_EXPEDIENTE
+  SAIDA_INTERVALO
+  RETORNO_INTERVALO
+  SAIDA_EXPEDIENTE
+}
+
+enum TipoEstadoJornada {
+  CONFORME
+  ATRASO
+  FALTA
+}
+
 model Empresa {
-  id             String            @id @default(uuid())
-  codigo         Int               @default(autoincrement())
-  cnpj           String            @unique
-  razaoSocial    String
-  nomeFantasia   String
-  contato        String
-  email          String            @unique
-  rua            String
-  numero         String
-  bairro         String
-  cidade         String
-  estado         String
-  cep            String
-  status         Boolean           @default(true)
+  id           String  @id @default(uuid())
+  codigo       Int     @default(autoincrement())
+  cnpj         String  @unique
+  razaoSocial  String
+  nomeFantasia String
+  contato      String
+  email        String  @unique
+  rua          String
+  numero       String
+  bairro       String
+  cidade       String
+  estado       String
+  cep          String
+  status       Boolean @default(true)
+
   usuario        Usuario[]         @relation("empresa")
   contadorCracha ContadorDeCracha? @relation("empresa")
+  competencia    Setores[]         @relation("empresa")
 
   @@map("empresa")
 }
+
+model Setores {
+  id        String  @id @default(uuid())
+  descricao String
+  empresaId String
+  empresa   Empresa @relation("empresa", fields: [empresaId], references: [id])
+  status    Boolean @default(true)
+
+  competenciaSetorial CompetenciaSetorial[] @relation("setores")
+  ativoSetores        Ativo[]               @relation("setor")
+
+  @@map("setores")
+}
+
+model CompetenciaSetorial {
+  id        String  @id @default(uuid())
+  usuarioId String
+  usuario   Usuario @relation("competencia", fields: [usuarioId], references: [id])
+  setorId   String
+  setor     Setores @relation("setores", fields: [setorId], references: [id])
+  status    Boolean @default(true)
+
+  @@map("competencia_setorial")
+}
+
+/**
+ * WEBSOCKETS
+ */
+model Solicitacoes {
+  id                String          @id @default(uuid())
+  solicitanteId     String
+  solicitante       Usuario         @relation("solicitante", fields: [solicitanteId], references: [id])
+  solicitadoId      String
+  solicitado        Usuario         @relation("solicitado", fields: [solicitadoId], references: [id])
+  tipoSolicitacaoId String
+  tipoSolicitacao   TipoSolicitacao @relation("solicitacoes", fields: [tipoSolicitacaoId], references: [id])
+  observacao        String?
+  dataEnvio         DateTime
+  dataVisualizacao  DateTime?
+  status            Boolean
+
+  @@map("solicitacoes")
+}
+
+model TipoSolicitacao {
+  id        String  @id @default(uuid())
+  descricao String
+  status    Boolean
+
+  solicitacoes Solicitacoes[] @relation("solicitacoes")
+
+  @@map("tipo_solicitacao")
+}
+
+model AlocacaoOperacional {
+  id         String           @id @default(uuid())
+  operadorId String
+  operador   Usuario          @relation("operador", fields: [operadorId], references: [id])
+  gestorId   String
+  gestor     Usuario          @relation("gestor", fields: [gestorId], references: [id])
+  tagAtivoId String
+  tagAtivo   TagAtivo         @relation("tag-ativo", fields: [tagAtivoId], references: [id])
+  condicao   CondicaoAlocacao @default(AGUARDANDO)
+  status     Boolean          @default(true)
+
+  estadoAtivo EstadoAtivo[] @relation("estado_ativo")
+
+  @@map("alocacao_operacional")
+}
+
+enum CondicaoAlocacao {
+  ACEITO
+  RECUSADO
+  AGUARDANDO
+}
+
+/**
+ * WEBSOCKETS
+ */
+model EstadoAtivo {
+  id                  String              @id @default(uuid())
+  alocacaoId          String
+  alocacaoOperacional AlocacaoOperacional @relation("estado_ativo", fields: [alocacaoId], references: [id])
+  tagAtivoId          String
+  tipoEstado          TipoEstadoAtivo
+  dataInicial         DateTime
+  dataFinal           DateTime?
+  status              Boolean
+
+  ocorrencia Ocorrencia? @relation("ocorrencia")
+
+  @@map("estado_ativo")
+}
+
+enum TipoEstadoAtivo {
+  PRODUZINDO
+  PARADA
+  FALHA
+}
+
+model Ocorrencia {
+  id             String         @id @default(uuid())
+  estadoAtivoId  String         @unique
+  estadoAtivo    EstadoAtivo    @relation("ocorrencia", fields: [estadoAtivoId], references: [id])
+  falhaId        String
+  falhas         Falhas         @relation("falhas", fields: [falhaId], references: [id])
+  solucaoId      String
+  solucoes       Solucoes       @relation("solucoes", fields: [solucaoId], references: [id])
+  tipoOcorrencia TipoOcorrencia
+  solucionadoId  String
+  solucionado    Usuario        @relation("usuario", fields: [solucionadoId], references: [id])
+  dataInicial    DateTime       @default(now())
+  dataFinal      DateTime
+  status         Boolean
+
+  fluxoOcorrencia FluxoOcorrencia[] @relation("ocorrencia")
+
+  @@map("ocorrencia")
+}
+
+model FluxoOcorrencia {
+  id                  String     @id @default(uuid())
+  ocorrenciaId        String
+  ocorrencia          Ocorrencia @relation("ocorrencia", fields: [ocorrenciaId], references: [id])
+  usuarioId           String
+  usuario             Usuario    @relation("usuario", fields: [usuarioId], references: [id])
+  transferidoPerfilId String
+  transferidoPerfil   Perfil     @relation("perfil", fields: [transferidoPerfilId], references: [id])
+  dataInicial         DateTime   @default(now())
+  dataFinal           DateTime
+  duracao             Int
+  status              Boolean    @default(true)
+
+  @@map("fluxo_ocorrencia")
+}
+
+enum TipoOcorrencia {
+  OPERACIONAL
+  MANUTENCAO
+  QUALIDADE
+}
+
+model Ativo {
+  id         String  @id @default(uuid())
+  descricao  String
+  modelo     String
+  fabricante String
+  ano        Int
+  setorId    String
+  setor      Setores @relation("setor", fields: [setorId], references: [id])
+  status     Boolean
+
+  falhaAtivo       Falhas[]                 @relation("ativo")
+  tagAtivo         TagAtivo[]               @relation("ativo")
+  competenciaAtivo CompetenciaOperacional[] @relation("ativo")
+
+  @@map("ativo")
+}
+
+model TagAtivo {
+  id        String  @id @default(uuid())
+  descricao String
+  ativoId   String
+  ativo     Ativo   @relation("ativo", fields: [ativoId], references: [id])
+  senha     String
+  status    Boolean
+
+  alocacaoTagAtivo AlocacaoOperacional[] @relation("tag-ativo")
+
+  @@map("tag_ativo")
+}
+
+model CompetenciaOperacional {
+  id         String  @id @default(uuid())
+  operadorId String
+  operador   Usuario @relation("operador", fields: [operadorId], references: [id])
+  gestorId   String
+  gestor     Usuario @relation("gestor", fields: [gestorId], references: [id])
+  ativoId    String
+  ativo      Ativo   @relation("ativo", fields: [ativoId], references: [id])
+  status     Boolean
+
+  @@map("compentencia_operacional")
+}
+
+model Falhas {
+  id               String  @id @default(uuid())
+  codigo           Int
+  descricao        String
+  ativoId          String
+  ativo            Ativo   @relation("ativo", fields: [ativoId], references: [id])
+  direcionamentoId String
+  perfil           Perfil  @relation("perfil", fields: [direcionamentoId], references: [id])
+  status           Boolean
+
+  solucaoFalha    Solucoes[]   @relation("falhas")
+  ocorrenciaFalha Ocorrencia[] @relation("falhas")
+
+  @@map("falha")
+}
+
+model Solucoes {
+  id               String  @id @default(uuid())
+  falhaId          String
+  falha            Falhas  @relation("falhas", fields: [falhaId], references: [id])
+  direcionamentoId String
+  perfil           Perfil  @relation("perfil", fields: [direcionamentoId], references: [id])
+  descricao        String
+  status           Boolean
+
+  ocorrenciaSolucoes Ocorrencia[] @relation("solucoes")
+
+  @@map("solucoes")
+}
+
+/**
+ * REFAZER A MIGRAÇÃO
+ */
