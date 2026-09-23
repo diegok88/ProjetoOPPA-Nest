@@ -28,4 +28,5 @@ export const TYPES_NOTICES = {
   EQUALS_CREDENTIAL: 'Credencial igual!',
   TOKEN_INVALID: 'Token inválido!',
   NOT_BELONG: 'Registro não pertence!',
+  COUNTER: 'Contagem realizada com sucesso!',
 } as const;

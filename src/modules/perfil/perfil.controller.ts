@@ -17,7 +17,11 @@ import {
 import { plainToInstance } from 'class-transformer';
 import { CreatePerfilDto } from './dto/create-perfil.dto';
 import { QueryPerfilFilterDto } from './dto/query-perfil.dto';
-import { ResponsePerfilDto } from './dto/response-perfil.dto';
+import {
+  ResponsePerfilContadorDto,
+  ResponsePerfilDto,
+  ResponsePerfilListDto,
+} from './dto/response-perfil.dto';
 import { UpdatePerfilDto } from './dto/update-perfil.dto';
 import { PerfilService } from './perfil.service';
 
@@ -47,13 +51,13 @@ export class PerfilController {
   }
 
   // LISTAR TODOS OS PERFIS PARA TABELA LIST - RETORNA APENAS id, descrição e nivel
-  @Get()
+  @Get('list')
   @Roles(ROLES.ASN1)
   async findAllList(
     @Query() query: QueryPerfilFilterDto,
-  ): Promise<ResponsePerfilDto[]> {
+  ): Promise<ResponsePerfilListDto[]> {
     const dados = await this.perfilService.findAll(query);
-    return plainToInstance(ResponsePerfilDto, dados);
+    return plainToInstance(ResponsePerfilListDto, dados);
   }
 
   // BUSCAR PERFIL PELO ID
@@ -64,6 +68,14 @@ export class PerfilController {
   ): Promise<ResponsePerfilDto> {
     const dado = await this.perfilService.findOne(id);
     return plainToInstance(ResponsePerfilDto, dado);
+  }
+
+  // CONTADOR DE REGISTROS TOTAIS, ATIVOS E INATIVOS
+  @Get('counter')
+  @Roles(ROLES.ASN1)
+  async counter(): Promise<ResponsePerfilContadorDto> {
+    const contador = await this.perfilService.counter();
+    return plainToInstance(ResponsePerfilContadorDto, contador);
   }
 
   // ATUALIZAÇÃO DO PERFIL PELO ID

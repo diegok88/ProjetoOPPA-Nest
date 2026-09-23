@@ -107,7 +107,7 @@ export class SetoresService {
         async (tx: any) => {
           await this.findOne(id, tx);
 
-          const atualizar = await tx.perfil.update({
+          const atualizar = await tx.setores.update({
             where: { id: id },
             data: updateSetoresDto,
           });
@@ -171,7 +171,7 @@ export class SetoresService {
             throw new UnauthorizedException(TYPES_NOTICES.IS_DEACTIVE);
           }
 
-          const inativar = await tx.perfil.update({
+          const inativar = await tx.setores.update({
             where: { id: id },
             data: { status: false, _auditAction: Acao.DEACTIVATE },
           });

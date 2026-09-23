@@ -1,4 +1,4 @@
-import { formatUppercase } from '@/utils/format-uppercase.util';
+import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsString, Length } from 'class-validator';
 
 export class CreateSetoresDto {
@@ -8,6 +8,6 @@ export class CreateSetoresDto {
     message:
       'A descrição deve conter no minimo 5 caracteres e no maximo 50 caracteres.',
   })
-  @formatUppercase()
+  @Transform(({ value }) => value.toUpperCase())
   descricao!: string;
 }

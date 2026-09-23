@@ -15,6 +15,7 @@ import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import { MAPA_VISIBILIDADE, Perfil } from './entities/perfil.entity';
 import { QueryPerfilFilterDto } from './dto/query-perfil.dto';
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { Contador } from '@/interfaces/counter.interface';
 
 @Injectable()
 export class PerfilService {
@@ -73,6 +74,23 @@ export class PerfilService {
       return listar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS */
+  async counter(): Promise<Contador> {
+    try {
+      const [total, ativos, inativos] = await Promise.all([
+        this.prisma.setores.count(),
+        this.prisma.setores.count({ where: { status: true } }),
+        this.prisma.setores.count({ where: { status: false } }),
+      ]);
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return { total, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
       throw error;
     }
   }

@@ -31,10 +31,10 @@ export class RolesGuard implements CanActivate {
     const usuario = solicitacao.user;
 
     const perfil = await this.perfil.findOne(usuario.perfil);
-    const { descricao } = perfil;
+    const autorizado = `${perfil.descricao} - ${perfil.nivel}`;
 
     const perfilAutorizado = perfilObrigatorio.some((perfil) => {
-      return descricao === perfil;
+      return autorizado === perfil;
     });
 
     if (!perfilAutorizado) {

@@ -24,7 +24,8 @@ export class ResponseAuthDto extends OmitType(ResponseUsuarioDto, [
 
   @Expose()
   get desPerfil(): string {
-    return this.perfil.descricao;
+    const perfilAutenticado = `${this.perfil.descricao} - ${this.perfil.nivel}`;
+    return perfilAutenticado;
   }
 }
 

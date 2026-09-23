@@ -215,6 +215,7 @@ model Empresa {
 
 model Setores {
   id        String  @id @default(uuid())
+  codigo    Int     @default(autoincrement())
   descricao String
   empresaId String
   empresa   Empresa @relation("empresa", fields: [empresaId], references: [id])

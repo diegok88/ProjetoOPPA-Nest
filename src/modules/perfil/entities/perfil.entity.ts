@@ -3,6 +3,7 @@ export class Perfil {
   id!: string;
   codigo!: number;
   descricao!: string;
+  nivel!: string;
   status!: boolean;
 }
 

@@ -1,3 +1,4 @@
+import { OmitType } from '@nestjs/mapped-types';
 import { Expose } from 'class-transformer';
 
 export class ResponsePerfilDto {
@@ -17,13 +18,17 @@ export class ResponsePerfilDto {
   status!: boolean;
 }
 
-export class ResponsePerfilListDto {
+export class ResponsePerfilListDto extends OmitType(ResponsePerfilDto, [
+  'status',
+] as const) {}
+
+export class ResponsePerfilContadorDto {
   @Expose()
-  id!: string;
+  total!: number;
 
   @Expose()
-  descricao!: string;
+  ativos!: number;
 
   @Expose()
-  nivel!: string;
+  inativos!: number;
 }
