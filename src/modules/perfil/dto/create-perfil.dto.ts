@@ -17,7 +17,7 @@ export class CreatePerfilDto {
 
   @IsString({ message: 'O nivel deve ser do tipo string.' })
   @IsNotEmpty({ message: 'O nivel não deve estar vazio.' })
-  @Matches(/^[a-zA-Z0-9]+$/, {
+  @Matches(/^[a-zA-Z0-9\s]+$/, {
     message: 'O nivel deve conter apenas letras e números',
   })
   @Transform(({ value }) => value.toUpperCase())

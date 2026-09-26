@@ -11,12 +11,13 @@ import {
 } from '@nestjs/common';
 import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
 import { GestorService } from '../gestor/gestor.service';
-import { QueryUsuarioDto } from '../usuario/dto/query-usuario.dto';
 import { UsuarioService } from '../usuario/usuario.service';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
 import { QueryEmpresaFilterDto } from './dto/query-empresa.dto';
 import { UpdateEmpresaDto } from './dto/update-empresa.dto';
 import { Empresa } from './entities/empresa.entity';
+import { Contador } from '@/interfaces/counter.interface';
+import { QueryUsuarioFilterDto } from '../usuario/dto/query-usuario.dto';
 
 @Injectable()
 export class EmpresaService {
@@ -77,10 +78,7 @@ export class EmpresaService {
 
       const listarEmpresas = await this.prisma.empresa.findMany({
         where: condicao,
-        include: {
-          usuario: true,
-          contadorCracha: true,
-        },
+        orderBy: { razaoSocial: 'asc' },
       });
       this.logger.log(TYPES_NOTICES.FIND_ALL);
       return listarEmpresas;
@@ -89,6 +87,24 @@ export class EmpresaService {
       throw error;
     }
   }
+
+  /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS */
+  async counter(): Promise<Contador> {
+    try {
+      const [total, ativos, inativos] = await Promise.all([
+        this.prisma.empresa.count(),
+        this.prisma.empresa.count({ where: { status: true } }),
+        this.prisma.empresa.count({ where: { status: false } }),
+      ]);
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return { total, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
   /*
   SERVIÇO DE BUSCA DE EMPRESA POR ID
   */
@@ -97,11 +113,14 @@ export class EmpresaService {
       const client = tx ?? this.prisma.client;
       const buscar = await client.empresa.findUnique({
         where: { id: id },
+        include: { contadorCracha: true },
       });
+
       if (!buscar) {
         this.logger.warn(TYPES_NOTICES.NOT_FOUND);
         throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
       }
+
       this.logger.log(TYPES_NOTICES.FIND_ONE);
       return buscar;
     } catch (error) {
@@ -201,7 +220,7 @@ export class EmpresaService {
         async (tx: any) => {
           await this.findOne(id, tx);
 
-          const consultarUsuario: QueryUsuarioDto = { empresaId: id };
+          const consultarUsuario: QueryUsuarioFilterDto = { empresaId: id };
           const listarUsuario = await this.usuario.findAll(
             consultarUsuario,
             tx,
@@ -241,7 +260,7 @@ export class EmpresaService {
         async (tx: any) => {
           await this.findOne(id, tx);
 
-          const consultarUsuario: QueryUsuarioDto = { empresaId: id };
+          const consultarUsuario: QueryUsuarioFilterDto = { empresaId: id };
           const listarUsuario = await this.usuario.findAll(
             consultarUsuario,
             tx,
@@ -274,7 +293,7 @@ export class EmpresaService {
   async remove(id: string): Promise<Empresa> {
     try {
       const deletarEmpresa = this.prisma.client.$transaction(async (tx) => {
-        const consultarUsuario: QueryUsuarioDto = { empresaId: id };
+        const consultarUsuario: QueryUsuarioFilterDto = { empresaId: id };
         const listarUsuario = await this.usuario.findAll(consultarUsuario, tx);
         const ids = listarUsuario.map((usuario) => usuario.id);
 

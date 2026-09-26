@@ -5,7 +5,7 @@ import { Usuario } from '@/modules/usuario/entities/usuario.entity';
 import { FormatCep } from '@/utils/format-cep.util';
 import { FormatCNPJ } from '@/utils/format-cnpj.util';
 import { FormatFone } from '@/utils/format-fone.util';
-import { OmitType } from '@nestjs/mapped-types';
+import { OmitType, PickType } from '@nestjs/mapped-types';
 import { Expose, Type } from 'class-transformer';
 
 export class ResponseEmpresaDto {
@@ -62,13 +62,30 @@ export class ResponseEmpresaDto {
     );
   }
 
-  @Type(() => ResponseContadorCrachaDto)
-  contadorCracha?: ResponseContadorCrachaDto;
+  @Type(() => ContadorCracha)
+  contadorCracha?: ContadorCracha;
 
   @Expose()
   get qtdCracha(): number | null {
     return this.contadorCracha?.contador ?? null;
   }
+}
+
+export class ResponseEmpresaListDto extends PickType(ResponseEmpresaDto, [
+  'id',
+  'codigo',
+  'razaoSocial',
+]) {}
+
+export class ResponseEmpresaContadorDto {
+  @Expose()
+  total!: number;
+
+  @Expose()
+  ativos!: number;
+
+  @Expose()
+  inativos!: number;
 }
 
 export class ResponseEmpresaAdminDto extends OmitType(ResponseEmpresaDto, [

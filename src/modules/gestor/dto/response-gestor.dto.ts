@@ -1,4 +1,7 @@
-import { Expose } from 'class-transformer';
+import { ResponseUsuarioDto } from '@/modules/usuario/dto/response-usuario.dto';
+import { Usuario } from '@/modules/usuario/entities/usuario.entity';
+import { PartialType } from '@nestjs/mapped-types';
+import { Expose, Type } from 'class-transformer';
 
 export class ResponseGestorDto {
   @Expose()
@@ -12,4 +15,16 @@ export class ResponseGestorDto {
 
   @Expose()
   status!: boolean;
+}
+
+export class ResponseGestorColaboradorDto extends PartialType(
+  ResponseGestorDto,
+) {
+  @Expose()
+  @Type(() => ResponseUsuarioDto)
+  colaborador?: ResponseUsuarioDto;
+
+  @Expose()
+  @Type(() => ResponseUsuarioDto)
+  gestor?: ResponseUsuarioDto;
 }

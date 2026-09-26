@@ -1,24 +1,18 @@
 import { TipoEscala, TipoTurno } from '@/generated/prisma/enums';
-import { formatUppercase } from '@/utils/format-uppercase.util';
 import { OmitType, PickType } from '@nestjs/mapped-types';
+import { Transform } from 'class-transformer';
 import {
   IsDate,
   IsEnum,
   IsNotEmpty,
-  IsNumber,
   IsString,
   IsUUID,
   Length,
   Matches,
-  Min,
   MinLength,
 } from 'class-validator';
 
 export class CreateUsuarioDto {
-  @IsNumber({}, { message: 'Crachá não é do tipo Number' })
-  @Min(0, { message: 'Crachá não deve ser um valor negativo' })
-  cracha!: number;
-
   @IsString({ message: 'Nome não é do tipo String.' })
   @IsNotEmpty({ message: 'Nome é um campo obrigatório.' })
   @Length(10, 100, {
@@ -29,7 +23,7 @@ export class CreateUsuarioDto {
     message:
       'O nome deve conter letras maisculas e minusculas, sem numeros e caracteres especiais.',
   })
-  @formatUppercase()
+  @Transform(({ value }) => value.toUpperCase())
   nome!: string;
 
   @IsDate({ message: 'Data de nascimento não é do tipo Date.' })
@@ -40,10 +34,26 @@ export class CreateUsuarioDto {
   @IsNotEmpty({ message: 'Data de admissão é um campo obrigatório.' })
   dataAdmissao!: Date;
 
-  @IsDate({ message: 'Data de desligamento não é do tipo Date.' })
-  @IsNotEmpty({ message: 'Data de desligamento é um campo obrigatório.' })
-  dataDesligamento!: Date;
+  @IsUUID('all', { message: 'Perfil id inválido.' })
+  @IsNotEmpty({ message: 'Perfil é um campo obrigatório.' })
+  perfilId!: string;
 
+  @IsEnum(TipoTurno, { message: 'Turno não pertence ao enum TipoTurno.' })
+  @IsNotEmpty({ message: 'Turno é um campo obrigatório.' })
+  @Transform(({ value }) => value.toUpperCase())
+  turno!: TipoTurno;
+
+  @IsEnum(TipoEscala, { message: 'Escala não pertence ao enum TipoEscala.' })
+  @IsNotEmpty({ message: 'Escala é um campo obrigatório.' })
+  @Transform(({ value }) => value.toUpperCase())
+  escala!: TipoEscala;
+
+  @IsUUID('all', { message: 'Empresa id inválido.' })
+  @IsNotEmpty({ message: 'Empresa é um campo obrigatório.' })
+  empresaId?: string;
+}
+
+export class CreateUsuarioMaster extends PickType(CreateUsuarioDto, ['nome']) {
   @IsString({ message: 'Senha não é do tipo String.' })
   @MinLength(6, { message: 'Senha deve conter no minimo 6 caracteres.' })
   @IsNotEmpty({ message: 'Senha é um campo obrigatório.' })
@@ -56,62 +66,7 @@ export class CreateUsuarioDto {
   @Length(4, 4, { message: 'Pin deve conter no minimo 4 caracteres.' })
   @IsNotEmpty({ message: 'Pin é um campo obrigatório.' })
   @Matches(/^\d+$/, {
-    message: 'O Pin deve conter apenas números',
+    message: 'Pin deve conter apenas números',
   })
   pin!: string;
-
-  @IsUUID('all', { message: 'Perfil id inválido.' })
-  @IsNotEmpty({ message: 'Perfil é um campo obrigatório.' })
-  perfilId!: string;
-
-  @IsEnum(TipoTurno, { message: 'Turno não pertence ao enum TipoTurno.' })
-  @IsNotEmpty({ message: 'Turno é um campo obrigatório.' })
-  @formatUppercase()
-  turno!: TipoTurno;
-
-  @IsEnum(TipoEscala, { message: 'Escala não pertence ao enum TipoEscala.' })
-  @IsNotEmpty({ message: 'Escala é um campo obrigatório.' })
-  @formatUppercase()
-  escala!: TipoEscala;
-
-  @IsUUID('all', { message: 'Empresa id inválido.' })
-  @IsNotEmpty({ message: 'Empresa é um campo obrigatório.' })
-  empresaId!: string;
-
-  @IsUUID('all', { message: 'Usuário id inválido.' })
-  @IsNotEmpty({ message: 'Usuário é um campo obrigatório.' })
-  registradoPorId!: string;
 }
-
-export class CreateUsuarioMaster extends PickType(CreateUsuarioDto, [
-  'nome',
-  'senha',
-  'pin',
-]) {}
-
-export class CreateUsuarioAssistDto extends OmitType(CreateUsuarioDto, [
-  'cracha',
-  'dataDesligamento',
-  'senha',
-  'pin',
-  'registradoPorId',
-]) {}
-
-export class CreateUsuarioAdminDto extends OmitType(CreateUsuarioDto, [
-  'cracha',
-  'senha',
-  'pin',
-  'empresaId',
-  'dataDesligamento',
-  'registradoPorId',
-]) {}
-
-export class CreateUsuarioGestorDto extends OmitType(CreateUsuarioDto, [
-  'cracha',
-  'senha',
-  'pin',
-  'dataDesligamento',
-  'perfilId',
-  'empresaId',
-  'registradoPorId',
-]) {}

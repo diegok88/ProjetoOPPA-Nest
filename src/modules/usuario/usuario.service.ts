@@ -1,4 +1,3 @@
-import { ROLES } from '@/auth/guards/roles.const';
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 import { PasswordPin } from '@/constants/password-pin.const';
 import { Prisma } from '@/generated/prisma/client';
@@ -20,21 +19,19 @@ import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-
 import { GestorService } from '../gestor/gestor.service';
 import { PerfilService } from '../perfil/perfil.service';
 import {
-  CreateUsuarioAdminDto,
-  CreateUsuarioAssistDto,
-  CreateUsuarioGestorDto,
+  CreateUsuarioDto,
   CreateUsuarioMaster,
 } from './dto/create-usuario.dto';
-import {
-  QueryBagdeEnterpriceDto,
-  QueryUsuarioDto,
-} from './dto/query-usuario.dto';
 import {
   UpdateUsuarioDto,
   UpdateUsuarioPasswordDto,
 } from './dto/update-usuario.dto';
 import { Usuario, UsuarioMaster } from './entities/usuario.entity';
-import { Empresa } from '../empresa/entities/empresa.entity';
+import {
+  QueryBagdeEnterpriceDto,
+  QueryUsuarioFilterDto,
+} from './dto/query-usuario.dto';
+import { Contador } from '@/interfaces/counter.interface';
 
 @Injectable()
 export class UsuarioService {
@@ -58,6 +55,7 @@ export class UsuarioService {
   async createMaster(create: CreateUsuarioMaster): Promise<UsuarioMaster> {
     try {
       const { senha, pin, ...dados } = create;
+
       const senhaHash = await this.generateHash(senha);
       const pinHash = await this.generateHash(pin);
 
@@ -80,18 +78,25 @@ export class UsuarioService {
   /*
   CRIAR USUARIO COM TODOS OS PERFIS DO SISTEMA: 
   - o mesmo é criado mediante empresa, contador de cracha e perfil criados.
-  - perfil de usuario da empresa de gestão do sistema.
+  - create padrão de para todos os perfis
   */
-  async createAssist(create: CreateUsuarioAssistDto): Promise<Usuario> {
+  async create(create: CreateUsuarioDto): Promise<Usuario> {
     try {
       const criarUsuario = await this.prisma.client.$transaction(
         async (tx: any) => {
+          const usuario = this.tenantContext.getStore()!;
+
           const senhaHash = await this.generateHash(PasswordPin.password);
           const pinHash = await this.generateHash(PasswordPin.pin);
 
-          const dadosContador: UpdateContadorCrachaDto = {
-            empresaId: create.empresaId,
-          };
+          let dadosContador: UpdateContadorCrachaDto;
+
+          if (create.empresaId) {
+            dadosContador = { empresaId: create.empresaId ?? '' };
+          } else {
+            dadosContador = { empresaId: usuario.empresa ?? '' };
+            create.empresaId = usuario.empresa;
+          }
 
           const criarCracha = await this.contadorCracha.update(
             dadosContador,
@@ -121,110 +126,26 @@ export class UsuarioService {
     }
   }
 
-  /*
-    CRIAR USUARIO COMO ADMINISTRADOR: 
-    - usuario de criação interna da empresa que usufrui do sistema.
-    - permitido criar usuario administradores, gestores e operacional.
-  */
-  async createAdmin(create: CreateUsuarioAdminDto): Promise<Usuario> {
-    try {
-      const criarUsuario = await this.prisma.client.$transaction(
-        async (tx: any) => {
-          const usuario = this.tenantContext.getStore()!;
-
-          const senhaHash = await this.generateHash(PasswordPin.password);
-          const pinHash = await this.generateHash(PasswordPin.pin);
-
-          const dadosContador: UpdateContadorCrachaDto = {
-            empresaId: usuario.empresa,
-          };
-          const criarCracha = await this.contadorCracha.update(
-            dadosContador,
-            tx,
-          );
-
-          const criar = await tx.usuario.create({
-            data: {
-              ...create,
-              cracha: criarCracha.contador,
-              senha: senhaHash,
-              pin: pinHash,
-              empresaId: usuario.empresa,
-            },
-          });
-
-          await this.gestor.create(criar.id, tx);
-
-          return criar;
-        },
-      );
-      this.logger.log(TYPES_NOTICES.CREATE);
-      return criarUsuario;
-    } catch (error) {
-      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATEADMIN');
-      throw error;
-    }
-  }
-
-  /*
-    CRIAR USUARIO COMO GESTOR: 
-    - o autorizado apenas para o perfil de supervisor.
-    - apenas criar usuarios operacionais.
-  */
-  async createGestor(create: CreateUsuarioGestorDto): Promise<Usuario> {
-    try {
-      const criarUsuario = await this.prisma.$transaction(async (tx) => {
-        const usuario = this.tenantContext.getStore()!;
-
-        const senhaHash = await this.generateHash(PasswordPin.password);
-        const pinHash = await this.generateHash(PasswordPin.pin);
-
-        const dadosContador: UpdateContadorCrachaDto = {
-          empresaId: usuario.empresa,
-        };
-        const criarCracha = await this.contadorCracha.update(dadosContador, tx);
-
-        const perfil = await this.perfil.findDescription(ROLES.OPN1);
-
-        const criar = await tx.usuario.create({
-          data: {
-            ...create,
-            cracha: criarCracha.contador,
-            senha: senhaHash,
-            pin: pinHash,
-            perfilId: perfil.id,
-            empresaId: usuario.empresa,
-          },
-        });
-
-        await this.gestor.create(criar.id, tx);
-
-        return criar;
-      });
-
-      this.logger.log(TYPES_NOTICES.CREATE);
-      return criarUsuario;
-    } catch (error) {
-      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATEGESTOR');
-      throw error;
-    }
-  }
-
   // LISTA OS USUARIOS
   async findAll(
-    query: QueryUsuarioDto,
+    query?: QueryUsuarioFilterDto,
     tx?: Prisma.TransactionClient,
   ): Promise<Usuario[]> {
     try {
+      const usuario = this.tenantContext.getStore();
       const client = tx ?? this.prisma.client;
 
-      const { campos, ...filtros } = query;
+      const { campos, ...filtros } = query ?? {};
 
       const condicao: Prisma.UsuarioWhereInput = {};
+      // Condição de registro não deve retornar
+      condicao.AND = [
+        { nome: { not: 'USUARIO MASTER' } },
+        { id: { not: usuario?.user } },
+      ];
 
       if (filtros.cracha) condicao.cracha = filtros.cracha;
-      if (filtros.nome)
-        condicao.nome = { contains: filtros.nome, mode: 'insensitive' };
+      if (filtros.nome) condicao.nome = filtros.nome;
       if (filtros.dataAdmissao) condicao.dataAdmissao = filtros.dataAdmissao;
       if (filtros.dataNascimento)
         condicao.dataNascimento = filtros.dataNascimento;
@@ -238,41 +159,34 @@ export class UsuarioService {
 
       const selecao = await this.buildSelect(campos);
 
-      const listarUsuarios = await client.usuario.findMany({
+      const listar = await client.usuario.findMany({
         where: condicao,
         select: selecao,
-        include: {
-          perfil: true,
-          empresa: true,
-          gestorComoColaborador: {
-            where: { status: true },
-            select: {
-              gestor: {
-                select: {
-                  nome: true,
-                  cracha: true,
-                },
-              },
-            },
-          },
-        },
       });
 
       this.logger.log(TYPES_NOTICES.FIND_ALL);
-
-      return listarUsuarios.map(({ gestorComoColaborador, ...usuario }) => {
-        const ligacao = gestorComoColaborador[0];
-
-        return {
-          ...usuario,
-          gestor: {
-            nome: ligacao?.gestor?.nome ?? null,
-            cracha: ligacao?.gestor?.cracha ?? null,
-          },
-        };
-      }) as Usuario[];
+      return listar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS */
+  async counter(): Promise<Contador> {
+    try {
+      const total = await this.prisma.usuario.count();
+      const ativos = await this.prisma.usuario.count({
+        where: { status: true },
+      });
+      const inativos = await this.prisma.usuario.count({
+        where: { status: false },
+      });
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return { total, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
       throw error;
     }
   }
@@ -291,6 +205,12 @@ export class UsuarioService {
         include: {
           perfil: true,
           empresa: true,
+          gestorComoColaborador: {
+            select: {
+              id: true,
+              gestor: { select: { nome: true, cracha: true } },
+            },
+          },
         },
       });
 
@@ -300,6 +220,7 @@ export class UsuarioService {
       }
 
       this.logger.log(TYPES_NOTICES.FIND_ONE);
+
       return buscar;
     } catch (error) {
       this.logger.error('Falha na busca do usuário.');
@@ -447,8 +368,6 @@ export class UsuarioService {
     try {
       const ativarUsuario = await this.prisma.client.$transaction(
         async (tx: any) => {
-          const usuario = this.tenantContext.getStore();
-
           const buscar = await this.findOne(id, tx);
           if (!buscar) {
             this.logger.warn(TYPES_NOTICES.NOT_FOUND);
@@ -487,8 +406,6 @@ export class UsuarioService {
     try {
       const inativarUsuario = await this.prisma.client.$transaction(
         async (tx: any) => {
-          const usuario = this.tenantContext.getStore();
-
           const buscar = await this.findOne(id, tx);
           if (!buscar) {
             this.logger.warn(TYPES_NOTICES.NOT_FOUND);

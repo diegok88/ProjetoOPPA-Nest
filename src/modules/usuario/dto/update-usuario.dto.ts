@@ -10,9 +10,7 @@ import {
 } from 'class-validator';
 import { CreateUsuarioDto } from './create-usuario.dto';
 
-export class UpdateUsuarioDto extends PartialType(
-  OmitType(CreateUsuarioDto, ['cracha', 'senha', 'pin', 'registradoPorId']),
-) {
+export class UpdateUsuarioDto extends PartialType(CreateUsuarioDto) {
   @IsOptional()
   @IsBoolean({ message: 'Status não é do tipo Boolean!' })
   status?: boolean;

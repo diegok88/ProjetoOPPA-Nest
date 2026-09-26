@@ -12,7 +12,11 @@ import {
 import { SetoresService } from './setores.service';
 import { CreateSetoresDto } from './dto/create-setores.dto';
 import { UpdateSetoresDto } from './dto/update-setores.dto';
-import { ResponseSetoresDto } from './dto/response-setores.dto';
+import {
+  ResponseSetoresContadorDto,
+  ResponseSetoresDto,
+  ResponseSetoresListDto,
+} from './dto/response-setores.dto';
 import { plainToInstance } from 'class-transformer';
 import { Roles } from '@/auth/guards/roles.decorator';
 import { ROLES } from '@/auth/guards/roles.const';
@@ -38,6 +42,23 @@ export class SetoresController {
   ): Promise<ResponseSetoresDto[]> {
     const dados = await this.setoresService.findAll(query);
     return plainToInstance(ResponseSetoresDto, dados);
+  }
+
+  @Get('list')
+  @Roles(ROLES.ASN1)
+  async findAllList(
+    @Query() query: QuerySetoresDto,
+  ): Promise<ResponseSetoresListDto[]> {
+    const dados = await this.setoresService.findAll(query);
+    return plainToInstance(ResponseSetoresListDto, dados);
+  }
+
+  // CONTADOR DE REGISTROS TOTAIS, ATIVOS E INATIVOS
+  @Get('counter')
+  @Roles(ROLES.ASN1)
+  async counter(): Promise<ResponseSetoresContadorDto> {
+    const contador = await this.setoresService.counter();
+    return plainToInstance(ResponseSetoresContadorDto, contador);
   }
 
   @Get(':id')

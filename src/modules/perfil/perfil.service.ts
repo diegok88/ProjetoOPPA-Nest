@@ -7,7 +7,6 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { QueryUsuarioDto } from '../usuario/dto/query-usuario.dto';
 import { UsuarioService } from '../usuario/usuario.service';
 import { CreatePerfilDto } from './dto/create-perfil.dto';
 import { UpdatePerfilDto } from './dto/update-perfil.dto';
@@ -16,6 +15,7 @@ import { MAPA_VISIBILIDADE, Perfil } from './entities/perfil.entity';
 import { QueryPerfilFilterDto } from './dto/query-perfil.dto';
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 import { Contador } from '@/interfaces/counter.interface';
+import { QueryUsuarioFilterDto } from '../usuario/dto/query-usuario.dto';
 
 @Injectable()
 export class PerfilService {
@@ -63,7 +63,7 @@ export class PerfilService {
 
       const listar = await this.prisma.client.perfil.findMany({
         where: condicao,
-        orderBy: { codigo: 'asc' },
+        orderBy: { descricao: 'asc' },
       });
 
       if (listar.length === 0) {
@@ -82,9 +82,9 @@ export class PerfilService {
   async counter(): Promise<Contador> {
     try {
       const [total, ativos, inativos] = await Promise.all([
-        this.prisma.setores.count(),
-        this.prisma.setores.count({ where: { status: true } }),
-        this.prisma.setores.count({ where: { status: false } }),
+        this.prisma.perfil.count(),
+        this.prisma.perfil.count({ where: { status: true } }),
+        this.prisma.perfil.count({ where: { status: false } }),
       ]);
 
       this.logger.log(TYPES_NOTICES.COUNTER);
@@ -168,7 +168,7 @@ export class PerfilService {
     try {
       const ativarPerfil = await this.prisma.client.$transaction(
         async (tx: any) => {
-          const dadosVerificar: QueryUsuarioDto = { perfilId: id };
+          const dadosVerificar: QueryUsuarioFilterDto = { perfilId: id };
           const verificar = await this.usuario.findAll(dadosVerificar, tx);
 
           if (verificar.length > 0) {
@@ -200,7 +200,7 @@ export class PerfilService {
     try {
       const inativarPerfil = await this.prisma.client.$transaction(
         async (tx: any) => {
-          const dadosVerificar: QueryUsuarioDto = { perfilId: id };
+          const dadosVerificar: QueryUsuarioFilterDto = { perfilId: id };
           const verificar = await this.usuario.findAll(dadosVerificar, tx);
 
           if (verificar.length > 0) {

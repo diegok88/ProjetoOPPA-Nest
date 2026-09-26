@@ -1,4 +1,4 @@
-import { formatUppercase } from '@/utils/format-uppercase.util';
+import { Transform } from 'class-transformer';
 import {
   IsEmail,
   IsNotEmpty,
@@ -23,7 +23,7 @@ export class CreateEmpresaDto {
     message:
       'A razao social deve conter no minimo 10 caracteres e no maximo 100 caracteres.',
   })
-  @formatUppercase()
+  @Transform(({ value }) => value.toUpperCase())
   razaoSocial!: string;
 
   @IsString({ message: 'O nome fantasia não é do tipo String.' })
@@ -32,7 +32,7 @@ export class CreateEmpresaDto {
     message:
       'O nome fantasia deve conter no minimo 10 caracteres e no maximo 100 caracteres.',
   })
-  @formatUppercase()
+  @Transform(({ value }) => value.toUpperCase())
   nomeFantasia!: string;
 
   @IsString({ message: 'O contato não é do tipo String.' })
@@ -53,7 +53,7 @@ export class CreateEmpresaDto {
     message:
       'A rua deve conter no minimo 5 caracteres e no maximo 50 caracteres.',
   })
-  @formatUppercase()
+  @Transform(({ value }) => value.toUpperCase())
   rua!: string;
 
   @IsString({ message: 'O numero não é do tipo String.' })
@@ -67,7 +67,7 @@ export class CreateEmpresaDto {
     message:
       'O bairro deve conter no minimo 5 caracteres e no maximo 50 caracteres.',
   })
-  @formatUppercase()
+  @Transform(({ value }) => value.toUpperCase())
   bairro!: string;
 
   @IsString({ message: 'A cidade não é do tipo String.' })
@@ -76,7 +76,7 @@ export class CreateEmpresaDto {
     message:
       'A cidade deve conter no minimo 5 caracteres e no maximo 50 caracteres.',
   })
-  @formatUppercase()
+  @Transform(({ value }) => value.toUpperCase())
   cidade!: string;
 
   @IsString({ message: 'O estado não é do tipo String.' })
@@ -84,7 +84,7 @@ export class CreateEmpresaDto {
   @Length(2, 2, {
     message: 'O estado deve conter apenas a abreviação sendo 2 caracteres.',
   })
-  @formatUppercase()
+  @Transform(({ value }) => value.toUpperCase())
   estado!: string;
 
   @IsString({ message: 'O cep não é do tipo String.' })

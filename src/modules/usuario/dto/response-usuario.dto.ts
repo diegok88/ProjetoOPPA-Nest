@@ -1,7 +1,17 @@
-import { ResponseEmpresaDto } from '@/modules/empresa/dto/response-empresa.dto';
-import { ResponsePerfilDto } from '@/modules/perfil/dto/response-perfil.dto';
-import { PartialType } from '@nestjs/mapped-types';
+import { Empresa } from '@/modules/empresa/entities/empresa.entity';
+import { Perfil } from '@/modules/perfil/entities/perfil.entity';
+import { PickType } from '@nestjs/mapped-types';
 import { Exclude, Expose, Type } from 'class-transformer';
+
+export class ResponseUsuarioGestorDto {
+  @Expose() nome?: string | null;
+  @Expose() cracha?: number | null;
+}
+
+export class ResponseUsuarioVinculoGestorDto {
+  @Type(() => ResponseUsuarioGestorDto)
+  gestor?: ResponseUsuarioGestorDto;
+}
 
 export class ResponseUsuarioDto {
   @Expose()
@@ -42,40 +52,50 @@ export class ResponseUsuarioDto {
 
   @Expose()
   status!: boolean;
-}
 
-export class ResponseUsuarioGestorDto {
-  @Expose() nome?: string | null;
-  @Expose() cracha?: number | null;
-}
-
-export class ResponseUsuarioAssistDto extends PartialType(ResponseUsuarioDto) {
-  @Type(() => ResponsePerfilDto)
-  perfil?: ResponsePerfilDto;
+  @Type(() => Perfil)
+  perfil?: Perfil;
 
   @Expose()
   get desPerfil(): string | null {
     return this.perfil?.descricao || null;
   }
 
-  @Type(() => ResponseEmpresaDto)
-  empresa?: ResponseEmpresaDto;
+  @Type(() => Empresa)
+  empresa?: Empresa;
 
   @Expose()
   get desEmpresa(): string | null {
-    return this.empresa?.nomeFantasia || null;
+    return this.empresa?.razaoSocial || null;
   }
 
-  @Type(() => ResponseUsuarioGestorDto)
-  gestor?: ResponseUsuarioGestorDto;
+  @Type(() => ResponseUsuarioVinculoGestorDto)
+  gestorComoColaborador?: ResponseUsuarioVinculoGestorDto[];
 
   @Expose()
   get nomeGestor(): string | null {
-    return this.gestor?.nome || null;
+    return this.gestorComoColaborador?.[0]?.gestor?.nome ?? null;
   }
 
   @Expose()
   get crachaGestor(): number | null {
-    return this.gestor?.cracha || null;
+    return this.gestorComoColaborador?.[0]?.gestor?.cracha ?? null;
   }
+}
+
+export class ResponseUsuarioListDto extends PickType(ResponseUsuarioDto, [
+  'id',
+  'cracha',
+  'nome',
+] as const) {}
+
+export class ResponseUsuarioContadorDto {
+  @Expose()
+  total!: number;
+
+  @Expose()
+  ativos!: number;
+
+  @Expose()
+  inativos!: number;
 }

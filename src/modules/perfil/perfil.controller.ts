@@ -50,7 +50,7 @@ export class PerfilController {
     return plainToInstance(ResponsePerfilDto, dados);
   }
 
-  // LISTAR TODOS OS PERFIS PARA TABELA LIST - RETORNA APENAS id, descrição e nivel
+  // LISTAR TODOS OS DADOS PARA TABELA LIST - RETORNA APENAS id, descrição e nivel
   @Get('list')
   @Roles(ROLES.ASN1)
   async findAllList(
@@ -58,6 +58,14 @@ export class PerfilController {
   ): Promise<ResponsePerfilListDto[]> {
     const dados = await this.perfilService.findAll(query);
     return plainToInstance(ResponsePerfilListDto, dados);
+  }
+
+  // CONTADOR DE REGISTROS TOTAIS, ATIVOS E INATIVOS
+  @Get('counter')
+  @Roles(ROLES.ASN1)
+  async counter(): Promise<ResponsePerfilContadorDto> {
+    const contador = await this.perfilService.counter();
+    return plainToInstance(ResponsePerfilContadorDto, contador);
   }
 
   // BUSCAR PERFIL PELO ID
@@ -68,14 +76,6 @@ export class PerfilController {
   ): Promise<ResponsePerfilDto> {
     const dado = await this.perfilService.findOne(id);
     return plainToInstance(ResponsePerfilDto, dado);
-  }
-
-  // CONTADOR DE REGISTROS TOTAIS, ATIVOS E INATIVOS
-  @Get('counter')
-  @Roles(ROLES.ASN1)
-  async counter(): Promise<ResponsePerfilContadorDto> {
-    const contador = await this.perfilService.counter();
-    return plainToInstance(ResponsePerfilContadorDto, contador);
   }
 
   // ATUALIZAÇÃO DO PERFIL PELO ID

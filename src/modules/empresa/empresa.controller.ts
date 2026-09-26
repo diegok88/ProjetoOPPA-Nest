@@ -19,7 +19,9 @@ import { plainToClass, plainToInstance } from 'class-transformer';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
 import { QueryEmpresaFilterDto } from './dto/query-empresa.dto';
 import {
+  ResponseEmpresaContadorDto,
   ResponseEmpresaDto,
+  ResponseEmpresaListDto,
   ResponseEmpresaMessageDto,
 } from './dto/response-empresa.dto';
 import { UpdateEmpresaDto } from './dto/update-empresa.dto';
@@ -48,6 +50,24 @@ export class EmpresaController {
   ): Promise<ResponseEmpresaDto[]> {
     const dados = await this.empresaService.findAll(query);
     return plainToInstance(ResponseEmpresaDto, dados);
+  }
+
+  // LISTAR TODOS OS DADOS PARA TABELA LIST - RETORNA APENAS id, descrição e nivel
+  @Get('list')
+  @Roles(ROLES.ASN1)
+  async findAllList(
+    @Query() query: QueryEmpresaFilterDto,
+  ): Promise<ResponseEmpresaListDto[]> {
+    const dados = await this.empresaService.findAll(query);
+    return plainToInstance(ResponseEmpresaListDto, dados);
+  }
+
+  // CONTADOR DE REGISTROS TOTAIS, ATIVOS E INATIVOS
+  @Get('counter')
+  @Roles(ROLES.ASN1)
+  async counter(): Promise<ResponseEmpresaContadorDto> {
+    const contador = await this.empresaService.counter();
+    return plainToInstance(ResponseEmpresaContadorDto, contador);
   }
 
   // CONTROLLER BUSCAR EMPRESA PELO ID

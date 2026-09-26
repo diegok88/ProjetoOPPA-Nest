@@ -88,6 +88,35 @@ export class GestorService {
   }
 
   /* 
+    LISTAR GESTORES APENAS TESTE: 
+    - lista todos os registro de colaboradores e seus gestores.
+    - possui um filtro se necessario
+  */
+  async findAllGestor(query: QueryGestorFilterDto): Promise<Gestor[]> {
+    try {
+      const condicao: Prisma.GestorWhereInput = {};
+      if (query.colaboradorId) condicao.colaboradorId = query.colaboradorId;
+      if (query.gestorId) condicao.gestorId = query.gestorId;
+      if (query.status) condicao.status = query.status;
+
+      const listar = await this.prisma.gestor.findMany({
+        where: condicao,
+        include: { colaborador: true, gestor: true },
+      });
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findall');
+      throw error;
+    }
+  }
+
+  /* 
     BUSCAR GESTOR POR ID:
     - busca o registro do gestor atraves do id.
   */
@@ -155,7 +184,7 @@ export class GestorService {
       const autenticado = this.getCurrentUser();
       const buscar = await this.findId(id, autenticado.user, client);
 
-      if (!buscar.status) {
+      if (buscar.status) {
         this.logger.warn(TYPES_NOTICES.IS_ACTIVE);
         throw new BadRequestException(TYPES_NOTICES.IS_ACTIVE);
       }

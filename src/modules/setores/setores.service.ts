@@ -12,6 +12,7 @@ import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import { Acao, Prisma } from '@/generated/prisma/client';
 import { QuerySetoresDto } from './dto/query-setores.dto';
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { Contador } from '@/interfaces/counter.interface';
 
 @Injectable()
 export class SetoresService {
@@ -57,6 +58,7 @@ export class SetoresService {
 
       const listar = await this.prisma.client.setores.findMany({
         where: condicao,
+        orderBy: { descricao: 'asc' },
       });
 
       if (listar.length === 0) {
@@ -71,6 +73,23 @@ export class SetoresService {
     }
   }
 
+  /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS */
+  async counter(): Promise<Contador> {
+    try {
+      const [total, ativos, inativos] = await Promise.all([
+        this.prisma.setores.count(),
+        this.prisma.setores.count({ where: { status: true } }),
+        this.prisma.setores.count({ where: { status: false } }),
+      ]);
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return { total, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
   /*
   BUSCAR SETORES:
   - serviço apenas permitido para usuaria ADMINISTRADOR E ASSISTENCIA - NIVEL 1
@@ -80,6 +99,7 @@ export class SetoresService {
       const client = tx ?? this.prisma.client;
       const buscar = await client.setores.findUnique({
         where: { id: id },
+        include: { empresa: true },
       });
       if (!buscar) {
         this.logger.warn(TYPES_NOTICES.NOT_FOUND);

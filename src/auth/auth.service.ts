@@ -4,7 +4,6 @@ import { CreateAuditoriaDto } from '@/modules/auditoria/dto/create-auditoria.dto
 import { QueryAuditoriaFindOneLastDto } from '@/modules/auditoria/dto/query-auditoria.dto';
 import { QueryEmpresaFilterDto } from '@/modules/empresa/dto/query-empresa.dto';
 import { EmpresaService } from '@/modules/empresa/empresa.service';
-import { QueryUsuarioDto } from '@/modules/usuario/dto/query-usuario.dto';
 import { UsuarioService } from '@/modules/usuario/usuario.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
@@ -21,6 +20,7 @@ import { LoginDto } from './dto/create-auth.dto';
 import { ResponseAuthDto } from './dto/response-auth.dto';
 import { Auth } from './entities/auth.entity';
 import { UserContext } from './tenant-context/user-context.interface';
+import { QueryUsuarioFilterDto } from '@/modules/usuario/dto/query-usuario.dto';
 
 @Injectable()
 export class AuthService {
@@ -59,7 +59,7 @@ export class AuthService {
         this.logger.log('login()');
         const filtro: QueryEmpresaFilterDto = { codigo: login.codEmpresa };
         const empresa = await this.empresa.findEnterpriceOne(filtro);
-        const verificar: QueryUsuarioDto = {
+        const verificar: QueryUsuarioFilterDto = {
           cracha: login.cracha,
           senha: login.senha,
           empresaId: empresa.id,

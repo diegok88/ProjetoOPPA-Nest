@@ -1,4 +1,3 @@
-import type { AuthenticatedRequest } from '@/auth/express/authenticated-request.interface';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { Public } from '@/auth/guards/public.decorator';
 import { RolesGuard } from '@/auth/guards/roles-auth.guard';
@@ -14,21 +13,17 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Query,
-  Req,
   UseGuards,
 } from '@nestjs/common';
-import { plainToClass, plainToInstance } from 'class-transformer';
+import { plainToInstance } from 'class-transformer';
 import {
-  CreateUsuarioAdminDto,
-  CreateUsuarioAssistDto,
-  CreateUsuarioGestorDto,
+  CreateUsuarioDto,
   CreateUsuarioMaster,
 } from './dto/create-usuario.dto';
-import { QueryAdminDto, QueryUsuarioDto } from './dto/query-usuario.dto';
 import {
-  ResponseUsuarioAssistDto,
+  ResponseUsuarioContadorDto,
   ResponseUsuarioDto,
+  ResponseUsuarioListDto,
 } from './dto/response-usuario.dto';
 import {
   UpdateUsuarioDto,
@@ -36,6 +31,7 @@ import {
   UpdateUsuarioPinDto,
 } from './dto/update-usuario.dto';
 import { UsuarioService } from './usuario.service';
+import { QueryUsuarioFilterDto } from './dto/query-usuario.dto';
 
 @Controller('usuario')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -54,62 +50,39 @@ export class UsuarioController {
     return plainToInstance(ResponseUsuarioDto, dado);
   }
 
-  // CRIAR USUARIO COMO ASSISTENCIA
-  @Post('assist')
+  // CRIAR USUARIO
+  @Post()
   @Roles(ROLES.ASN1)
-  async createAssist(
-    @Body() create: CreateUsuarioAssistDto,
-  ): Promise<ResponseUsuarioDto> {
-    const dado = await this.usuarioService.createAssist(create);
-    return plainToInstance(ResponseUsuarioDto, dado);
-  }
-
-  // CRIAR USUARIO COMO ADMINISTRADOR
-  @Post('admin')
-  @Roles(ROLES.ADN1)
-  async createAdmin(
-    @Body() create: CreateUsuarioAdminDto,
-  ): Promise<ResponseUsuarioDto> {
-    const dado = this.usuarioService.createAdmin(create);
-    return plainToInstance(ResponseUsuarioDto, dado);
-  }
-
-  @Post('gestor')
-  @Roles(ROLES.ASN1)
-  async createGestor(
-    @Body() create: CreateUsuarioGestorDto,
-  ): Promise<ResponseUsuarioDto> {
-    const dado = this.usuarioService.createGestor(create);
+  async create(@Body() create: CreateUsuarioDto): Promise<ResponseUsuarioDto> {
+    const dado = await this.usuarioService.create(create);
     return plainToInstance(ResponseUsuarioDto, dado);
   }
 
   // LISTA OS USUARIOS
   @Get()
   @Roles(ROLES.ASN1)
-  async findAll(
-    @Query() queryUsuarioDto: QueryUsuarioDto,
-  ): Promise<ResponseUsuarioAssistDto[]> {
-    const dados = await this.usuarioService.findAll(queryUsuarioDto);
-    return plainToInstance(ResponseUsuarioAssistDto, dados);
+  async findAll(): Promise<ResponseUsuarioDto[]> {
+    const dados = await this.usuarioService.findAll();
+    return plainToInstance(ResponseUsuarioDto, dados);
   }
 
-  // LISTA OS USUARIOS COM PARAMETROS ESPECIFICOS, MAIS USANDO O MESMO SERVIÇO
-  @Get('admin')
-  @Roles(ROLES.ADN1)
-  async findAllAdmin(
-    @Query() query: QueryAdminDto,
-  ): Promise<ResponseUsuarioDto[]> {
-    const usuario = this.tenantContext.getStore()!;
-    const queryAdmin: QueryUsuarioDto = {
-      ...query,
-      empresaId: usuario.empresa,
-      status: query.status ?? true,
-      campos: query.campos ?? 'id,nome,cracha',
+  // LISTA OS USUARIOS
+  @Get('list')
+  @Roles(ROLES.ASN1)
+  async findAllList(): Promise<ResponseUsuarioListDto[]> {
+    const query: QueryUsuarioFilterDto = {
+      campos: 'id,cracha,nome',
     };
-
-    const dados = await this.usuarioService.findAll(queryAdmin);
-
+    const dados = await this.usuarioService.findAll(query);
     return plainToInstance(ResponseUsuarioDto, dados);
+  }
+
+  // CONTADOR DE REGISTROS TOTAIS, ATIVOS E INATIVOS
+  @Get('counter')
+  @Roles(ROLES.ASN1)
+  async counter(): Promise<ResponseUsuarioContadorDto> {
+    const contador = await this.usuarioService.counter();
+    return plainToInstance(ResponseUsuarioContadorDto, contador);
   }
 
   // BUSCA USUARIO PELO ID
