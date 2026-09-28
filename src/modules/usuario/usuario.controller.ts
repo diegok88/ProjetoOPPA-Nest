@@ -24,6 +24,7 @@ import {
   ResponseUsuarioContadorDto,
   ResponseUsuarioDto,
   ResponseUsuarioListDto,
+  ResponseUsuarioRelacaoDto,
 } from './dto/response-usuario.dto';
 import {
   UpdateUsuarioDto,
@@ -89,9 +90,9 @@ export class UsuarioController {
   @Get(':id')
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<ResponseUsuarioDto> {
+  ): Promise<ResponseUsuarioRelacaoDto> {
     const dado = await this.usuarioService.findOne(id);
-    return plainToInstance(ResponseUsuarioDto, dado);
+    return plainToInstance(ResponseUsuarioRelacaoDto, dado);
   }
 
   // ATUALIZA USUARIO PELO ID

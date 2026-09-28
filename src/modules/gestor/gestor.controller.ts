@@ -2,8 +2,10 @@ import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { GestorService } from './gestor.service';
 import { QueryGestorFilterDto } from './dto/query-gestor.dto';
 import {
-  ResponseGestorColaboradorDto,
   ResponseGestorDto,
+  ResponseGestorRelacoesDto,
+  ResponseGestorRelacoesParcialDto,
+  ResponseGestorUsuarioDto,
 } from './dto/response-gestor.dto';
 import { plainToInstance } from 'class-transformer';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
@@ -29,9 +31,18 @@ export class GestorController {
   @Roles(ROLES.ASN1)
   async findAllGestor(
     @Query() query: QueryGestorFilterDto,
-  ): Promise<ResponseGestorColaboradorDto[]> {
+  ): Promise<ResponseGestorRelacoesDto[]> {
     const dados = await this.gestorService.findAllGestor(query);
-    return plainToInstance(ResponseGestorColaboradorDto, dados);
+    return plainToInstance(ResponseGestorRelacoesDto, dados);
+  }
+
+  @Get('list')
+  @Roles(ROLES.ASN1)
+  async findAllGestorParcial(
+    @Query() query: QueryGestorFilterDto,
+  ): Promise<ResponseGestorRelacoesParcialDto[]> {
+    const dados = await this.gestorService.findAllGestorParcial(query);
+    return plainToInstance(ResponseGestorRelacoesParcialDto, dados);
   }
 
   @Get(':id')
@@ -39,5 +50,14 @@ export class GestorController {
   async findOne(@Param('id') id: string): Promise<ResponseGestorDto> {
     const dado = this.gestorService.findOne(id);
     return plainToInstance(ResponseGestorDto, dado);
+  }
+
+  @Get('findOneUser/:id')
+  @Roles(ROLES.ASN1)
+  async findOneUser(
+    @Param('id') id: string,
+  ): Promise<ResponseGestorUsuarioDto> {
+    const dado = this.gestorService.findOneUser(id);
+    return plainToInstance(ResponseGestorUsuarioDto, dado);
   }
 }

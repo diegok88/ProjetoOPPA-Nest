@@ -11,7 +11,15 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { QueryGestorFilterDto } from './dto/query-gestor.dto';
-import { Gestor } from './entities/gestor.entity';
+import {
+  Gestor,
+  GestorRelacoes,
+  GestorUsuario,
+} from './entities/gestor.entity';
+import {
+  ResponseGestorRelacoesParcialDto,
+  ResponseGestorUsuarioDto,
+} from './dto/response-gestor.dto';
 
 @Injectable()
 export class GestorService {
@@ -61,8 +69,8 @@ export class GestorService {
 
   /* 
     LISTAR GESTORES: 
-    - lista todos os registro de colaboradores e seus gestores.
-    - possui um filtro se necessario
+    - lista todos os registros.
+    - possui um filtro se necessario.
   */
   async findAll(query: QueryGestorFilterDto): Promise<Gestor[]> {
     try {
@@ -89,10 +97,10 @@ export class GestorService {
 
   /* 
     LISTAR GESTORES APENAS TESTE: 
-    - lista todos os registro de colaboradores e seus gestores.
-    - possui um filtro se necessario
+    - lista todos os registro de colaboradores e seus gestores com relação de entidades.
+    - possui um filtro se necessario.
   */
-  async findAllGestor(query: QueryGestorFilterDto): Promise<Gestor[]> {
+  async findAllGestor(query: QueryGestorFilterDto): Promise<GestorRelacoes[]> {
     try {
       const condicao: Prisma.GestorWhereInput = {};
       if (query.colaboradorId) condicao.colaboradorId = query.colaboradorId;
@@ -101,7 +109,48 @@ export class GestorService {
 
       const listar = await this.prisma.gestor.findMany({
         where: condicao,
-        include: { colaborador: true, gestor: true },
+        include: {
+          colaborador: true,
+          gestor: true,
+        },
+      });
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findall');
+      throw error;
+    }
+  }
+
+  /* 
+    LISTAR GESTORES APENAS TESTE: 
+    - lista todos os registro de colaboradores e seus gestores com relação de entidades.
+    - possui um filtro se necessario.
+    - apenas retorna os dados escolhidos
+  */
+  async findAllGestorParcial(
+    query: QueryGestorFilterDto,
+  ): Promise<ResponseGestorRelacoesParcialDto[]> {
+    try {
+      const condicao: Prisma.GestorWhereInput = {};
+      if (query.colaboradorId) condicao.colaboradorId = query.colaboradorId;
+      if (query.gestorId) condicao.gestorId = query.gestorId;
+      if (query.status !== undefined) condicao.status = query.status;
+
+      condicao.gestorId = this.tenantContext.getStore()?.user;
+
+      const listar = await this.prisma.gestor.findMany({
+        where: condicao,
+        include: {
+          colaborador: { select: { id: true, cracha: true, nome: true } },
+          gestor: { select: { id: true, cracha: true, nome: true } },
+        },
+        orderBy: { colaborador: { nome: 'asc' } },
       });
 
       if (listar.length === 0) {
@@ -137,6 +186,33 @@ export class GestorService {
       return buscar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.FIND_ONE, ' - findone');
+      throw error;
+    }
+  }
+
+  async findOneUser(id: string): Promise<GestorUsuario> {
+    try {
+      const buscar = await this.prisma.gestor.findUnique({
+        where: { id: id },
+        include: {
+          colaborador: {
+            include: {
+              perfil: { select: { descricao: true, nivel: true } },
+              empresa: { select: { razaoSocial: true } },
+            },
+          },
+          gestor: { select: { id: true, cracha: true, nome: true } },
+        },
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      return buscar as GestorUsuario;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.FIND_ONE, ' - FindOneUser');
       throw error;
     }
   }

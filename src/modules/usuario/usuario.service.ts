@@ -26,7 +26,7 @@ import {
   UpdateUsuarioDto,
   UpdateUsuarioPasswordDto,
 } from './dto/update-usuario.dto';
-import { Usuario, UsuarioMaster } from './entities/usuario.entity';
+import { Usuario, UsuarioRelacao } from './entities/usuario.entity';
 import {
   QueryBagdeEnterpriceDto,
   QueryUsuarioFilterDto,
@@ -52,7 +52,7 @@ export class UsuarioService {
     - ajustar essa criação para um formato de criação apartir da inicialização do sistema, para criar o registro.
     - usuario criado sem necessidade de autenticação.
   */
-  async createMaster(create: CreateUsuarioMaster): Promise<UsuarioMaster> {
+  async createMaster(create: CreateUsuarioMaster): Promise<Usuario> {
     try {
       const { senha, pin, ...dados } = create;
 
@@ -196,15 +196,18 @@ export class UsuarioService {
     - busca apenas pelo id.
     - retorna os dados completos com as chaves.
   */
-  async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Usuario> {
+  async findOne(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<UsuarioRelacao> {
     try {
       const client = tx ?? this.prisma.client;
 
       const buscar = await client.usuario.findUnique({
         where: { id: id },
         include: {
-          perfil: true,
-          empresa: true,
+          perfil: { select: { descricao: true, nivel: true } },
+          empresa: { select: { razaoSocial: true } },
           gestorComoColaborador: {
             select: {
               id: true,
@@ -221,7 +224,7 @@ export class UsuarioService {
 
       this.logger.log(TYPES_NOTICES.FIND_ONE);
 
-      return buscar;
+      return buscar as UsuarioRelacao;
     } catch (error) {
       this.logger.error('Falha na busca do usuário.');
       throw error;

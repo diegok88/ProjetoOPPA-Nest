@@ -1,18 +1,41 @@
-import { Empresa } from '@/modules/empresa/entities/empresa.entity';
-import { Perfil } from '@/modules/perfil/entities/perfil.entity';
 import { PickType } from '@nestjs/mapped-types';
 import { Exclude, Expose, Type } from 'class-transformer';
 
-export class ResponseUsuarioGestorDto {
-  @Expose() nome?: string | null;
-  @Expose() cracha?: number | null;
+/* RETORNO PARCIAL DO PERFIL */
+export class ResponsePerfilParcialDto {
+  @Expose()
+  descricao!: string | null;
+
+  @Expose()
+  nivel!: string | null;
 }
 
-export class ResponseUsuarioVinculoGestorDto {
-  @Type(() => ResponseUsuarioGestorDto)
-  gestor?: ResponseUsuarioGestorDto;
+/* RETORNO PARCIAL DO EMPRESA */
+export class ResponseEmpresaParcialDto {
+  @Expose()
+  razaoSocial!: string | null;
 }
 
+/* RESUMO DO GESTOR DENTRO DO VÍNCULO (nome e crachá, sem id no select) */
+export class ResponseUsuarioGestorParcialDto {
+  @Expose()
+  cracha!: number | null;
+
+  @Expose()
+  nome!: string | null;
+}
+
+/* CADA ITEM DA LISTA gestorComoColaborador */
+export class ResponseGestorVinculoDto {
+  @Expose()
+  id!: string;
+
+  @Expose()
+  @Type(() => ResponseUsuarioGestorParcialDto)
+  gestor?: ResponseUsuarioGestorParcialDto;
+}
+
+/* RETORNO DO USUARIO */
 export class ResponseUsuarioDto {
   @Expose()
   id!: string;
@@ -53,42 +76,30 @@ export class ResponseUsuarioDto {
   @Expose()
   status!: boolean;
 
-  @Type(() => Perfil)
-  perfil?: Perfil;
+  @Expose()
+  @Type(() => ResponsePerfilParcialDto)
+  perfil?: ResponsePerfilParcialDto;
 
   @Expose()
-  get desPerfil(): string | null {
-    return this.perfil?.descricao || null;
-  }
-
-  @Type(() => Empresa)
-  empresa?: Empresa;
-
-  @Expose()
-  get desEmpresa(): string | null {
-    return this.empresa?.razaoSocial || null;
-  }
-
-  @Type(() => ResponseUsuarioVinculoGestorDto)
-  gestorComoColaborador?: ResponseUsuarioVinculoGestorDto[];
-
-  @Expose()
-  get nomeGestor(): string | null {
-    return this.gestorComoColaborador?.[0]?.gestor?.nome ?? null;
-  }
-
-  @Expose()
-  get crachaGestor(): number | null {
-    return this.gestorComoColaborador?.[0]?.gestor?.cracha ?? null;
-  }
+  @Type(() => ResponseEmpresaParcialDto)
+  empresa?: ResponseEmpresaParcialDto;
 }
 
+/* DTO PARA CONSULTA UNICA: aplicado para a requisição findOne() */
+export class ResponseUsuarioRelacaoDto extends ResponseUsuarioDto {
+  @Expose()
+  @Type(() => ResponseGestorVinculoDto)
+  gestorComoColaborador?: ResponseGestorVinculoDto[];
+}
+
+/* DTO DE RETORNO DE UMA LISTA: apenas aplicado para a listagem no front */
 export class ResponseUsuarioListDto extends PickType(ResponseUsuarioDto, [
   'id',
   'cracha',
   'nome',
 ] as const) {}
 
+/* DTO DO CONTADOR: retorna total, ativos e inativos */
 export class ResponseUsuarioContadorDto {
   @Expose()
   total!: number;
