@@ -3,3 +3,4 @@ export class TipoSolicitacao {
   descricao!: string;
   status!: boolean;
 }
+

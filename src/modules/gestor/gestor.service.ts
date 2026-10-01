@@ -13,13 +13,12 @@ import {
 import { QueryGestorFilterDto } from './dto/query-gestor.dto';
 import {
   Gestor,
+  GestorComRelacoes,
   GestorRelacoes,
   GestorUsuario,
 } from './entities/gestor.entity';
-import {
-  ResponseGestorRelacoesParcialDto,
-  ResponseGestorUsuarioDto,
-} from './dto/response-gestor.dto';
+import { ResponseGestorRelacoesParcialDto } from './dto/response-gestor.dto';
+import { Contador } from '@/interfaces/counter.interface';
 
 @Injectable()
 export class GestorService {
@@ -68,18 +67,49 @@ export class GestorService {
   }
 
   /* 
+    CRIAR GESTOR ATRAVES DE UMA LISTA:
+    - função interna em conjunto com a competencia setorial.
+    - somente autorizado para gestores de equipe
+  */
+
+  async createAll(
+    ids: Array<string>,
+    gestorId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Prisma.BatchPayload> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const criar = await client.gestor.createMany({
+        data: ids.map((colaboradorId) => ({ colaboradorId, gestorId })),
+        skipDuplicates: true,
+      });
+
+      return criar;
+    } catch (error) {
+      this.logger.log(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATEALL');
+      throw error;
+    }
+  }
+
+  /* 
     LISTAR GESTORES: 
     - lista todos os registros.
     - possui um filtro se necessario.
   */
-  async findAll(query: QueryGestorFilterDto): Promise<Gestor[]> {
+  async findAll(
+    query: QueryGestorFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Gestor[]> {
     try {
+      const client = tx ?? this.prisma.client;
+
       const condicao: Prisma.GestorWhereInput = {};
       if (query.colaboradorId) condicao.colaboradorId = query.colaboradorId;
       if (query.gestorId) condicao.gestorId = query.gestorId;
       if (query.status) condicao.status = query.status;
 
-      const listar = await this.prisma.gestor.findMany({
+      const listar = await client.gestor.findMany({
         where: condicao,
       });
 
@@ -165,6 +195,29 @@ export class GestorService {
     }
   }
 
+  /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS */
+  async counter(): Promise<Contador> {
+    try {
+      const ctx = this.tenantContext.getStore()?.user;
+
+      const total = await this.prisma.gestor.count({
+        where: { gestorId: ctx },
+      });
+      const ativos = await this.prisma.gestor.count({
+        where: { gestorId: ctx, status: true },
+      });
+      const inativos = await this.prisma.gestor.count({
+        where: { gestorId: ctx, status: false },
+      });
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return { total, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
   /* 
     BUSCAR GESTOR POR ID:
     - busca o registro do gestor atraves do id.
@@ -225,7 +278,7 @@ export class GestorService {
     colId: string,
     gesId: string,
     tx?: Prisma.TransactionClient,
-  ): Promise<Gestor> {
+  ): Promise<GestorRelacoes> {
     try {
       const client = tx ?? this.prisma.client;
 
@@ -233,6 +286,10 @@ export class GestorService {
         where: {
           colaboradorId: colId,
           gestorId: gesId,
+        },
+        include: {
+          colaborador: true,
+          gestor: true,
         },
       });
 

@@ -2,6 +2,11 @@ import { Empresa } from '@/modules/empresa/entities/empresa.entity';
 import { OmitType } from '@nestjs/mapped-types';
 import { Expose, Type } from 'class-transformer';
 
+export class ResponseSetoresEmpresaDto {
+  @Expose()
+  razaoSocial!: string;
+}
+
 export class ResponseSetoresDto {
   @Expose()
   id!: string;
@@ -17,14 +22,10 @@ export class ResponseSetoresDto {
 
   @Expose()
   status!: boolean;
-
-  @Type(() => Empresa)
-  empresa?: Empresa;
-
+  
   @Expose()
-  get nomeEmpresa(): string | null {
-    return this.empresa?.razaoSocial ?? null;
-  }
+  @Type(() => ResponseSetoresEmpresaDto)
+  empresa?: ResponseSetoresEmpresaDto;
 }
 
 export class ResponseSetoresListDto extends OmitType(ResponseSetoresDto, [

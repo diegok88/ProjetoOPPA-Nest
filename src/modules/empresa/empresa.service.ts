@@ -57,6 +57,7 @@ export class EmpresaService {
       throw error;
     }
   }
+
   /*
   SERVIÇO LISTAR EMPRESAS
   */
@@ -88,7 +89,9 @@ export class EmpresaService {
     }
   }
 
-  /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS */
+  /* 
+  FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS 
+  */
   async counter(): Promise<Contador> {
     try {
       const [total, ativos, inativos] = await Promise.all([
@@ -98,6 +101,47 @@ export class EmpresaService {
       ]);
 
       this.logger.log(TYPES_NOTICES.COUNTER);
+      return { total, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
+  /* 
+  FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS 
+  */
+  async counterCollaborators(): Promise<Contador> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+
+      this.logger.debug(ctx.empresa);
+
+      const usuarioTotal = await this.prisma.empresa.findUnique({
+        where: { id: ctx.empresa },
+        include: {
+          _count: { select: { usuario: true } },
+        },
+      });
+      const usuarioAtivos = await this.prisma.empresa.findUnique({
+        where: { id: ctx.empresa },
+        include: {
+          _count: { select: { usuario: { where: { status: true } } } },
+        },
+      });
+      const usuarioInativos = await this.prisma.empresa.findUnique({
+        where: { id: ctx.empresa },
+        include: {
+          _count: { select: { usuario: { where: { status: false } } } },
+        },
+      });
+
+      const total = usuarioTotal?._count.usuario ?? 0;
+      const ativos = usuarioAtivos?._count.usuario ?? 0;
+      const inativos = usuarioInativos?._count.usuario ?? 0;
+
+      this.logger.debug(total, ativos, inativos);
+
       return { total, ativos, inativos };
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
@@ -183,8 +227,11 @@ export class EmpresaService {
     try {
       const atualizarEmpresa = await this.prisma.client.$transaction(
         async (tx: any) => {
-          const usuario = this.tenantContext.getStore()!;
-          const buscarUsuario = await this.usuario.findOne(usuario.user, tx);
+          const ctx = this.tenantContext.getStore()!;
+          const buscarUsuario = await tx.usuario.findUnique({
+            where: { id: ctx.user },
+            select: { empresaId: true },
+          });
           if (id !== buscarUsuario.empresaId) {
             this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
             throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);

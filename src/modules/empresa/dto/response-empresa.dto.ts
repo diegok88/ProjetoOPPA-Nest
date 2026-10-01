@@ -1,5 +1,3 @@
-import { ResponseContadorCrachaDto } from '@/modules/contador-cracha/dto/response-contador-cracha.dto';
-import { ContadorCracha } from '@/modules/contador-cracha/entities/contador-cracha.entity';
 import { ResponseUsuarioDto } from '@/modules/usuario/dto/response-usuario.dto';
 import { Usuario } from '@/modules/usuario/entities/usuario.entity';
 import { FormatCep } from '@/utils/format-cep.util';
@@ -7,6 +5,14 @@ import { FormatCNPJ } from '@/utils/format-cnpj.util';
 import { FormatFone } from '@/utils/format-fone.util';
 import { OmitType, PickType } from '@nestjs/mapped-types';
 import { Expose, Type } from 'class-transformer';
+
+export class ResponseEmpresaContadorCrachaDto {
+  @Expose()
+  id!: string;
+
+  @Expose()
+  contador!: number;
+}
 
 export class ResponseEmpresaDto {
   @Expose()
@@ -62,13 +68,9 @@ export class ResponseEmpresaDto {
     );
   }
 
-  @Type(() => ContadorCracha)
-  contadorCracha?: ContadorCracha;
-
   @Expose()
-  get qtdCracha(): number | null {
-    return this.contadorCracha?.contador ?? null;
-  }
+  @Type(() => ResponseEmpresaContadorCrachaDto)
+  contadorCracha?: ResponseEmpresaContadorCrachaDto;
 }
 
 export class ResponseEmpresaListDto extends PickType(ResponseEmpresaDto, [

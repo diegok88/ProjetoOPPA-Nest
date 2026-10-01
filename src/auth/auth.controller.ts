@@ -8,7 +8,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { plainToClass } from 'class-transformer';
+import { plainToClass, plainToInstance } from 'class-transformer';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/create-auth.dto';
@@ -42,6 +42,7 @@ export class AuthController {
       httpOnly: true,
       secure: false,
       sameSite: 'lax',
+      path: '/',
       maxAge: 24 * 60 * 60 * 1000,
     });
     return plainToClass(ResponseAuthMessageDto, {
@@ -55,7 +56,12 @@ export class AuthController {
   ): Promise<ResponseAuthMessageDto> {
     const usuario: UserContext = this.tenantContext.getStore()!;
     await this.authService.logout(usuario);
-    res.clearCookie('jwt');
+    res.clearCookie('jwt', {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      path: '/',
+    });
     return plainToClass(ResponseAuthMessageDto, TYPES_NOTICES.LOGOUT);
   }
 
@@ -63,6 +69,7 @@ export class AuthController {
   async getIt(): Promise<ResponseAuthDto> {
     const usuario = this.tenantContext.getStore()!;
     this.logger.log('getIt()');
-    return this.authService.findProfile(usuario.user);
+    const usuarioPerfil = this.authService.findProfile(usuario.user);
+    return plainToInstance(ResponseAuthDto, usuarioPerfil);
   }
 }

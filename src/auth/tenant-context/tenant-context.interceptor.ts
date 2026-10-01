@@ -23,6 +23,7 @@ export class TenantContextInterceptor implements NestInterceptor {
         user: user.userId,
         perfil: user.perfil,
         empresa: user.empresa,
+        versaoToken: user.versaoToken,
       };
 
       return new Observable((subscriber) => {

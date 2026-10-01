@@ -1,3 +1,8 @@
 export interface AuthenticatedRequest extends Request {
-  user: { userId: string; perfil: string; empresa: string };
+  user: {
+    userId: string;
+    perfil: string;
+    empresa: string;
+    versaoToken: number;
+  };
 }

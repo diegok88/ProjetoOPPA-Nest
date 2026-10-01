@@ -40,8 +40,9 @@ export class AuthService {
       sub: token.userId,
       perfil: token.perfil,
       empresa: token.empresa,
+      versaoToken: token.versaoToken,
     };
-    this.logger.debug('generateToken()');
+    this.logger.log('generateToken()');
     return this.jwtService.sign(payload);
   }
 
@@ -61,7 +62,6 @@ export class AuthService {
         const empresa = await this.empresa.findEnterpriceOne(filtro);
         const verificar: QueryUsuarioFilterDto = {
           cracha: login.cracha,
-          senha: login.senha,
           empresaId: empresa.id,
         };
         const validarUsuario =
@@ -70,7 +70,8 @@ export class AuthService {
           this.logger.warn(`Usuário crachá ${login.cracha} não encontrado.`);
           throw new NotFoundException();
         }
-        const { senha, perfilId, id, empresaId, cracha } = validarUsuario;
+        const { senha, perfilId, id, empresaId, cracha, versaoToken } =
+          validarUsuario;
         if (verificar.cracha !== cracha || verificar.empresaId !== empresaId) {
           this.logger.warn('Usuário com credenciais não autorizado.');
           throw new UnauthorizedException();
@@ -95,6 +96,7 @@ export class AuthService {
           userId: id,
           perfil: perfilId,
           empresa: empresaId,
+          versaoToken: versaoToken,
         };
         const token = await this.generateToken(dadosToken);
 
@@ -122,7 +124,11 @@ export class AuthService {
   // LOGOUT DO USUARIO
   async logout(usuario: UserContext): Promise<void> {
     try {
+      /* Função de busca unica pelo id, arquivo: UsuarioService */
       const buscar = await this.usuario.findOne(usuario.user);
+      /* Função que incrementa a versão do token a cada logout do usuario, arquivo: UsuarioService */
+      await this.usuario.incrementarVersaoToken(buscar.id, buscar.versaoToken);
+
       const queryAuditoria: QueryAuditoriaFindOneLastDto = {
         acao: Acao.LOGIN,
         empresaId: usuario.empresa,

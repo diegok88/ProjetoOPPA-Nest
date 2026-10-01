@@ -26,11 +26,17 @@ import {
 } from './dto/response-empresa.dto';
 import { UpdateEmpresaDto } from './dto/update-empresa.dto';
 import { EmpresaService } from './empresa.service';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { PerfilService } from '../perfil/perfil.service';
 
 @Controller('empresa')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class EmpresaController {
-  constructor(private readonly empresaService: EmpresaService) {}
+  constructor(
+    private readonly empresaService: EmpresaService,
+    private readonly perfilService: PerfilService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
 
   // CONTROLLER CRIAR EMPRESA
   @Post()
@@ -54,15 +60,25 @@ export class EmpresaController {
 
   // LISTAR TODOS OS DADOS PARA TABELA LIST - RETORNA APENAS id, descrição e nivel
   @Get('list')
-  @Roles(ROLES.ASN1)
-  async findAllList(
-    @Query() query: QueryEmpresaFilterDto,
-  ): Promise<ResponseEmpresaListDto[]> {
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async findAllList(): Promise<ResponseEmpresaListDto[]> {
+    const usuario = this.tenantContext.getStore()!;
+    const codigo = await this.empresaService.findOne(usuario.empresa);
+    const perfil = await this.perfilService.findOne(usuario.perfil);
+    const desPerfil = `${perfil.descricao} - ${perfil.nivel}`;
+    let query: QueryEmpresaFilterDto = {};
+    if (desPerfil !== ROLES.ASN1) {
+      query = { codigo: codigo.codigo };
+    }
     const dados = await this.empresaService.findAll(query);
     return plainToInstance(ResponseEmpresaListDto, dados);
   }
 
-  // CONTADOR DE REGISTROS TOTAIS, ATIVOS E INATIVOS
+  /*
+  CONTADOR DE REGISTROS:
+  - Retorna dados totais, ativos e inativos.
+  - Apenas para Assistência.
+  */
   @Get('counter')
   @Roles(ROLES.ASN1)
   async counter(): Promise<ResponseEmpresaContadorDto> {
@@ -70,9 +86,21 @@ export class EmpresaController {
     return plainToInstance(ResponseEmpresaContadorDto, contador);
   }
 
+  /*
+  CONTADOR DE REGISTROS:
+  - Retorna dados totais, ativos e inativos.
+  - Apenas para Administradores e gestores.
+  */
+  @Get('counter_collaborators')
+  @Roles(ROLES.ADN1)
+  async counterCollaborators(): Promise<ResponseEmpresaContadorDto> {
+    const contador = await this.empresaService.counterCollaborators();
+    return plainToInstance(ResponseEmpresaContadorDto, contador);
+  }
+
   // CONTROLLER BUSCAR EMPRESA PELO ID
   @Get(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseEmpresaDto> {
@@ -82,7 +110,7 @@ export class EmpresaController {
 
   // CONTROLLER ATUALIZAR EMPRESA PELO ID
   @Patch(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateEmpresaDto: UpdateEmpresaDto,

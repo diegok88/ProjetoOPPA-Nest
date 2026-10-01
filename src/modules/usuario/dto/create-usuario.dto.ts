@@ -5,6 +5,7 @@ import {
   IsDate,
   IsEnum,
   IsNotEmpty,
+  IsOptional,
   IsString,
   IsUUID,
   Length,
@@ -49,7 +50,8 @@ export class CreateUsuarioDto {
   escala!: TipoEscala;
 
   @IsUUID('all', { message: 'Empresa id inválido.' })
-  @IsNotEmpty({ message: 'Empresa é um campo obrigatório.' })
+  @Transform(({ value }) => (value === '' ? undefined : value))
+  @IsOptional()
   empresaId?: string;
 }
 

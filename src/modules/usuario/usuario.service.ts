@@ -98,6 +98,8 @@ export class UsuarioService {
             create.empresaId = usuario.empresa;
           }
 
+          this.logger.debug(dadosContador);
+
           const criarCracha = await this.contadorCracha.update(
             dadosContador,
             tx,
@@ -514,10 +516,12 @@ export class UsuarioService {
             throw new UnauthorizedException(TYPES_NOTICES.NOT_DEACTIVE);
           }
 
+          /*
           if (buscar.empresaId !== usuario.empresa) {
             this.logger.warn(TYPES_NOTICES.NOT_BELONG);
             throw new UnauthorizedException(TYPES_NOTICES.NOT_BELONG);
           }
+          */
 
           await this.gestor.remove(buscar.id, tx);
 
@@ -558,6 +562,29 @@ export class UsuarioService {
       return remover;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - removeAll');
+      throw error;
+    }
+  }
+
+  /* 
+  FUNÇÃO AUTOINCRMENTAL DA VERSÃO DO TOKEN
+  - finalidade de criar um controle de acesso sempre a cada novo acesso.
+  - gera sempre um novo token a cada acesso.
+  - o valor é incremental
+  */
+  async incrementarVersaoToken(id: string, versao: number) {
+    try {
+      await this.prisma.client.usuario.update({
+        where: { id: id },
+        data: { versaoToken: versao + 1 },
+      });
+
+      this.logger.log(TYPES_NOTICES.UPDATE_INCREMENT);
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - IncrementerVersaoToken',
+      );
       throw error;
     }
   }

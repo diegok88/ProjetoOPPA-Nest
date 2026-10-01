@@ -52,7 +52,7 @@ export class PerfilController {
 
   // LISTAR TODOS OS DADOS PARA TABELA LIST - RETORNA APENAS id, descrição e nivel
   @Get('list')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findAllList(
     @Query() query: QueryPerfilFilterDto,
   ): Promise<ResponsePerfilListDto[]> {
@@ -70,7 +70,7 @@ export class PerfilController {
 
   // BUSCAR PERFIL PELO ID
   @Get(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponsePerfilDto> {

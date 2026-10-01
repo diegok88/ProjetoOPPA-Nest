@@ -1,9 +1,7 @@
-import { Empresa } from '@/modules/empresa/entities/empresa.entity';
+import { Prisma, Setores as SetorModel } from '@/generated/prisma/client';
 
-export class Setores {
-  id!: string;
-  descricao!: string;
-  empresaId!: string;
-  status!: boolean;
-  empresa?: Empresa;
-}
+export type Setores = SetorModel;
+
+export type SetoresRelacao = Prisma.SetoresGetPayload<{
+  include: { empresa: true };
+}>;

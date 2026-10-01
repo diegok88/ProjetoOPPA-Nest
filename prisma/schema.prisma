@@ -37,6 +37,7 @@ model Usuario {
   id               String      @id @default(uuid())
   cracha           Int?
   nome             String?
+  cpf              String?
   dataNascimento   DateTime?
   dataAdmissao     DateTime?
   dataDesligamento DateTime?
@@ -49,6 +50,7 @@ model Usuario {
   empresaId        String?
   empresa          Empresa?    @relation("empresa", fields: [empresaId], references: [id])
   status           Boolean     @default(true)
+  versaoToken      Int         @default(0)
 
   gestorComoColaborador       Gestor[]                 @relation("colaborador")
   gestorComoGestor            Gestor[]                 @relation("gestor")
@@ -57,7 +59,8 @@ model Usuario {
   dispensaComoColaborador     Dispensa[]               @relation("colaborador")
   dispensaComoGestor          Dispensa[]               @relation("gestor")
   controleJornada             ControleJornada[]        @relation("colaborador")
-  gestorComoCompetencia       CompetenciaSetorial[]    @relation("competencia")
+  colaboradorComoCompetencia  CompetenciaSetorial[]    @relation("colaborador")
+  gestorComoCompetencia       CompetenciaSetorial[]    @relation("gestor")
   solicitacoesComoSolicitante Solicitacoes[]           @relation("solicitante")
   solicitacoesComoSolicitado  Solicitacoes[]           @relation("solicitado")
   ocorrenciaUsuario           Ocorrencia[]             @relation("usuario")
@@ -228,12 +231,15 @@ model Setores {
 }
 
 model CompetenciaSetorial {
-  id        String  @id @default(uuid())
-  usuarioId String
-  usuario   Usuario @relation("competencia", fields: [usuarioId], references: [id])
-  setorId   String
-  setor     Setores @relation("setores", fields: [setorId], references: [id])
-  status    Boolean @default(true)
+  id            String    @id @default(uuid())
+  colaboradorId String
+  colaborador   Usuario   @relation("colaborador", fields: [colaboradorId], references: [id])
+  gestorId      String
+  gestor        Usuario   @relation("gestor", fields: [gestorId], references: [id])
+  setorId       String
+  setor         Setores   @relation("setores", fields: [setorId], references: [id])
+  turno         TipoTurno
+  status        Boolean   @default(true)
 
   @@map("competencia_setorial")
 }

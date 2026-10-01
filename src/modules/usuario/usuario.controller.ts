@@ -37,10 +37,7 @@ import { QueryUsuarioFilterDto } from './dto/query-usuario.dto';
 @Controller('usuario')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsuarioController {
-  constructor(
-    private readonly usuarioService: UsuarioService,
-    private readonly tenantContext: TenantContextService,
-  ) {}
+  constructor(private readonly usuarioService: UsuarioService) {}
   // CRIAR USUARIO MASTER
   @Post('master')
   @Public()
@@ -53,7 +50,7 @@ export class UsuarioController {
 
   // CRIAR USUARIO
   @Post()
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async create(@Body() create: CreateUsuarioDto): Promise<ResponseUsuarioDto> {
     const dado = await this.usuarioService.create(create);
     return plainToInstance(ResponseUsuarioDto, dado);
@@ -61,7 +58,7 @@ export class UsuarioController {
 
   // LISTA OS USUARIOS
   @Get()
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findAll(): Promise<ResponseUsuarioDto[]> {
     const dados = await this.usuarioService.findAll();
     return plainToInstance(ResponseUsuarioDto, dados);
@@ -69,7 +66,7 @@ export class UsuarioController {
 
   // LISTA OS USUARIOS
   @Get('list')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findAllList(): Promise<ResponseUsuarioListDto[]> {
     const query: QueryUsuarioFilterDto = {
       campos: 'id,cracha,nome',
@@ -80,7 +77,7 @@ export class UsuarioController {
 
   // CONTADOR DE REGISTROS TOTAIS, ATIVOS E INATIVOS
   @Get('counter')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async counter(): Promise<ResponseUsuarioContadorDto> {
     const contador = await this.usuarioService.counter();
     return plainToInstance(ResponseUsuarioContadorDto, contador);
@@ -88,6 +85,7 @@ export class UsuarioController {
 
   // BUSCA USUARIO PELO ID
   @Get(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseUsuarioRelacaoDto> {
@@ -97,7 +95,7 @@ export class UsuarioController {
 
   // ATUALIZA USUARIO PELO ID
   @Patch(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() update: UpdateUsuarioDto,

@@ -7,7 +7,7 @@ import {
 import { CreateSetoresDto } from './dto/create-setores.dto';
 import { UpdateSetoresDto } from './dto/update-setores.dto';
 import { PrismaService } from '@/prisma/prisma.service';
-import { Setores } from './entities/setores.entity';
+import { Setores, SetoresRelacao } from './entities/setores.entity';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import { Acao, Prisma } from '@/generated/prisma/client';
 import { QuerySetoresDto } from './dto/query-setores.dto';
@@ -94,7 +94,10 @@ export class SetoresService {
   BUSCAR SETORES:
   - serviço apenas permitido para usuaria ADMINISTRADOR E ASSISTENCIA - NIVEL 1
   */
-  async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Setores> {
+  async findOne(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<SetoresRelacao> {
     try {
       const client = tx ?? this.prisma.client;
       const buscar = await client.setores.findUnique({

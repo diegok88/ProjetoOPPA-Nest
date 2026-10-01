@@ -52,6 +52,7 @@ export class PerfilService {
         ? MAPA_VISIBILIDADE[desPerfil.descricao]
         : undefined;
 
+      this.logger.log(permitidos);
       const condicao: Prisma.PerfilWhereInput = {
         AND: [
           { descricao: { in: permitidos } },

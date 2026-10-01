@@ -24,7 +24,7 @@ export class AuditoriaController {
 
   @Get()
   @UseGuards(RolesGuard)
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findAll(
     @Query() query: QueryAuditoriaFilterDto,
   ): Promise<ResponseAuditoriaDto[]> {
@@ -34,7 +34,7 @@ export class AuditoriaController {
 
   @Get(':id')
   @UseGuards(RolesGuard)
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findOne(@Param('id') id: string): Promise<ResponseAuditoriaDto> {
     const dado = await this.auditoriaService.findOne(id);
     return plainToInstance(ResponseAuditoriaDto, dado);

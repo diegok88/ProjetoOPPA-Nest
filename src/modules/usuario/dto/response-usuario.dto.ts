@@ -77,6 +77,9 @@ export class ResponseUsuarioDto {
   status!: boolean;
 
   @Expose()
+  versaoToken!: number;
+
+  @Expose()
   @Type(() => ResponsePerfilParcialDto)
   perfil?: ResponsePerfilParcialDto;
 

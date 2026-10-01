@@ -51,3 +51,15 @@ export class ResponseGestorUsuarioDto extends ResponseGestorDto {
   @Type(() => ResponseUsuarioGestorParcialDto)
   gestor?: ResponseUsuarioGestorParcialDto;
 }
+
+/* DTO DO CONTADOR: retorna total, ativos e inativos */
+export class ResponseGestorContadorDto {
+  @Expose()
+  total!: number;
+
+  @Expose()
+  ativos!: number;
+
+  @Expose()
+  inativos!: number;
+}

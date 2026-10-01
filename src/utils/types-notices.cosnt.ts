@@ -7,6 +7,7 @@ export const TYPES_NOTICES = {
   CREATE_MANY: 'Registros criados com sucesso!',
   UPDATE: 'Registro atualizado com sucesso!',
   UPDATE_MANY: 'Registros atualizados com sucesso!',
+  UPDATE_INCREMENT: 'Atualização incremental realizado com sucesso!',
   ACTIVE: 'Registro ativado com sucesso!',
   IS_ACTIVE: 'Registro está ativo!',
   ACTIVE_MANY: 'Registros ativados com sucesso!',
@@ -29,4 +30,5 @@ export const TYPES_NOTICES = {
   TOKEN_INVALID: 'Token inválido!',
   NOT_BELONG: 'Registro não pertence!',
   COUNTER: 'Contagem realizada com sucesso!',
+  NOT_SHIFT: 'Turno incompátivel com o usuário!',
 } as const;

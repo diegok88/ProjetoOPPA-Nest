@@ -2,6 +2,7 @@ import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { GestorService } from './gestor.service';
 import { QueryGestorFilterDto } from './dto/query-gestor.dto';
 import {
+  ResponseGestorContadorDto,
   ResponseGestorDto,
   ResponseGestorRelacoesDto,
   ResponseGestorRelacoesParcialDto,
@@ -37,12 +38,19 @@ export class GestorController {
   }
 
   @Get('list')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findAllGestorParcial(
     @Query() query: QueryGestorFilterDto,
   ): Promise<ResponseGestorRelacoesParcialDto[]> {
     const dados = await this.gestorService.findAllGestorParcial(query);
     return plainToInstance(ResponseGestorRelacoesParcialDto, dados);
+  }
+
+  @Get('counter')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async counter(): Promise<ResponseGestorContadorDto> {
+    const contador = await this.gestorService.counter();
+    return plainToInstance(ResponseGestorContadorDto, contador);
   }
 
   @Get(':id')

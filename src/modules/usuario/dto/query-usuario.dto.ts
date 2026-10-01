@@ -83,6 +83,10 @@ export class QueryUsuarioFilterDto {
   status?: boolean;
 
   @IsOptional()
+  @IsNumber({}, { message: 'Versão não é do tipo Number' })
+  versaoToken?: number;
+
+  @IsOptional()
   @IsString({ message: 'Campos não é do tipo String.' })
   campos?: string;
 }
