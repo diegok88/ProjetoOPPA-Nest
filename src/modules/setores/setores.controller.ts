@@ -21,10 +21,16 @@ import { plainToInstance } from 'class-transformer';
 import { Roles } from '@/auth/guards/roles.decorator';
 import { ROLES } from '@/auth/guards/roles.const';
 import { QuerySetoresDto } from './dto/query-setores.dto';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { PerfilService } from '../perfil/perfil.service';
 
 @Controller('setores')
 export class SetoresController {
-  constructor(private readonly setoresService: SetoresService) {}
+  constructor(
+    private readonly setoresService: SetoresService,
+    private readonly perfilService: PerfilService,
+    private readonly tennantContext: TenantContextService,
+  ) {}
 
   @Post()
   @Roles(ROLES.ASN1, ROLES.ADN1)
@@ -45,10 +51,16 @@ export class SetoresController {
   }
 
   @Get('list')
-  @Roles(ROLES.ASN1)
-  async findAllList(
-    @Query() query: QuerySetoresDto,
-  ): Promise<ResponseSetoresListDto[]> {
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async findAllList(): Promise<ResponseSetoresListDto[]> {
+    const query: QuerySetoresDto = { campos: 'id,codigo,descricao' };
+    const ctx = this.tennantContext.getStore()!;
+    const perfil = await this.perfilService.findOne(ctx.perfil);
+    const desPerfil = `${perfil.descricao} - ${perfil.nivel}`;
+    if (desPerfil !== ROLES.ASN1) {
+      query.empresaId = ctx.empresa;
+    }
+
     const dados = await this.setoresService.findAll(query);
     return plainToInstance(ResponseSetoresListDto, dados);
   }

@@ -29,7 +29,7 @@ export class AuditoriaController {
     @Query() query: QueryAuditoriaFilterDto,
   ): Promise<ResponseAuditoriaDto[]> {
     const dados = await this.auditoriaService.findAll(query);
-    return plainToInstance(ResponseAuditoriaDto, dados);
+    return plainToInstance(ResponseAuditoriaDto, dados); 
   }
 
   @Get(':id')

@@ -37,7 +37,7 @@ export class AuthController {
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<ResponseAuthMessageDto> {
-    const token = await this.authService.login(loginDto);
+    const token = await this.authService.login(loginDto); 
     res.cookie('jwt', token, {
       httpOnly: true,
       secure: false,

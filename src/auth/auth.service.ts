@@ -21,6 +21,7 @@ import { ResponseAuthDto } from './dto/response-auth.dto';
 import { Auth } from './entities/auth.entity';
 import { UserContext } from './tenant-context/user-context.interface';
 import { QueryUsuarioFilterDto } from '@/modules/usuario/dto/query-usuario.dto';
+import { GenerateTokenService } from './jwt-generate-token/jwt-generate-token.service';
 
 @Injectable()
 export class AuthService {
@@ -31,20 +32,8 @@ export class AuthService {
     private readonly empresa: EmpresaService,
     private readonly auditoria: AuditoriaService,
     private readonly prisma: PrismaService,
-    private readonly jwtService: JwtService,
+    private readonly generateToken: GenerateTokenService,
   ) {}
-
-  // GERADOR DE TOKEN
-  async generateToken(token: Auth) {
-    const payload = {
-      sub: token.userId,
-      perfil: token.perfil,
-      empresa: token.empresa,
-      versaoToken: token.versaoToken,
-    };
-    this.logger.log('generateToken()');
-    return this.jwtService.sign(payload);
-  }
 
   // OBTER O PERFIL - criar entidade usuario para tipar o retorno -
   async findProfile(id: string): Promise<ResponseAuthDto> {
@@ -76,7 +65,7 @@ export class AuthService {
           this.logger.warn('Usuário com credenciais não autorizado.');
           throw new UnauthorizedException();
         }
-        const validarSenha = this.usuario.compareHash(senha, login.senha);
+        const validarSenha = await this.usuario.compareHash(login.senha, senha);
         if (!validarSenha) {
           this.logger.warn(`Usuário crachá ${login.cracha} não autorizado.`);
           throw new UnauthorizedException();
@@ -98,7 +87,7 @@ export class AuthService {
           empresa: empresaId,
           versaoToken: versaoToken,
         };
-        const token = await this.generateToken(dadosToken);
+        const token = await this.generateToken.generateToken(dadosToken);
 
         this.logger.log('Token gerado com sucesso!');
 

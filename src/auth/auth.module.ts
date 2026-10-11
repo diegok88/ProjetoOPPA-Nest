@@ -9,14 +9,12 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategyService } from './strategies/jwt.strategy.service';
 import { TenantContextModule } from './tenant-context/tenant-context.module';
+import { GenerateTokenModule } from './jwt-generate-token/jwt-generate-token.module';
 
 @Module({
   imports: [
     PassportModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET ?? 'projeto_oppa',
-      signOptions: { expiresIn: '1d' },
-    }),
+    GenerateTokenModule,
     TenantContextModule,
     UsuarioModule,
     EmpresaModule,

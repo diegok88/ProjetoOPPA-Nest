@@ -21,4 +21,8 @@ export class QueryPerfilFilterDto {
   @IsOptional()
   @IsBoolean({ message: 'Status não é do tipo Boolean!' })
   status?: boolean;
+
+  @IsOptional()
+  @IsString({ message: 'O campo deve ser do tipo string.' })
+  campos?: string;
 }

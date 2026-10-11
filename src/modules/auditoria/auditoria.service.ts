@@ -168,7 +168,7 @@ export class AuditoriaService {
   // SERVIÇO DE LISTAGEM DE AUDITORIAS CADASTRADAS - SOMENTE PERFIL MASTER
   async findAll(query: QueryAuditoriaFilterDto): Promise<Auditoria[]> {
     try {
-      const condicao: Prisma.AuditoriaWhereInput = {};
+      const condicao: Prisma.AuditoriaWhereInput = {}; 
 
       if (query.acao) condicao.acao = query.acao;
       if (query.dataHora) condicao.dataHora = query.dataHora;

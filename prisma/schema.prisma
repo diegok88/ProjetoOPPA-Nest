@@ -136,7 +136,7 @@ model Penalidade {
   dataInicial    DateTime
   dataFinal      DateTime
   justificativa  String?
-  status         Boolean
+  status         Boolean        @default(true)
 
   @@map("penalidade")
 }
@@ -156,7 +156,7 @@ model Dispensa {
   tipoDispensa TipoDispensa
   dataInicial  DateTime
   dataFinal    DateTime
-  status       Boolean
+  status       Boolean      @default(true)
 
   @@map("dispensa")
 }
@@ -175,7 +175,7 @@ model ControleJornada {
   estadoJornada TipoEstadoJornada
   dataRegistro  DateTime
   tagAtivoId    String
-  status        Boolean
+  status        Boolean           @default(true)
 
   @@map("controle_jornada")
 }
@@ -212,6 +212,7 @@ model Empresa {
   usuario        Usuario[]         @relation("empresa")
   contadorCracha ContadorDeCracha? @relation("empresa")
   competencia    Setores[]         @relation("empresa")
+  ativo          Ativo[]           @relation("empresa")
 
   @@map("empresa")
 }
@@ -232,6 +233,7 @@ model Setores {
 
 model CompetenciaSetorial {
   id            String    @id @default(uuid())
+  codigo        Int       @default(autoincrement())
   colaboradorId String
   colaborador   Usuario   @relation("colaborador", fields: [colaboradorId], references: [id])
   gestorId      String
@@ -258,7 +260,7 @@ model Solicitacoes {
   observacao        String?
   dataEnvio         DateTime
   dataVisualizacao  DateTime?
-  status            Boolean
+  status            Boolean         @default(true)
 
   @@map("solicitacoes")
 }
@@ -306,7 +308,7 @@ model EstadoAtivo {
   tipoEstado          TipoEstadoAtivo
   dataInicial         DateTime
   dataFinal           DateTime?
-  status              Boolean
+  status              Boolean             @default(true)
 
   ocorrencia Ocorrencia? @relation("ocorrencia")
 
@@ -332,7 +334,7 @@ model Ocorrencia {
   solucionado    Usuario        @relation("usuario", fields: [solucionadoId], references: [id])
   dataInicial    DateTime       @default(now())
   dataFinal      DateTime
-  status         Boolean
+  status         Boolean        @default(true)
 
   fluxoOcorrencia FluxoOcorrencia[] @relation("ocorrencia")
 
@@ -363,13 +365,16 @@ enum TipoOcorrencia {
 
 model Ativo {
   id         String  @id @default(uuid())
+  codigo     Int     @default(autoincrement())
   descricao  String
   modelo     String
   fabricante String
   ano        Int
   setorId    String
   setor      Setores @relation("setor", fields: [setorId], references: [id])
-  status     Boolean
+  empresaId  String
+  empresa    Empresa @relation("empresa", fields: [empresaId], references: [id])
+  status     Boolean @default(true)
 
   falhaAtivo       Falhas[]                 @relation("ativo")
   tagAtivo         TagAtivo[]               @relation("ativo")
@@ -380,11 +385,12 @@ model Ativo {
 
 model TagAtivo {
   id        String  @id @default(uuid())
+  codigo    Int     @default(autoincrement())
   descricao String
   ativoId   String
   ativo     Ativo   @relation("ativo", fields: [ativoId], references: [id])
   senha     String
-  status    Boolean
+  status    Boolean @default(true)
 
   alocacaoTagAtivo AlocacaoOperacional[] @relation("tag-ativo")
 
@@ -399,20 +405,20 @@ model CompetenciaOperacional {
   gestor     Usuario @relation("gestor", fields: [gestorId], references: [id])
   ativoId    String
   ativo      Ativo   @relation("ativo", fields: [ativoId], references: [id])
-  status     Boolean
+  status     Boolean @default(true)
 
   @@map("compentencia_operacional")
 }
 
 model Falhas {
   id               String  @id @default(uuid())
-  codigo           Int
+  codigo           String
   descricao        String
   ativoId          String
   ativo            Ativo   @relation("ativo", fields: [ativoId], references: [id])
   direcionamentoId String
   perfil           Perfil  @relation("perfil", fields: [direcionamentoId], references: [id])
-  status           Boolean
+  status           Boolean @default(true)
 
   solucaoFalha    Solucoes[]   @relation("falhas")
   ocorrenciaFalha Ocorrencia[] @relation("falhas")
@@ -422,18 +428,15 @@ model Falhas {
 
 model Solucoes {
   id               String  @id @default(uuid())
+  codigo           Int     @default(autoincrement())
   falhaId          String
   falha            Falhas  @relation("falhas", fields: [falhaId], references: [id])
   direcionamentoId String
   perfil           Perfil  @relation("perfil", fields: [direcionamentoId], references: [id])
   descricao        String
-  status           Boolean
+  status           Boolean @default(true)
 
   ocorrenciaSolucoes Ocorrencia[] @relation("solucoes")
 
   @@map("solucoes")
 }
-
-/**
- * REFAZER A MIGRAÇÃO
- */

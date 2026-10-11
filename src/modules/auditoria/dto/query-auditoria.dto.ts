@@ -19,7 +19,7 @@ export class QueryAuditoriaFindOneLastDto extends PickType(CreateAuditoriaDto, [
   'registradoPorId',
 ]) {}
 
-export class QueryAuditoriaFilterDto {
+export class QueryAuditoriaFilterDto { 
   @IsOptional()
   @IsString()
   entidade?: string;

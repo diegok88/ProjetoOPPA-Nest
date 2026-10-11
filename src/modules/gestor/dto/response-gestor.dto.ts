@@ -1,3 +1,4 @@
+import { TipoTurno } from '@/generated/prisma/enums';
 import {
   ResponseUsuarioDto,
   ResponseUsuarioGestorParcialDto,
@@ -62,4 +63,22 @@ export class ResponseGestorContadorDto {
 
   @Expose()
   inativos!: number;
+}
+
+/* RETORNO PARA A LISTAGEM DE USUARIOS POR GESTOR - competencia setoial */
+export class ResponseUsuarioGestorCompetenciaDto {
+  @Expose()
+  cracha!: number | null;
+
+  @Expose()
+  nome!: string | null;
+
+  @Expose()
+  turno!: TipoTurno;
+}
+
+export class ResponseGestorCompetenciaRelacaoDto extends ResponseGestorDto {
+  @Expose()
+  @Type(() => ResponseUsuarioGestorCompetenciaDto)
+  colaborador?: ResponseUsuarioGestorCompetenciaDto;
 }

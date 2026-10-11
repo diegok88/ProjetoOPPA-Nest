@@ -15,7 +15,11 @@ import { CreateFalhaDto } from './dto/create-falha.dto';
 import { UpdateFalhaDto } from './dto/update-falha.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/roles-auth.guard';
-import { ResponseFalhasDto } from './dto/response-falhas.dto';
+import {
+  ResponseFalhasContadorDto,
+  ResponseFalhasDto,
+  ResponseTagAtivoRelacaoDto,
+} from './dto/response-falhas.dto';
 import { plainToInstance } from 'class-transformer';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
@@ -27,7 +31,7 @@ export class FalhasController {
   constructor(private readonly falhasService: FalhasService) {}
 
   @Post()
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async create(
     @Body() createFalhaDto: CreateFalhaDto,
   ): Promise<ResponseFalhasDto> {
@@ -36,7 +40,7 @@ export class FalhasController {
   }
 
   @Get()
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findAll(
     @Query() query: QueryFalhasFilterDto,
   ): Promise<ResponseFalhasDto[]> {
@@ -44,17 +48,24 @@ export class FalhasController {
     return plainToInstance(ResponseFalhasDto, dados);
   }
 
+  @Get('counter')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async counter(): Promise<ResponseFalhasContadorDto> {
+    const contador = await this.falhasService.counter();
+    return plainToInstance(ResponseFalhasContadorDto, contador);
+  }
+
   @Get(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<ResponseFalhasDto> {
+  ): Promise<ResponseTagAtivoRelacaoDto> {
     const dado = await this.falhasService.findOne(id);
-    return plainToInstance(ResponseFalhasDto, dado);
+    return plainToInstance(ResponseTagAtivoRelacaoDto, dado);
   }
 
   @Patch(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateFalhaDto: UpdateFalhaDto,
@@ -63,8 +74,17 @@ export class FalhasController {
     return plainToInstance(ResponseFalhasDto, dado);
   }
 
+  @Patch('active/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async active(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseFalhasDto> {
+    const dado = await this.falhasService.active(id);
+    return plainToInstance(ResponseFalhasDto, dado);
+  }
+
   @Patch('deactive/:id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseFalhasDto> {
@@ -73,7 +93,7 @@ export class FalhasController {
   }
 
   @Delete(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseFalhasDto> {

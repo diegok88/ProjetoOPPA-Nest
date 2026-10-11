@@ -3,7 +3,6 @@ import { Public } from '@/auth/guards/public.decorator';
 import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
-import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 import {
   Body,
   Controller,
@@ -13,6 +12,8 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
@@ -23,7 +24,6 @@ import {
 import {
   ResponseUsuarioContadorDto,
   ResponseUsuarioDto,
-  ResponseUsuarioListDto,
   ResponseUsuarioRelacaoDto,
 } from './dto/response-usuario.dto';
 import {
@@ -33,11 +33,19 @@ import {
 } from './dto/update-usuario.dto';
 import { UsuarioService } from './usuario.service';
 import { QueryUsuarioFilterDto } from './dto/query-usuario.dto';
+import { Auth } from '@/auth/entities/auth.entity';
+import { AuthService } from '@/auth/auth.service';
+import type { Response } from 'express';
+import { GenerateTokenService } from '@/auth/jwt-generate-token/jwt-generate-token.service';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 
 @Controller('usuario')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsuarioController {
-  constructor(private readonly usuarioService: UsuarioService) {}
+  constructor(
+    private readonly usuarioService: UsuarioService,
+    private readonly generateToken: GenerateTokenService,
+  ) {}
   // CRIAR USUARIO MASTER
   @Post('master')
   @Public()
@@ -59,18 +67,9 @@ export class UsuarioController {
   // LISTA OS USUARIOS
   @Get()
   @Roles(ROLES.ASN1, ROLES.ADN1)
-  async findAll(): Promise<ResponseUsuarioDto[]> {
-    const dados = await this.usuarioService.findAll();
-    return plainToInstance(ResponseUsuarioDto, dados);
-  }
-
-  // LISTA OS USUARIOS
-  @Get('list')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
-  async findAllList(): Promise<ResponseUsuarioListDto[]> {
-    const query: QueryUsuarioFilterDto = {
-      campos: 'id,cracha,nome',
-    };
+  async findAll(
+    @Query() query: QueryUsuarioFilterDto,
+  ): Promise<ResponseUsuarioDto[]> {
     const dados = await this.usuarioService.findAll(query);
     return plainToInstance(ResponseUsuarioDto, dados);
   }
@@ -93,6 +92,70 @@ export class UsuarioController {
     return plainToInstance(ResponseUsuarioRelacaoDto, dado);
   }
 
+  // ATUALIZA O SENHA DO USUARIO
+  @Patch('password')
+  async updatePassword(
+    @Body() updatePassword: UpdateUsuarioPasswordDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<ResponseUsuarioDto> {
+    const tipo = 'PAS';
+    const dado = await this.usuarioService.updatePasswordPinUsuario(
+      updatePassword,
+      tipo,
+    );
+
+    const dadosToken: Auth = {
+      userId: dado.id,
+      perfil: dado.perfilId!,
+      empresa: dado.empresaId!,
+      versaoToken: dado.versaoToken,
+    };
+
+    const token = await this.generateToken.generateToken(dadosToken);
+
+    res.cookie('jwt', token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
+    return plainToInstance(ResponseUsuarioDto, dado);
+  }
+
+  // ATUALIZA O PIN DO USUARIO
+  @Patch('pin')
+  async updatePin(
+    @Body() update: UpdateUsuarioPinDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<ResponseUsuarioDto> {
+    const tipo = 'PIN';
+    const dado = await this.usuarioService.updatePasswordPinUsuario(
+      update,
+      tipo,
+    );
+
+    const dadosToken: Auth = {
+      userId: dado.id,
+      perfil: dado.perfilId!,
+      empresa: dado.empresaId!,
+      versaoToken: dado.versaoToken,
+    };
+
+    const token = await this.generateToken.generateToken(dadosToken);
+
+    res.cookie('jwt', token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
+    return plainToInstance(ResponseUsuarioDto, dado);
+  }
+
   // ATUALIZA USUARIO PELO ID
   @Patch(':id')
   @Roles(ROLES.ASN1, ROLES.ADN1)
@@ -104,34 +167,7 @@ export class UsuarioController {
     return plainToInstance(ResponseUsuarioDto, dado);
   }
 
-  // ATUALIZA O SENHA DO USUARIO
-  @Post('password')
-  async updatePassword(
-    @Body() updatePassword: UpdateUsuarioPasswordDto,
-  ): Promise<ResponseUsuarioDto> {
-    console.log(updatePassword);
-    const tipo = 'PAS';
-    const dado = await this.usuarioService.updatePasswordPinUsuario(
-      updatePassword,
-      tipo,
-    );
-    return plainToInstance(ResponseUsuarioDto, dado);
-  }
-
-  // ATUALIZA O PIN DO USUARIO
-  @Post('pin')
-  async updatePin(
-    @Body() update: UpdateUsuarioPinDto,
-  ): Promise<ResponseUsuarioDto> {
-    const tipo = 'PIN';
-    const dado = await this.usuarioService.updatePasswordPinUsuario(
-      update,
-      tipo,
-    );
-    return plainToInstance(ResponseUsuarioDto, dado);
-  }
-
-  // INATIVAR USUARIO
+  // ATIVAR USUARIO
   @Patch('active/:id')
   @Roles(ROLES.ASN1, ROLES.ADN1)
   async active(

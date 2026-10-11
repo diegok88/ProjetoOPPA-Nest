@@ -15,7 +15,11 @@ import { CreateSolucoesDto } from './dto/create-solucoes.dto';
 import { UpdateSolucoeDto } from './dto/update-solucoes.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/roles-auth.guard';
-import { ResponseSolucoesDto } from './dto/response-solucoes.dto';
+import {
+  ResponseSolucoesContadorDto,
+  ResponseSolucoesDto,
+  ResponseSolucoesRelacaoDto,
+} from './dto/response-solucoes.dto';
 import { plainToInstance } from 'class-transformer';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
@@ -39,18 +43,25 @@ export class SolucoesController {
   @Roles(ROLES.ASN1)
   async findAll(
     @Query() query: QuerySolucoesFilterDto,
-  ): Promise<ResponseSolucoesDto[]> {
+  ): Promise<ResponseSolucoesRelacaoDto[]> {
     const dados = await this.solucoesService.findAll(query);
-    return plainToInstance(ResponseSolucoesDto, dados);
+    return plainToInstance(ResponseSolucoesRelacaoDto, dados);
+  }
+
+  @Get('counter')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async counter(): Promise<ResponseSolucoesContadorDto> {
+    const contador = await this.solucoesService.counter();
+    return plainToInstance(ResponseSolucoesContadorDto, contador);
   }
 
   @Get(':id')
   @Roles(ROLES.ASN1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<ResponseSolucoesDto> {
+  ): Promise<ResponseSolucoesRelacaoDto> {
     const dado = await this.solucoesService.findOne(id);
-    return plainToInstance(ResponseSolucoesDto, dado);
+    return plainToInstance(ResponseSolucoesRelacaoDto, dado);
   }
 
   @Patch(':id')
@@ -60,6 +71,15 @@ export class SolucoesController {
     @Body() updateSolucoeDto: UpdateSolucoeDto,
   ): Promise<ResponseSolucoesDto> {
     const dado = await this.solucoesService.update(id, updateSolucoeDto);
+    return plainToInstance(ResponseSolucoesDto, dado);
+  }
+
+  @Patch('active/:id')
+  @Roles(ROLES.ASN1)
+  async active(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseSolucoesDto> {
+    const dado = await this.solucoesService.active(id);
     return plainToInstance(ResponseSolucoesDto, dado);
   }
 

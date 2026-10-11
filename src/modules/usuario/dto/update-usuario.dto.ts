@@ -1,4 +1,4 @@
-import { OmitType, PartialType } from '@nestjs/mapped-types';
+import { PartialType } from '@nestjs/mapped-types';
 import {
   IsBoolean,
   IsNotEmpty,
@@ -12,7 +12,7 @@ import { CreateUsuarioDto } from './create-usuario.dto';
 
 export class UpdateUsuarioDto extends PartialType(CreateUsuarioDto) {
   @IsOptional()
-  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' }) 
   status?: boolean;
 }
 

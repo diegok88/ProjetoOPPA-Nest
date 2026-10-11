@@ -42,7 +42,7 @@ export class PerfilController {
 
   // LISTAR TODOS OS PERFIS
   @Get()
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findAll(
     @Query() query: QueryPerfilFilterDto,
   ): Promise<ResponsePerfilDto[]> {

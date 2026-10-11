@@ -33,22 +33,6 @@ export class QueryUsuarioFilterDto {
   nome?: string;
 
   @IsOptional()
-  @IsString({ message: 'Nome não é do tipo String.' })
-  @MinLength(6, { message: 'Senha deve conter no minimo 6 caracteres.' })
-  @Matches(/^[a-zA-Z0-9]+$/, {
-    message: 'Senha deve conter apenas letras e números',
-  })
-  senha?: string;
-
-  @IsOptional()
-  @IsString({ message: 'Nome não é do tipo String.' })
-  @MinLength(4, { message: 'Pin deve conter no minimo 4 caracteres.' })
-  @Matches(/^\d+$/, {
-    message: 'O cnpj deve conter apenas números',
-  })
-  pin?: string;
-
-  @IsOptional()
   @IsDate({ message: 'Data de nascimento não é do tipo Date.' })
   dataNascimento?: Date;
 
@@ -89,6 +73,10 @@ export class QueryUsuarioFilterDto {
   @IsOptional()
   @IsString({ message: 'Campos não é do tipo String.' })
   campos?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Incluir não é do tipo String.' })
+  incluir?: string;
 }
 
 export class QueryBagdeEnterpriceDto {

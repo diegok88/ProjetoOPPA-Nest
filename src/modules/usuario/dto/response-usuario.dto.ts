@@ -1,4 +1,3 @@
-import { PickType } from '@nestjs/mapped-types';
 import { Exclude, Expose, Type } from 'class-transformer';
 
 /* RETORNO PARCIAL DO PERFIL */
@@ -78,7 +77,10 @@ export class ResponseUsuarioDto {
 
   @Expose()
   versaoToken!: number;
+}
 
+/* DTO PARA CONSULTA UNICA: aplicado para a requisição findOne() */
+export class ResponseUsuarioRelacaoDto extends ResponseUsuarioDto {
   @Expose()
   @Type(() => ResponsePerfilParcialDto)
   perfil?: ResponsePerfilParcialDto;
@@ -86,21 +88,11 @@ export class ResponseUsuarioDto {
   @Expose()
   @Type(() => ResponseEmpresaParcialDto)
   empresa?: ResponseEmpresaParcialDto;
-}
 
-/* DTO PARA CONSULTA UNICA: aplicado para a requisição findOne() */
-export class ResponseUsuarioRelacaoDto extends ResponseUsuarioDto {
   @Expose()
   @Type(() => ResponseGestorVinculoDto)
   gestorComoColaborador?: ResponseGestorVinculoDto[];
 }
-
-/* DTO DE RETORNO DE UMA LISTA: apenas aplicado para a listagem no front */
-export class ResponseUsuarioListDto extends PickType(ResponseUsuarioDto, [
-  'id',
-  'cracha',
-  'nome',
-] as const) {}
 
 /* DTO DO CONTADOR: retorna total, ativos e inativos */
 export class ResponseUsuarioContadorDto {

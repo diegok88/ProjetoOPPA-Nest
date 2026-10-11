@@ -3,13 +3,17 @@ import { ContadorCrachaModule } from '../contador-cracha/contador-cracha.module'
 import { PerfilModule } from '../perfil/perfil.module';
 import { UsuarioController } from './usuario.controller';
 import { UsuarioService } from './usuario.service';
-import { GestorModule } from '../gestor/gestor.module';
+import { CompetenciaSetorialOrquestradorModule } from '@/services-orchestrator/competencia-setorial/competencia-setorial-orquestrador.module';
+import { GenerateTokenModule } from '@/auth/jwt-generate-token/jwt-generate-token.module';
+import { GestorOrquestradorModule } from '@/services-orchestrator/gestor/gestor.module';
 
 @Module({
   imports: [
     forwardRef(() => PerfilModule),
-    forwardRef(() => GestorModule),
+    GenerateTokenModule,
     ContadorCrachaModule,
+    CompetenciaSetorialOrquestradorModule,
+    GestorOrquestradorModule,
   ],
   controllers: [UsuarioController],
   providers: [UsuarioService],

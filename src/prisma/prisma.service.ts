@@ -61,6 +61,11 @@ export class PrismaService
       'Perfil',
       'Setores',
       'Alocacao',
+      'CompetenciaSetorial',
+      'Ativo',
+      'TagAtivo',
+      'Falhas',
+      'Solucoes',
     ];
 
     this.extended = this.$extends({
@@ -125,7 +130,6 @@ export class PrismaService
           },
           // ATUALIZAÇÃO EM LOTE - update many
           async updateMany({ model, args, query }) {
-            const modeloNome = model;
             const user = tenantContext.getStore();
 
             let acao = Acao.UPDATE;
@@ -135,29 +139,33 @@ export class PrismaService
               delete dataAny._auditAction;
             }
 
+            // decide se audita ANTES de pagar qualquer query
+            const auditado = !!user && MODELOS_AUDITADOS.includes(model);
+            if (!auditado) return query(args);
+
+            // estado anterior
             const antes = await prismaClient[model].findMany({
               where: args.where,
             });
+            if (antes.length === 0) return query(args);
 
             const resultado = await query(args);
-            if (!user) return resultado;
-            if (!MODELOS_AUDITADOS.includes(modeloNome)) return resultado;
-
-            const depois = resultado;
 
             const dadosAuditoria = antes.map((itemAntes: any) => {
+              const itemDepois = { ...itemAntes, ...dataAny };
+
               const dados: UpdateAuditoriaDto = {
-                entidade: modeloNome.toUpperCase(),
+                entidade: model.toUpperCase(),
                 registroId: itemAntes.id,
                 acao: acao,
                 antes: ExtractDataAuditoria(itemAntes),
-                depois: ExtractDataAuditoria(depois),
+                depois: ExtractDataAuditoria(itemDepois),
                 empresaId: user.empresa,
                 registradoPorId: user.user,
               };
               return dados;
             });
-            console.log(dadosAuditoria);
+
             await getAuditoriaService().updateAll(dadosAuditoria, prismaClient);
 
             return resultado;

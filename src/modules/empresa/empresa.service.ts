@@ -61,7 +61,7 @@ export class EmpresaService {
   /*
   SERVIÇO LISTAR EMPRESAS
   */
-  async findAll(query: QueryEmpresaFilterDto): Promise<Empresa[]> {
+  async findAll(query: QueryEmpresaFilterDto): Promise<Empresa[]> { 
     try {
       const condicao: Prisma.EmpresaWhereInput = {};
       if (query.codigo) condicao.codigo = query.codigo;

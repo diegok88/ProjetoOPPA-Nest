@@ -2,7 +2,6 @@ import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
-import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import {
   Body,
   Controller,
@@ -15,14 +14,13 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { plainToClass, plainToInstance } from 'class-transformer';
+import { plainToInstance } from 'class-transformer';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
 import { QueryEmpresaFilterDto } from './dto/query-empresa.dto';
 import {
   ResponseEmpresaContadorDto,
   ResponseEmpresaDto,
   ResponseEmpresaListDto,
-  ResponseEmpresaMessageDto,
 } from './dto/response-empresa.dto';
 import { UpdateEmpresaDto } from './dto/update-empresa.dto';
 import { EmpresaService } from './empresa.service';
@@ -62,9 +60,9 @@ export class EmpresaController {
   @Get('list')
   @Roles(ROLES.ASN1, ROLES.ADN1)
   async findAllList(): Promise<ResponseEmpresaListDto[]> {
-    const usuario = this.tenantContext.getStore()!;
-    const codigo = await this.empresaService.findOne(usuario.empresa);
-    const perfil = await this.perfilService.findOne(usuario.perfil);
+    const ctx = this.tenantContext.getStore()!;
+    const codigo = await this.empresaService.findOne(ctx.empresa);
+    const perfil = await this.perfilService.findOne(ctx.perfil);
     const desPerfil = `${perfil.descricao} - ${perfil.nivel}`;
     let query: QueryEmpresaFilterDto = {};
     if (desPerfil !== ROLES.ASN1) {

@@ -51,13 +51,19 @@ export class SetoresService {
   */
   async findAll(query: QuerySetoresDto): Promise<Setores[]> {
     try {
+      const { campos, ...filtros } = query ?? {}; 
+
       const condicao: Prisma.SetoresWhereInput = {};
-      if (query.descricao) condicao.descricao = query.descricao;
-      if (query.empresaId) condicao.empresaId = query.empresaId;
-      if (query.status) condicao.status = query.status;
+      if (filtros.codigo) condicao.codigo = filtros.codigo;
+      if (filtros.descricao) condicao.descricao = filtros.descricao;
+      if (filtros.empresaId) condicao.empresaId = filtros.empresaId;
+      if (filtros.status) condicao.status = filtros.status;
+
+      const selecao = await this.buildSelect(campos);
 
       const listar = await this.prisma.client.setores.findMany({
         where: condicao,
+        select: selecao,
         orderBy: { descricao: 'asc' },
       });
 
@@ -240,5 +246,31 @@ export class SetoresService {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
       throw error;
     }
+  }
+
+  // METODO DE CONSULTA DINAMICA
+  private readonly allowedSetoresFiels = [
+    'id',
+    'codigo',
+    'descricao',
+    'empresaId',
+    'status',
+  ];
+
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedSetoresFiels.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
   }
 }

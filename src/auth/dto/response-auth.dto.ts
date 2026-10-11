@@ -5,8 +5,6 @@ import { OmitType, PickType } from '@nestjs/mapped-types';
 import { Expose, Type } from 'class-transformer';
 
 export class ResponseAuthDto extends OmitType(ResponseUsuarioDto, [
-  'empresaId',
-  'perfilId',
   'dataDesligamento',
   'senha',
   'pin',

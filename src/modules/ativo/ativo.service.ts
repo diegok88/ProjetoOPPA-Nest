@@ -7,21 +7,29 @@ import {
 import { CreateAtivoDto } from './dto/create-ativo.dto';
 import { UpdateAtivoDto } from './dto/update-ativo.dto';
 import { PrismaService } from '@/prisma/prisma.service';
-import { Ativo } from './entities/ativo.entity';
+import { Ativo, AtivoRelacoes } from './entities/ativo.entity';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import { QueryAtivoFilterDto } from './dto/query-ativo.dto';
 import { Acao, Prisma } from '@/generated/prisma/client';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { Contador } from '@/interfaces/counter.interface';
 
 @Injectable()
 export class AtivoService {
   private logger = new Logger(AtivoService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
 
-  async create(createAtivoDto: CreateAtivoDto): Promise<Ativo> {
+  async create(
+    createAtivoDto: CreateAtivoDto,
+    empresa: string,
+  ): Promise<Ativo> {
     try {
       const criar = await this.prisma.client.ativo.create({
-        data: { ...createAtivoDto },
+        data: { ...createAtivoDto, empresaId: empresa },
       });
       this.logger.log(TYPES_NOTICES.CREATE);
       return criar;
@@ -31,19 +39,54 @@ export class AtivoService {
     }
   }
 
-  async findAll(query: QueryAtivoFilterDto): Promise<Ativo[]> {
+  async findAll(
+    query: QueryAtivoFilterDto,
+    tx?: Prisma.TransactionClient, 
+  ): Promise<AtivoRelacoes[]> {
     try {
+      const client = tx ?? this.prisma.client;
+
+      const { campos, ...filtros } = query ?? {};
+
       const condicao: Prisma.AtivoWhereInput = {};
+      if (query.codigo) condicao.codigo = query.codigo;
       if (query.descricao) condicao.descricao = query.descricao;
       if (query.modelo) condicao.modelo = query.modelo;
       if (query.fabricante) condicao.fabricante = query.fabricante;
       if (query.ano) condicao.ano = query.ano;
       if (query.setorId) condicao.setorId = query.setorId;
+      if (query.empresaId) condicao.empresaId = query.empresaId;
       if (query.status) condicao.status = query.status;
 
-      const listar = await this.prisma.client.ativo.findMany({
+      const selecao = await this.buildSelect(campos);
+
+      const opcoes: Prisma.AtivoFindManyArgs = {
         where: condicao,
-      });
+        orderBy: { codigo: 'asc' },
+      };
+
+      if (campos?.length) {
+        opcoes.select = selecao;
+      } else {
+        opcoes.include =
+          filtros.incluir === 'todos_relacoes'
+            ? {
+                setor: true,
+                empresa: true,
+                competenciaAtivo: true,
+                tagAtivo: true,
+                falhaAtivo: true,
+              }
+            : filtros.incluir === 'empresa'
+              ? { empresa: true }
+              : filtros.incluir === 'competenciaAtivo'
+                ? { competenciaAtivo: true }
+                : filtros.incluir === 'falhaAtivo'
+                  ? { falhaAtivo: true }
+                  : { tagAtivo: true };
+      }
+
+      const listar: AtivoRelacoes[] = await client.ativo.findMany(opcoes);
 
       if (listar.length === 0) {
         this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
@@ -57,11 +100,43 @@ export class AtivoService {
     }
   }
 
-  async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Ativo> {
+  /* FUNÇÃO CONTADOR DE REGISTROS: TOTAL, ATIVOS E INATIVOS EM UMA ÚNICA QUERY */
+  async counter(): Promise<Contador> {
+    try {
+      const ctx = this.tenantContext.getStore()?.empresa;
+
+      const grupos = await this.prisma.ativo.groupBy({
+        by: ['status'],
+        where: { empresaId: ctx },
+        _count: { _all: true },
+      });
+
+      const ativos = grupos.find((g) => g.status === true)?._count._all ?? 0;
+      const inativos = grupos.find((g) => g.status === false)?._count._all ?? 0;
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return { total: ativos + inativos, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
+  async findOne(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<AtivoRelacoes> {
     try {
       const client = tx ?? this.prisma.client;
       const buscar = await client.ativo.findUnique({
         where: { id: id },
+        include: {
+          falhaAtivo: true,
+          tagAtivo: true,
+          competenciaAtivo: true,
+          empresa: true,
+          setor: true,
+        },
       });
 
       if (!buscar) {
@@ -95,6 +170,34 @@ export class AtivoService {
       return atualizarAtivo;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
+      throw error;
+    }
+  }
+
+  async active(id: string): Promise<Ativo> {
+    try {
+      const ativarAtivo = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (verificar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_ACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_ACTIVE);
+          }
+
+          const ativar = await tx.ativo.update({
+            where: { id: id },
+            data: { status: true, _auditAction: Acao.ACTIVE },
+          });
+
+          return ativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.ACTIVE);
+      return ativarAtivo;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - ACTIVE');
       throw error;
     }
   }
@@ -152,5 +255,34 @@ export class AtivoService {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
       throw error;
     }
+  }
+
+  // METODO DE CONSULTA DINAMICA
+  private readonly allowedAtivoFiels = [
+    'id',
+    'codigo',
+    'descricao',
+    'modelo',
+    'fabricante',
+    'ano',
+    'empresaId',
+    'status',
+  ];
+
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedAtivoFiels.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
   }
 }

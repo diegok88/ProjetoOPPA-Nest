@@ -47,6 +47,8 @@ export class PerfilService {
     try {
       const ctx = this.tennant.getStore()!;
 
+      const { campos, ...filtros } = query ?? {};
+
       const desPerfil = await this.findOne(ctx.perfil);
       const permitidos = desPerfil
         ? MAPA_VISIBILIDADE[desPerfil.descricao]
@@ -56,14 +58,19 @@ export class PerfilService {
       const condicao: Prisma.PerfilWhereInput = {
         AND: [
           { descricao: { in: permitidos } },
-          query.codigo ? { codigo: query.codigo } : {},
-          query.descricao ? { descricao: { contains: query.descricao } } : {},
-          query.status !== undefined ? { status: query.status } : {},
+          filtros.codigo ? { codigo: filtros.codigo } : {},
+          filtros.descricao
+            ? { descricao: { contains: filtros.descricao } }
+            : {},
+          filtros.status !== undefined ? { status: filtros.status } : {},
         ],
       };
 
+      const selecao = await this.buildSelect(campos);
+
       const listar = await this.prisma.client.perfil.findMany({
         where: condicao,
+        select: selecao,
         orderBy: { descricao: 'asc' },
       });
 
@@ -254,5 +261,30 @@ export class PerfilService {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
       throw error;
     }
+  }
+
+  // METODO DE CONSULTA DINAMICA
+  private readonly allowedPerfilFiels = [
+    'id',
+    'codigo',
+    'descricao',
+    'nivel',
+    'status',
+  ];
+
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedPerfilFiels.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
   }
 }

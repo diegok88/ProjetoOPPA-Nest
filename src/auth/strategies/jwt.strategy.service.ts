@@ -33,7 +33,7 @@ export class JwtStrategyService extends PassportStrategy(Strategy) {
       userId: payload.sub,
       perfil: payload.perfil,
       empresa: payload.empresa,
-      versao: payload.versao,
+      versao: payload.versaoToken,
     };
   }
 }

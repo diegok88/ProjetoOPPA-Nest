@@ -1,19 +1,11 @@
-import {
-  IsUUID,
-  IsString,
-  IsNotEmpty,
-  IsBoolean,
-  IsInt,
-  Min,
-  Length,
-  Matches,
-} from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsUUID, IsString, IsNotEmpty, Length, Matches } from 'class-validator';
 
 export class CreateFalhaDto {
-  @IsInt({ message: 'O código deve ser um número inteiro.' })
-  @Min(0, { message: 'O código não deve ser um valor negativo.' })
+  @IsString({ message: 'A código não é do tipo String.' })
   @IsNotEmpty({ message: 'O código é um campo obrigatório.' })
-  codigo!: number;
+  @Transform(({ value }) => value.toUpperCase())
+  codigo!: string;
 
   @IsString({ message: 'A descrição não é do tipo String.' })
   @IsNotEmpty({ message: 'A descrição é um campo obrigatório.' })
@@ -25,6 +17,7 @@ export class CreateFalhaDto {
     message:
       'A descrição deve conter letras maisculas e minusculas, sem numeros e caracteres especiais.',
   })
+  @Transform(({ value }) => value.toUpperCase())
   descricao!: string;
 
   @IsUUID('all', { message: 'Ativo id inválido.' })

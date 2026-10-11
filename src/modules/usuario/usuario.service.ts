@@ -6,8 +6,6 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import {
   BadRequestException,
-  forwardRef,
-  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -17,7 +15,6 @@ import * as bcrypt from 'bcrypt';
 import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
 import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
 import { GestorService } from '../gestor/gestor.service';
-import { PerfilService } from '../perfil/perfil.service';
 import {
   CreateUsuarioDto,
   CreateUsuarioMaster,
@@ -26,12 +23,14 @@ import {
   UpdateUsuarioDto,
   UpdateUsuarioPasswordDto,
 } from './dto/update-usuario.dto';
-import { Usuario, UsuarioRelacao } from './entities/usuario.entity';
+import { Usuario, UsuarioListagem } from './entities/usuario.entity';
 import {
   QueryBagdeEnterpriceDto,
   QueryUsuarioFilterDto,
 } from './dto/query-usuario.dto';
 import { Contador } from '@/interfaces/counter.interface';
+import { CompetenciaSetorialOrquestradorService } from '@/services-orchestrator/competencia-setorial/competencia-setorial-orquestrador.service';
+import { GestorOrquestradorService } from '@/services-orchestrator/gestor/gestor.service';
 
 @Injectable()
 export class UsuarioService {
@@ -40,9 +39,8 @@ export class UsuarioService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly contadorCracha: ContadorCrachaService,
-    @Inject(forwardRef(() => PerfilService))
-    private readonly perfil: PerfilService,
-    private readonly gestor: GestorService,
+    private readonly gestorOrq: GestorOrquestradorService,
+    private readonly compSetOrq: CompetenciaSetorialOrquestradorService,
     private readonly tenantContext: TenantContextService,
   ) {}
 
@@ -84,7 +82,7 @@ export class UsuarioService {
     try {
       const criarUsuario = await this.prisma.client.$transaction(
         async (tx: any) => {
-          const usuario = this.tenantContext.getStore()!;
+          const ctx = this.tenantContext.getStore()!;
 
           const senhaHash = await this.generateHash(PasswordPin.password);
           const pinHash = await this.generateHash(PasswordPin.pin);
@@ -94,8 +92,8 @@ export class UsuarioService {
           if (create.empresaId) {
             dadosContador = { empresaId: create.empresaId ?? '' };
           } else {
-            dadosContador = { empresaId: usuario.empresa ?? '' };
-            create.empresaId = usuario.empresa;
+            dadosContador = { empresaId: ctx.empresa ?? '' };
+            create.empresaId = ctx.empresa;
           }
 
           this.logger.debug(dadosContador);
@@ -114,7 +112,7 @@ export class UsuarioService {
             },
           });
 
-          await this.gestor.create(criar.id, tx);
+          await this.gestorOrq.create(criar.id, ctx.user, tx);
 
           return criar;
         },
@@ -132,9 +130,10 @@ export class UsuarioService {
   async findAll(
     query?: QueryUsuarioFilterDto,
     tx?: Prisma.TransactionClient,
-  ): Promise<Usuario[]> {
+  ): Promise<UsuarioListagem[]> {
     try {
-      const usuario = this.tenantContext.getStore();
+      const ctx = this.tenantContext.getStore()!;
+
       const client = tx ?? this.prisma.client;
 
       const { campos, ...filtros } = query ?? {};
@@ -143,7 +142,7 @@ export class UsuarioService {
       // Condição de registro não deve retornar
       condicao.AND = [
         { nome: { not: 'USUARIO MASTER' } },
-        { id: { not: usuario?.user } },
+        { id: { not: ctx?.user } },
       ];
 
       if (filtros.cracha) condicao.cracha = filtros.cracha;
@@ -161,10 +160,62 @@ export class UsuarioService {
 
       const selecao = await this.buildSelect(campos);
 
-      const listar = await client.usuario.findMany({
+      const INCLUDES: Record<string, Prisma.UsuarioInclude> = {
+        todos_relacoes: {
+          perfil: true,
+          empresa: true,
+          gestorComoColaborador: { include: { gestor: true } },
+        },
+        todos_relacoes_parcial: {
+          perfil: { select: { descricao: true, nivel: true } },
+          empresa: { select: { razaoSocial: true } },
+          gestorComoColaborador: {
+            select: {
+              id: true,
+              gestor: { select: { nome: true, cracha: true } },
+            },
+          },
+        },
+        perfil: { perfil: true },
+        empresa: { empresa: true },
+        gestorComoColaborador: { gestorComoColaborador: true },
+        perfil_parcial: {
+          perfil: { select: { descricao: true, nivel: true } },
+        },
+        empresa_parcial: {
+          empresa: { select: { razaoSocial: true } },
+        },
+        gestor_parcial: {
+          gestorComoColaborador: {
+            select: {
+              id: true,
+              gestor: { select: { nome: true, cracha: true } },
+            },
+          },
+        },
+      };
+
+      const opcoes: Prisma.UsuarioFindManyArgs = {
         where: condicao,
-        select: selecao,
-      });
+        orderBy: { cracha: 'asc' },
+      };
+
+      if (campos?.length) {
+        opcoes.select = selecao;
+      } else {
+        const incluir =
+          filtros.incluir && INCLUDES[filtros.incluir]
+            ? INCLUDES[filtros.incluir]
+            : undefined;
+
+        if (incluir) opcoes.include = incluir;
+      }
+
+      const listar: Usuario[] = await client.usuario.findMany(opcoes);
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
 
       this.logger.log(TYPES_NOTICES.FIND_ALL);
       return listar;
@@ -177,16 +228,16 @@ export class UsuarioService {
   /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS */
   async counter(): Promise<Contador> {
     try {
-      const total = await this.prisma.usuario.count();
-      const ativos = await this.prisma.usuario.count({
-        where: { status: true },
-      });
-      const inativos = await this.prisma.usuario.count({
-        where: { status: false },
+      const grupos = await this.prisma.usuario.groupBy({
+        by: ['status'],
+        _count: { _all: true },
       });
 
+      const ativos = grupos.find((g) => g.status === true)?._count._all ?? 0;
+      const inativos = grupos.find((g) => g.status === false)?._count._all ?? 0;
+
       this.logger.log(TYPES_NOTICES.COUNTER);
-      return { total, ativos, inativos };
+      return { total: ativos + inativos, ativos, inativos };
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
       throw error;
@@ -201,20 +252,17 @@ export class UsuarioService {
   async findOne(
     id: string,
     tx?: Prisma.TransactionClient,
-  ): Promise<UsuarioRelacao> {
+  ): Promise<UsuarioListagem> {
     try {
       const client = tx ?? this.prisma.client;
 
       const buscar = await client.usuario.findUnique({
         where: { id: id },
         include: {
-          perfil: { select: { descricao: true, nivel: true } },
-          empresa: { select: { razaoSocial: true } },
+          perfil: true,
+          empresa: true,
           gestorComoColaborador: {
-            select: {
-              id: true,
-              gestor: { select: { nome: true, cracha: true } },
-            },
+            include: { gestor: true },
           },
         },
       });
@@ -226,7 +274,7 @@ export class UsuarioService {
 
       this.logger.log(TYPES_NOTICES.FIND_ONE);
 
-      return buscar as UsuarioRelacao;
+      return buscar;
     } catch (error) {
       this.logger.error('Falha na busca do usuário.');
       throw error;
@@ -271,8 +319,9 @@ export class UsuarioService {
 
   /*
   ATUALIZA USUARIO PELO ID: 
-  - atualiza todos os dados
-  - ajustar o mesmo de acordo com o perfil do usuario
+  - atualiza todos os dados.
+  - ajustar o mesmo de acordo com o perfil do usuario.
+  - ao atualizar o turno se o usuario for gestor o mesmo inativa suas competencias.
   */
   async update(id: string, update: UpdateUsuarioDto): Promise<Usuario> {
     try {
@@ -282,6 +331,10 @@ export class UsuarioService {
           if (!buscar) {
             this.logger.warn(TYPES_NOTICES.NOT_FOUND);
             throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+          }
+
+          if (update.turno !== buscar.turno) {
+            await this.compSetOrq.deactiveAllCompSet(id, tx);
           }
 
           const atualizar = await tx.usuario.update({
@@ -313,9 +366,9 @@ export class UsuarioService {
     try {
       const atualizarUsuario = await this.prisma.client.$transaction(
         async (tx: any) => {
-          const usuario = this.tenantContext.getStore()!;
+          const ctx = this.tenantContext.getStore()!;
 
-          const buscar = await this.findOne(usuario.user, tx);
+          const buscar = await this.findOne(ctx.user, tx);
 
           if (!buscar) {
             this.logger.warn(TYPES_NOTICES.NOT_FOUND);
@@ -349,8 +402,8 @@ export class UsuarioService {
           else dado.pin = novoHash;
 
           const atualizar = await tx.usuario.update({
-            where: { id: usuario.user },
-            data: dado,
+            where: { id: ctx.user },
+            data: { ...dado, versaoToken: buscar.versaoToken + 1 },
           });
 
           return atualizar;
@@ -373,6 +426,8 @@ export class UsuarioService {
     try {
       const ativarUsuario = await this.prisma.client.$transaction(
         async (tx: any) => {
+          const ctx = this.tenantContext.getStore()!;
+
           const buscar = await this.findOne(id, tx);
           if (!buscar) {
             this.logger.warn(TYPES_NOTICES.NOT_FOUND);
@@ -388,7 +443,7 @@ export class UsuarioService {
             },
           });
 
-          await this.gestor.active(ativar.id, tx);
+          await this.gestorOrq.active(ativar.id, ctx, tx);
 
           return ativar;
         },
@@ -411,6 +466,8 @@ export class UsuarioService {
     try {
       const inativarUsuario = await this.prisma.client.$transaction(
         async (tx: any) => {
+          const ctx = this.tenantContext.getStore()!;
+
           const buscar = await this.findOne(id, tx);
           if (!buscar) {
             this.logger.warn(TYPES_NOTICES.NOT_FOUND);
@@ -426,7 +483,7 @@ export class UsuarioService {
             },
           });
 
-          await this.gestor.deactive(inativar.id, tx);
+          await this.gestorOrq.deactive(inativar.id, ctx, tx);
 
           return inativar;
         },
@@ -507,8 +564,6 @@ export class UsuarioService {
     try {
       const deletarUsuario = await this.prisma.client.$transaction(
         async (tx: any) => {
-          const usuario = this.tenantContext.getStore()!;
-
           const buscar = await this.findOne(id, tx);
 
           if (buscar.status === true) {
@@ -523,7 +578,7 @@ export class UsuarioService {
           }
           */
 
-          await this.gestor.remove(buscar.id, tx);
+          await this.gestorOrq.remove(buscar.id, tx);
 
           const deletar = await tx.usuario.delete({
             where: { id: id },
@@ -615,6 +670,7 @@ export class UsuarioService {
     'empresaId',
     'status',
   ];
+
   private async buildSelect(
     campos?: string,
   ): Promise<Record<string, true> | undefined> {

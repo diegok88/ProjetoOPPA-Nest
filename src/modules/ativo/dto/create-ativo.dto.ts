@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   IsString,
   IsNotEmpty,
@@ -20,6 +21,7 @@ export class CreateAtivoDto {
     message:
       'A descrição deve conter letras maisculas e minusculas, sem numeros e caracteres especiais.',
   })
+  @Transform(({ value }) => value.toUpperCase())
   descricao!: string;
 
   @IsString({ message: 'O modelo não é do tipo String.' })
@@ -31,17 +33,19 @@ export class CreateAtivoDto {
   @Matches(/^[a-zA-Z0-9]+$/, {
     message: 'O modelo deve conter apenas letras e números',
   })
+  @Transform(({ value }) => value.toUpperCase())
   modelo!: string;
 
   @IsString({ message: 'O fabricante não é do tipo String.' })
   @IsNotEmpty({ message: 'O fabricante é um campo obrigatório.' })
-  @Length(5, 100, {
+  @Length(3, 100, {
     message:
       'O fabricante deve conter no minimo 10 caracteres e no maximo 100 caracteres.',
   })
   @Matches(/^[a-zA-Z0-9]+$/, {
     message: 'O fabricante deve conter apenas letras e números',
   })
+  @Transform(({ value }) => value.toUpperCase())
   fabricante!: string;
 
   @IsNumber({}, { message: 'O ano não é do tipo Number.' })
