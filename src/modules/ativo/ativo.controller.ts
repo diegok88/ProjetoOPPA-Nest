@@ -31,8 +31,7 @@ import { PerfilService } from '../perfil/perfil.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AtivoController {
   constructor(
-    private readonly ativoService: AtivoService,
-    private readonly perfilService: PerfilService,
+    private readonly ativoService: AtivoService, 
     private readonly tennantContext: TenantContextService,
   ) {}
 

@@ -3,19 +3,18 @@ import { Prisma } from '@/generated/prisma/client';
 import { Acao } from '@/generated/prisma/enums';
 import { PrismaService } from '@/prisma/prisma.service';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { QueryGestorFilterDto } from './dto/query-gestor.dto';
 import {
   Gestor,
+  GestorListagem,
   GestorRelacoes,
   GestorUsuario,
 } from './entities/gestor.entity';
 import { ResponseGestorRelacoesParcialDto } from './dto/response-gestor.dto';
 import { Contador } from '@/interfaces/counter.interface';
+import { PerfilService } from '../perfil/perfil.service';
+import { ROLES } from '@/auth/guards/roles.const';
 
 @Injectable()
 export class GestorService {
@@ -23,6 +22,7 @@ export class GestorService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly perfilService: PerfilService,
     private readonly tenantContext: TenantContextService,
   ) {}
 
@@ -60,18 +60,74 @@ export class GestorService {
   async findAll(
     query: QueryGestorFilterDto,
     tx?: Prisma.TransactionClient,
-  ): Promise<Gestor[]> {
+  ): Promise<GestorListagem[]> {
     try {
+      const ctx = this.tenantContext.getStore()!;
+
+      const buscarPerfil = await this.perfilService.findOne(ctx.perfil, tx);
+      const perfil = `${buscarPerfil.descricao} - ${buscarPerfil.nivel}`;
+
       const client = tx ?? this.prisma.client;
 
-      const condicao: Prisma.GestorWhereInput = {};
-      if (query.colaboradorId) condicao.colaboradorId = query.colaboradorId;
-      if (query.gestorId) condicao.gestorId = query.gestorId;
-      if (query.status) condicao.status = query.status;
+      const { campos, ...filtros } = query ?? {};
 
-      const listar = await client.gestor.findMany({
+      this.logger.debug(query);
+
+      const condicao: Prisma.GestorWhereInput = {};
+      if (filtros.colaboradorId) condicao.colaboradorId = filtros.colaboradorId;
+      if (filtros.gestorId) condicao.gestorId = filtros.gestorId;
+      if (filtros.status) condicao.status = filtros.status;
+      if (filtros.gestor === true) condicao.gestorId = ctx.user;
+      else if (filtros.gestor === false) {
+        if (perfil === ROLES.ADN1) {
+          const filtroUsuario: Prisma.GestorWhereInput['gestor'] = {};
+          if (!filtroUsuario.empresaId) filtroUsuario.empresaId = ctx.empresa;
+          if (Object.keys(filtroUsuario).length > 0)
+            condicao.gestor = filtroUsuario;
+        }
+      }
+
+      this.logger.debug(condicao);
+
+      const selecao = await this.buildSelect(campos);
+
+      const INCLUDES: Record<string, Prisma.GestorInclude> = {
+        todos_relacoes: { colaborador: true, gestor: true },
+        todos_parcial: {
+          colaborador: { select: { id: true, cracha: true, nome: true } },
+          gestor: { select: { id: true, cracha: true, nome: true } },
+        },
+        colaborador_parcial: {
+          colaborador: { select: { id: true, cracha: true, nome: true } },
+        },
+        gestor_usuario: {
+          colaborador: {
+            include: {
+              perfil: { select: { descricao: true, nivel: true } },
+              empresa: { select: { razaoSocial: true } },
+            },
+          },
+          gestor: { select: { cracha: true, nome: true } },
+        },
+      };
+
+      const opcoes: Prisma.GestorFindManyArgs = {
         where: condicao,
-      });
+        orderBy: { colaborador: { cracha: 'asc' } },
+      };
+
+      if (campos?.length) {
+        opcoes.select = selecao;
+      } else {
+        const incluir =
+          filtros.incluir && INCLUDES[filtros.incluir]
+            ? INCLUDES[filtros.incluir]
+            : undefined;
+
+        if (incluir) opcoes.include = incluir;
+      }
+
+      const listar: Gestor[] = await client.gestor.findMany(opcoes);
 
       if (listar.length === 0) {
         this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
@@ -160,20 +216,19 @@ export class GestorService {
   /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS */
   async counter(): Promise<Contador> {
     try {
-      const ctx = this.tenantContext.getStore()?.user;
+      const ctx = this.tenantContext.getStore()!;
 
-      const total = await this.prisma.gestor.count({
-        where: { gestorId: ctx },
+      const grupos = await this.prisma.gestor.groupBy({
+        by: ['status'],
+        where: { gestorId: ctx.user },
+        _count: { _all: true },
       });
-      const ativos = await this.prisma.gestor.count({
-        where: { gestorId: ctx, status: true },
-      });
-      const inativos = await this.prisma.gestor.count({
-        where: { gestorId: ctx, status: false },
-      });
+
+      const ativos = grupos.find((g) => g.status === true)?._count._all ?? 0;
+      const inativos = grupos.find((g) => g.status === false)?._count._all ?? 0;
 
       this.logger.log(TYPES_NOTICES.COUNTER);
-      return { total, ativos, inativos };
+      return { total: ativos + inativos, ativos, inativos };
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
       throw error;
@@ -338,5 +393,29 @@ export class GestorService {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - removeall');
       throw error;
     }
+  }
+
+  private readonly allowedGestorFiels = [
+    'id',
+    'colaboradorId',
+    'gestorId',
+    'status',
+  ];
+
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedGestorFiels.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
   }
 }

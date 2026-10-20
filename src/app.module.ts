@@ -28,6 +28,8 @@ import { CompetenciaOperacionalModule } from './modules/competencia-operacional/
 import { FalhasModule } from './modules/falhas/falhas.module';
 import { SolucoesModule } from './modules/solucoes/solucoes.module';
 import { AlocacaoModule } from './modules/alocacao/alocacao.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { SchedulesModule } from './schedule/schedules.module';
 
 @Module({
   imports: [
@@ -35,6 +37,8 @@ import { AlocacaoModule } from './modules/alocacao/alocacao.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    ScheduleModule.forRoot(),
+    SchedulesModule,
     TenantContextModule,
     PrismaModule,
     UsuarioModule,

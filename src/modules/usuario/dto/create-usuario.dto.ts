@@ -1,6 +1,6 @@
 import { TipoEscala, TipoTurno } from '@/generated/prisma/enums';
 import { OmitType, PickType } from '@nestjs/mapped-types';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsDate,
   IsEnum,
@@ -27,10 +27,12 @@ export class CreateUsuarioDto {
   @Transform(({ value }) => value.toUpperCase())
   nome!: string;
 
+  @Type(() => Date)
   @IsDate({ message: 'Data de nascimento não é do tipo Date.' })
   @IsNotEmpty({ message: 'Data de nascimento é um campo obrigatório.' })
   dataNascimento!: Date;
 
+  @Type(() => Date)
   @IsDate({ message: 'Data de admissão não é do tipo Date.' })
   @IsNotEmpty({ message: 'Data de admissão é um campo obrigatório.' })
   dataAdmissao!: Date;

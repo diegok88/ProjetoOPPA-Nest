@@ -21,12 +21,12 @@ export class GestorController {
   constructor(private readonly gestorService: GestorService) {}
 
   @Get()
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findAll(
     @Query() query: QueryGestorFilterDto,
-  ): Promise<ResponseGestorDto[]> {
+  ): Promise<ResponseGestorRelacoesParcialDto[]> {
     const dados = await this.gestorService.findAll(query);
-    return plainToInstance(ResponseGestorDto, dados);
+    return plainToInstance(ResponseGestorRelacoesParcialDto, dados);
   }
 
   @Get('gestor_colaborador')
@@ -57,7 +57,7 @@ export class GestorController {
   }
 
   @Get('counter')
-  @Roles(ROLES.ASN1, ROLES.ADN1) 
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async counter(): Promise<ResponseGestorContadorDto> {
     const contador = await this.gestorService.counter();
     return plainToInstance(ResponseGestorContadorDto, contador);

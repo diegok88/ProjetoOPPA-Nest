@@ -1,11 +1,10 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { PerfilService } from './perfil.service';
 import { PerfilController } from './perfil.controller';
-import { AuditoriaModule } from '../auditoria/auditoria.module';
-import { UsuarioModule } from '../usuario/usuario.module';
+import { UsuarioOrquestradorModule } from '@/services-orchestrator/usuario/usuario-orquestrador.module';
 
 @Module({
-  imports: [forwardRef(() => UsuarioModule)],
+  imports: [UsuarioOrquestradorModule],
   controllers: [PerfilController],
   providers: [PerfilService],
   exports: [PerfilService],

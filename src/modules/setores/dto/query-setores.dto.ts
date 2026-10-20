@@ -1,14 +1,18 @@
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
   IsUUID,
 } from 'class-validator';
 
-export class QuerySetoresDto { 
+export class QuerySetoresDto {
   @IsOptional()
-  @IsNumber({}, { message: 'Código não é do tipo Number' })
+  @Type(() => Number)
+  @IsInt({ message: 'Código não é do tipo Inteiro!' })
+  @IsNumber({}, { message: 'Código não é do tipo Number!' })
   codigo?: number;
 
   @IsOptional()
@@ -20,6 +24,9 @@ export class QuerySetoresDto {
   empresaId?: string;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  )
   @IsBoolean({ message: 'Status não é do tipo Boolean!' })
   status?: boolean;
 

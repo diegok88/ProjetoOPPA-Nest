@@ -97,9 +97,6 @@ enum TipoTurno {
   COMERCIAL
 }
 
-/**
- * ENTIDADE FORTE
- */
 model Perfil {
   id        String  @id @default(uuid())
   codigo    Int     @default(autoincrement())
@@ -127,16 +124,18 @@ model Gestor {
 }
 
 model Penalidade {
-  id             String         @id @default(uuid())
-  usuarioId      String
-  colaborador    Usuario        @relation("colaborador", fields: [usuarioId], references: [id])
-  gestorId       String
-  gestor         Usuario        @relation("gestor", fields: [gestorId], references: [id])
-  tipoPenalidade TipoPenalidade
-  dataInicial    DateTime
-  dataFinal      DateTime
-  justificativa  String?
-  status         Boolean        @default(true)
+  id                 String             @id @default(uuid())
+  codigo             Int                @default(autoincrement())
+  colaboradorId      String
+  colaborador        Usuario            @relation("colaborador", fields: [colaboradorId], references: [id])
+  gestorId           String
+  gestor             Usuario            @relation("gestor", fields: [gestorId], references: [id])
+  tipoPenalidade     TipoPenalidade
+  dataInicial        DateTime
+  dataFinal          DateTime
+  justificativa      String?
+  situacaoPenalidade SituacaoPenalidade
+  status             Boolean            @default(true)
 
   @@map("penalidade")
 }
@@ -144,19 +143,28 @@ model Penalidade {
 enum TipoPenalidade {
   ORIENTACAO
   ADVERTENCIA
-  SUSPENCAO
+  SUSPENSAO
+}
+
+enum SituacaoPenalidade {
+  PENDENTE
+  CANCELADA
+  EXECUCAO
+  FINALIZADA
 }
 
 model Dispensa {
-  id           String       @id @default(uuid())
-  usuarioId    String
-  colaborador  Usuario      @relation("colaborador", fields: [usuarioId], references: [id])
-  gestorId     String
-  gestor       Usuario      @relation("gestor", fields: [gestorId], references: [id])
-  tipoDispensa TipoDispensa
-  dataInicial  DateTime
-  dataFinal    DateTime
-  status       Boolean      @default(true)
+  id               String           @id @default(uuid())
+  codigo           Int              @default(autoincrement())
+  colaboradorId    String
+  colaborador      Usuario          @relation("colaborador", fields: [colaboradorId], references: [id])
+  gestorId         String
+  gestor           Usuario          @relation("gestor", fields: [gestorId], references: [id])
+  tipoDispensa     TipoDispensa
+  situacaoDispensa SituacaoDispensa
+  dataInicial      DateTime
+  dataFinal        DateTime
+  status           Boolean          @default(true)
 
   @@map("dispensa")
 }
@@ -165,6 +173,13 @@ enum TipoDispensa {
   BANCO_DE_HORAS
   FERIAS
   ATESTADO
+}
+
+enum SituacaoDispensa {
+  PENDENTE
+  CANCELADA
+  EXECUCAO
+  FINALIZADA
 }
 
 model ControleJornada {
@@ -277,6 +292,7 @@ model TipoSolicitacao {
 
 model AlocacaoOperacional {
   id         String           @id @default(uuid())
+  codigo     Int              @default(autoincrement())
   operadorId String
   operador   Usuario          @relation("operador", fields: [operadorId], references: [id])
   gestorId   String
@@ -399,6 +415,7 @@ model TagAtivo {
 
 model CompetenciaOperacional {
   id         String  @id @default(uuid())
+  codigo     Int     @default(autoincrement())
   operadorId String
   operador   Usuario @relation("operador", fields: [operadorId], references: [id])
   gestorId   String

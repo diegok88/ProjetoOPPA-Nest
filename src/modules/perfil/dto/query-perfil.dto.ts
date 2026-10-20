@@ -1,10 +1,16 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreatePerfilDto } from './create-perfil.dto';
-import { IsBoolean, IsNumber, IsOptional, IsString } from 'class-validator';
-import { Transform } from 'class-transformer';
+import {
+  IsBoolean,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 
 export class QueryPerfilFilterDto {
   @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Código não é do tipo Inteiro!' })
   @IsNumber({}, { message: 'Código não é do tipo Number!' })
   codigo?: number;
 
@@ -19,6 +25,9 @@ export class QueryPerfilFilterDto {
   nivel?: string;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  )
   @IsBoolean({ message: 'Status não é do tipo Boolean!' })
   status?: boolean;
 

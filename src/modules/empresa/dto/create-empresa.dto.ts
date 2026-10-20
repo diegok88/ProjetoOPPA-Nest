@@ -8,90 +8,107 @@ import {
   MaxLength,
 } from 'class-validator';
 
+const toUpperIfString = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? value.toUpperCase() : value;
+
 export class CreateEmpresaDto {
-  @IsString({ message: 'O cnpj não é do tipo String.' })
-  @IsNotEmpty({ message: 'O cnpj é um campo obrigatório.' })
-  @Length(14, 14, { message: 'O cnpj deve conter apenas 14 caracteres.' })
-  @Matches(/^\d+$/, {
-    message: 'O cnpj deve conter apenas números',
+  @IsString({ message: 'O CNPJ deve ser um texto.' })
+  @IsNotEmpty({ message: 'O CNPJ é um campo obrigatório.' })
+  @Length(14, 14, {
+    message: (args) =>
+      `O CNPJ deve conter exatamente ${args.constraints[0]} caracteres.`,
   })
+  @Matches(/^\d+$/, { message: 'O CNPJ deve conter apenas números.' })
   cnpj!: string;
 
-  @IsString({ message: 'A razao social não é do tipo String.' })
-  @IsNotEmpty({ message: 'A razao social é um campo obrigatório.' })
+  @IsString({ message: 'A razão social deve ser um texto.' })
+  @IsNotEmpty({ message: 'A razão social é um campo obrigatório.' })
   @Length(10, 100, {
-    message:
-      'A razao social deve conter no minimo 10 caracteres e no maximo 100 caracteres.',
+    message: (args) =>
+      `A razão social deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
   })
-  @Transform(({ value }) => value.toUpperCase())
+  @Transform(toUpperIfString)
   razaoSocial!: string;
 
-  @IsString({ message: 'O nome fantasia não é do tipo String.' })
+  @IsString({ message: 'O nome fantasia deve ser um texto.' })
   @IsNotEmpty({ message: 'O nome fantasia é um campo obrigatório.' })
   @Length(10, 100, {
-    message:
-      'O nome fantasia deve conter no minimo 10 caracteres e no maximo 100 caracteres.',
+    message: (args) =>
+      `O nome fantasia deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
   })
-  @Transform(({ value }) => value.toUpperCase())
+  @Transform(toUpperIfString)
   nomeFantasia!: string;
 
-  @IsString({ message: 'O contato não é do tipo String.' })
+  @IsString({ message: 'O contato deve ser um texto.' })
   @IsNotEmpty({ message: 'O contato é um campo obrigatório.' })
-  @Length(11, 11, { message: 'O contato deve conter apenas 11 caracteres.' })
-  @Matches(/^\d+$/, {
-    message: 'O contato deve conter apenas números',
+  @Length(11, 11, {
+    message: (args) =>
+      `O contato deve conter exatamente ${args.constraints[0]} caracteres.`,
   })
+  @Matches(/^\d+$/, { message: 'O contato deve conter apenas números.' })
   contato!: string;
 
-  @IsEmail({}, { message: 'O dado não é um email' })
-  @IsNotEmpty({ message: 'O email é um campo obrigatório.' })
+  @IsString({ message: 'O e-mail deve ser um texto.' })
+  @IsNotEmpty({ message: 'O e-mail é um campo obrigatório.' })
+  @IsEmail(
+    {},
+    {
+      message:
+        'O e-mail informado é inválido. Informe um e-mail no formato nome@dominio.com.',
+    },
+  )
   email!: string;
 
-  @IsString({ message: 'A rua não é do tipo String.' })
+  @IsString({ message: 'A rua deve ser um texto.' })
   @IsNotEmpty({ message: 'A rua é um campo obrigatório.' })
   @Length(5, 50, {
-    message:
-      'A rua deve conter no minimo 5 caracteres e no maximo 50 caracteres.',
+    message: (args) =>
+      `A rua deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
   })
-  @Transform(({ value }) => value.toUpperCase())
+  @Transform(toUpperIfString)
   rua!: string;
 
-  @IsString({ message: 'O numero não é do tipo String.' })
-  @IsNotEmpty({ message: 'O numero é um campo obrigatório.' })
-  @MaxLength(20, { message: 'O numero deve conter no maximo 20 caracteres.' })
+  @IsString({ message: 'O número deve ser um texto.' })
+  @IsNotEmpty({ message: 'O número é um campo obrigatório.' })
+  @MaxLength(20, {
+    message: (args) =>
+      `O número deve conter no máximo ${args.constraints[0]} caracteres.`,
+  })
   numero!: string;
 
-  @IsString({ message: 'O bairro não é do tipo String.' })
+  @IsString({ message: 'O bairro deve ser um texto.' })
   @IsNotEmpty({ message: 'O bairro é um campo obrigatório.' })
   @Length(5, 50, {
-    message:
-      'O bairro deve conter no minimo 5 caracteres e no maximo 50 caracteres.',
+    message: (args) =>
+      `O bairro deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
   })
-  @Transform(({ value }) => value.toUpperCase())
+  @Transform(toUpperIfString)
   bairro!: string;
 
-  @IsString({ message: 'A cidade não é do tipo String.' })
+  @IsString({ message: 'A cidade deve ser um texto.' })
   @IsNotEmpty({ message: 'A cidade é um campo obrigatório.' })
   @Length(5, 50, {
-    message:
-      'A cidade deve conter no minimo 5 caracteres e no maximo 50 caracteres.',
+    message: (args) =>
+      `A cidade deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
   })
-  @Transform(({ value }) => value.toUpperCase())
+  @Transform(toUpperIfString)
   cidade!: string;
 
-  @IsString({ message: 'O estado não é do tipo String.' })
+  @IsString({ message: 'O estado deve ser um texto.' })
   @IsNotEmpty({ message: 'O estado é um campo obrigatório.' })
   @Length(2, 2, {
-    message: 'O estado deve conter apenas a abreviação sendo 2 caracteres.',
+    message: (args) =>
+      `O estado deve conter exatamente ${args.constraints[0]} caracteres (sigla UF).`,
   })
-  @Transform(({ value }) => value.toUpperCase())
+  @Transform(toUpperIfString)
   estado!: string;
 
-  @IsString({ message: 'O cep não é do tipo String.' })
-  @IsNotEmpty({ message: 'O cep é um campo obrigatórioo.' })
-  @Length(8, 8, { message: 'O cep  conter apenas 8 caracteres.' })
-  @Matches(/^\d+$/, {
-    message: 'O cep deve conter apenas números',
+  @IsString({ message: 'O CEP deve ser um texto.' })
+  @IsNotEmpty({ message: 'O CEP é um campo obrigatório.' })
+  @Length(8, 8, {
+    message: (args) =>
+      `O CEP deve conter exatamente ${args.constraints[0]} caracteres.`,
   })
+  @Matches(/^\d+$/, { message: 'O CEP deve conter apenas números.' })
   cep!: string;
 }

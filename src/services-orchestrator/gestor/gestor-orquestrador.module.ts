@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { GestorOrquestradorService } from './gestor.service';
+import { GestorOrquestradorService } from './gestor-orquestrador.service';
 
 @Module({
   providers: [GestorOrquestradorService],

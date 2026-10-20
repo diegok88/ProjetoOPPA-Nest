@@ -1,5 +1,8 @@
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -8,6 +11,12 @@ import {
 } from 'class-validator';
 
 export class QuerySolucoesFilterDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Código não é do tipo Inteiro!' })
+  @IsNumber({}, { message: 'Código não é do tipo Number!' })
+  codigo?: number;
+
   @IsOptional()
   @IsUUID('all', { message: 'Ativo id inválida.' })
   ativoId!: string;
@@ -33,6 +42,9 @@ export class QuerySolucoesFilterDto {
   descricao!: string;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  )
   @IsBoolean({ message: 'Status não é do tipo Boolean!' })
   status?: boolean;
 

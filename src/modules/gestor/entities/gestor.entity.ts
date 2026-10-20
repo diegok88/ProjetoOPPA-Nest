@@ -27,3 +27,11 @@ export type GestorUsuario = Prisma.GestorGetPayload<{
     gestor: { select: { cracha: true; nome: true } };
   };
 }>;
+
+export type GestorColaborador = Prisma.GestorGetPayload<{
+  include: {
+    colaborador: { select: { id: true; cracha: true; nome: true } };
+  };
+}>;
+
+export type GestorListagem = Gestor | GestorComRelacoes | GestorUsuario;

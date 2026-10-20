@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsOptional,
@@ -37,6 +38,9 @@ export class QueryFalhasFilterDto {
   direcionamentoId?: string;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
   @IsBoolean({ message: 'Status não é do tipo Boolean!' })
   status?: boolean;
 

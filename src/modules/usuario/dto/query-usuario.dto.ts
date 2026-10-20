@@ -2,6 +2,7 @@ import {
   IsBoolean,
   IsDate,
   IsEnum,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -9,13 +10,14 @@ import {
   IsUUID,
   Length,
   Matches,
-  MinLength,
 } from 'class-validator';
 import { TipoTurno, TipoEscala } from '@/generated/prisma/enums';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 export class QueryUsuarioFilterDto {
   @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Crachá não é do tipo Inteiro!' })
   @IsNumber({}, { message: 'Crachá não é do tipo Number' })
   cracha?: number;
 
@@ -63,7 +65,10 @@ export class QueryUsuarioFilterDto {
   empresaId?: string;
 
   @IsOptional()
-  @IsBoolean({ message: 'O status não é do tipo Boolean.' })
+  @Transform(({ value }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  )
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
   status?: boolean;
 
   @IsOptional()

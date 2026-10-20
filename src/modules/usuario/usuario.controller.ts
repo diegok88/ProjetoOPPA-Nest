@@ -34,10 +34,8 @@ import {
 import { UsuarioService } from './usuario.service';
 import { QueryUsuarioFilterDto } from './dto/query-usuario.dto';
 import { Auth } from '@/auth/entities/auth.entity';
-import { AuthService } from '@/auth/auth.service';
 import type { Response } from 'express';
 import { GenerateTokenService } from '@/auth/jwt-generate-token/jwt-generate-token.service';
-import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 
 @Controller('usuario')
 @UseGuards(JwtAuthGuard, RolesGuard)

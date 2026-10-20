@@ -16,6 +16,7 @@ import { QueryPerfilFilterDto } from './dto/query-perfil.dto';
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 import { Contador } from '@/interfaces/counter.interface';
 import { QueryUsuarioFilterDto } from '../usuario/dto/query-usuario.dto';
+import { UsuarioOrquestradorService } from '@/services-orchestrator/usuario/usuario-orquestrador.service';
 
 @Injectable()
 export class PerfilService {
@@ -23,7 +24,7 @@ export class PerfilService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly usuario: UsuarioService,
+    private readonly usuarioOrq: UsuarioOrquestradorService,
     private readonly tennant: TenantContextService,
   ) {}
 
@@ -89,14 +90,16 @@ export class PerfilService {
   /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS */
   async counter(): Promise<Contador> {
     try {
-      const [total, ativos, inativos] = await Promise.all([
-        this.prisma.perfil.count(),
-        this.prisma.perfil.count({ where: { status: true } }),
-        this.prisma.perfil.count({ where: { status: false } }),
-      ]);
+      const grupos = await this.prisma.perfil.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      });
+
+      const ativos = grupos.find((g) => g.status === true)?._count._all ?? 0;
+      const inativos = grupos.find((g) => g.status === false)?._count._all ?? 0;
 
       this.logger.log(TYPES_NOTICES.COUNTER);
-      return { total, ativos, inativos };
+      return { total: ativos + inativos, ativos, inativos };
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
       throw error;
@@ -171,20 +174,29 @@ export class PerfilService {
     }
   }
 
-  // ATIVAÇÃO DO PERFIL PELO ID
+  /* ATIVAÇÃO DO PERFIL PELO ID
+  - perfil faz uma busca para identificar se possui usuário cadastrado.
+  - somente aceita ativação se não há usuário cadastrado.
+  - se possui alteração somente diretamente no banco de dados.
+ */
   async active(id: string): Promise<Perfil> {
     try {
       const ativarPerfil = await this.prisma.client.$transaction(
         async (tx: any) => {
-          const dadosVerificar: QueryUsuarioFilterDto = { perfilId: id };
-          const verificar = await this.usuario.findAll(dadosVerificar, tx);
+          const buscar = await this.findOne(id, tx);
 
-          if (verificar.length > 0) {
-            this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
-            throw new UnauthorizedException(TYPES_NOTICES.EMPTY_LIST);
+          if (buscar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_ACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_ACTIVE);
           }
 
-          await this.findOne(id, tx);
+          const queryUsuario: QueryUsuarioFilterDto = { perfilId: buscar.id };
+          const verificar = await this.usuarioOrq.findAll(queryUsuario, tx);
+
+          if (verificar.length > 0) {
+            this.logger.warn(TYPES_NOTICES.EMPTY_NOT);
+            throw new UnauthorizedException(TYPES_NOTICES.EMPTY_NOT);
+          }
 
           const ativar = await tx.perfil.update({
             where: { id: id },
@@ -208,15 +220,20 @@ export class PerfilService {
     try {
       const inativarPerfil = await this.prisma.client.$transaction(
         async (tx: any) => {
-          const dadosVerificar: QueryUsuarioFilterDto = { perfilId: id };
-          const verificar = await this.usuario.findAll(dadosVerificar, tx);
+          const buscar = await this.findOne(id, tx);
 
-          if (verificar.length > 0) {
-            this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
-            throw new UnauthorizedException(TYPES_NOTICES.EMPTY_LIST);
+          if (!buscar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_DEACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_DEACTIVE);
           }
 
-          await this.findOne(id, tx);
+          const queryUsuario: QueryUsuarioFilterDto = { perfilId: buscar.id };
+          const verificar = await this.usuarioOrq.findAll(queryUsuario, tx);
+
+          if (verificar.length > 0) {
+            this.logger.warn(TYPES_NOTICES.EMPTY_NOT);
+            throw new UnauthorizedException(TYPES_NOTICES.EMPTY_NOT);
+          }
 
           const inativar = await tx.perfil.update({
             where: { id: id },

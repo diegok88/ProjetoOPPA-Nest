@@ -55,6 +55,8 @@ export class PrismaService
     */
     const MODELOS_AUDITADOS = [
       'Usuario',
+      'Penalidade',
+      'Dispensa',
       'Gestor',
       'Empresa',
       'ContadorDeCracha',

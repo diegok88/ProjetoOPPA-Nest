@@ -1,4 +1,5 @@
 import { TipoTurno } from '@/generated/prisma/enums';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsEnum,
@@ -11,8 +12,9 @@ import {
 
 export class QueryCompetenciaSetorialFilterDto {
   @IsOptional()
-  @IsNumber({}, { message: 'Código não é do tipo Number.' })
-  @IsInt({ message: 'Código não é um número inteiro.' })
+  @Type(() => Number)
+  @IsInt({ message: 'Código não é do tipo Inteiro!' })
+  @IsNumber({}, { message: 'Código não é do tipo Number!' })
   codigo?: number;
 
   @IsOptional()
@@ -32,7 +34,10 @@ export class QueryCompetenciaSetorialFilterDto {
   turno?: TipoTurno;
 
   @IsOptional()
-  @IsBoolean({ message: 'O status não é do tipo Boolean.' })
+  @Transform(({ value }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  )
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
   status?: boolean;
 
   @IsOptional()

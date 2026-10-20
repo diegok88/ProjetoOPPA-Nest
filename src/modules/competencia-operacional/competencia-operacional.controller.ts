@@ -15,11 +15,19 @@ import { CreateCompetenciaOperacionalDto } from './dto/create-competencia-operac
 import { UpdateCompetenciaOperacionalDto } from './dto/update-competencia-operacional.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/roles-auth.guard';
-import { ResponseCompetenciaOperacionalDto } from './dto/response-competencia-operacional.dto';
+import {
+  ResponseCompetenciaOperacionalAssetsDto,
+  ResponseCompetenciaOperacionalContadorDto,
+  ResponseCompetenciaOperacionalDto,
+} from './dto/response-competencia-operacional.dto';
 import { plainToInstance } from 'class-transformer';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
-import { QueryCompetenciaOperacionalFilterDto } from './dto/query-competencia-operacional.dto';
+import {
+  QueryCompetenciaOperacionalCounterDto,
+  QueryCompetenciaOperacionalFilterDto,
+  QueryCompetenciaOperacionalOperadorDto,
+} from './dto/query-competencia-operacional.dto';
 
 @Controller('competencia-operacional')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -29,7 +37,7 @@ export class CompetenciaOperacionalController {
   ) {}
 
   @Post()
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async create(
     @Body() createCompetenciaOperacionalDto: CreateCompetenciaOperacionalDto,
   ): Promise<ResponseCompetenciaOperacionalDto> {
@@ -40,12 +48,31 @@ export class CompetenciaOperacionalController {
   }
 
   @Get()
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findAll(
     @Query() query: QueryCompetenciaOperacionalFilterDto,
   ): Promise<ResponseCompetenciaOperacionalDto[]> {
     const dados = await this.competenciaOperacionalService.findAll(query);
     return plainToInstance(ResponseCompetenciaOperacionalDto, dados);
+  }
+
+  @Get('assets')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async findAssetsAvailable(
+    @Query() query: QueryCompetenciaOperacionalOperadorDto,
+  ): Promise<ResponseCompetenciaOperacionalAssetsDto[]> {
+    const dados =
+      await this.competenciaOperacionalService.findAssetsAvailable(query);
+    return plainToInstance(ResponseCompetenciaOperacionalAssetsDto, dados);
+  }
+
+  @Get('counter')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async counter(
+    @Query() query: QueryCompetenciaOperacionalCounterDto,
+  ): Promise<ResponseCompetenciaOperacionalContadorDto> {
+    const contador = await this.competenciaOperacionalService.counter(query);
+    return plainToInstance(ResponseCompetenciaOperacionalContadorDto, contador);
   }
 
   @Get(':id')

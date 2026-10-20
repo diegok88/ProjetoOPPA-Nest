@@ -7,5 +7,6 @@ import { PerfilModule } from '../perfil/perfil.module';
   imports: [forwardRef(() => PerfilModule)],
   controllers: [AtivoController],
   providers: [AtivoService],
+  exports: [AtivoService],
 })
 export class AtivoModule {}

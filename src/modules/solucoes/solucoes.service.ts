@@ -7,11 +7,7 @@ import {
 import { CreateSolucoesDto } from './dto/create-solucoes.dto';
 import { UpdateSolucoeDto } from './dto/update-solucoes.dto';
 import { PrismaService } from '@/prisma/prisma.service';
-import {
-  Solucoes,
-  SolucoesListagem,
-  SolucoesRelacoes,
-} from './entities/solucoes.entity';
+import { Solucoes, SolucoesListagem } from './entities/solucoes.entity';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import { QuerySolucoesFilterDto } from './dto/query-solucoes.dto';
 import { Acao, Prisma } from '@/generated/prisma/client';

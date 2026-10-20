@@ -7,7 +7,11 @@ import {
 import { CreateAtivoDto } from './dto/create-ativo.dto';
 import { UpdateAtivoDto } from './dto/update-ativo.dto';
 import { PrismaService } from '@/prisma/prisma.service';
-import { Ativo, AtivoRelacoes } from './entities/ativo.entity';
+import {
+  Ativo,
+  AtivoRelacoes,
+  AtivoRelacoesParcial,
+} from './entities/ativo.entity';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import { QueryAtivoFilterDto } from './dto/query-ativo.dto';
 import { Acao, Prisma } from '@/generated/prisma/client';
@@ -41,9 +45,11 @@ export class AtivoService {
 
   async findAll(
     query: QueryAtivoFilterDto,
-    tx?: Prisma.TransactionClient, 
+    tx?: Prisma.TransactionClient,
   ): Promise<AtivoRelacoes[]> {
     try {
+      const ctx = this.tenantContext.getStore()!;
+
       const client = tx ?? this.prisma.client;
 
       const { campos, ...filtros } = query ?? {};
@@ -57,6 +63,8 @@ export class AtivoService {
       if (query.setorId) condicao.setorId = query.setorId;
       if (query.empresaId) condicao.empresaId = query.empresaId;
       if (query.status) condicao.status = query.status;
+
+      if (query.gestor === true) condicao.empresaId = ctx.empresa;
 
       const selecao = await this.buildSelect(campos);
 
@@ -96,6 +104,36 @@ export class AtivoService {
       return listar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO QUE RETORNA OS ATIVOS 
+  - apenas o que não foi atibuido ao colaborador.
+  - requerida na competência operacional.
+  */
+  async findAssetsAvailable(
+    ids: Array<string>,
+  ): Promise<AtivoRelacoesParcial[]> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+
+      const condicao: Prisma.AtivoWhereInput = {
+        ...(ids.length ? { id: { notIn: ids } } : {}),
+        empresaId: ctx.empresa,
+      };
+
+      const ativos = await this.prisma.client.ativo.findMany({
+        where: condicao,
+        select: { id: true, codigo: true, descricao: true, modelo: true },
+      });
+
+      return ativos;
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - findAssetsAvailable()',
+      );
       throw error;
     }
   }

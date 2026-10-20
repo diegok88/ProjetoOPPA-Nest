@@ -11,3 +11,7 @@ export type AtivoRelacoes = Prisma.AtivoGetPayload<{
     setor: true;
   };
 }>;
+
+export type AtivoRelacoesParcial = Prisma.AtivoGetPayload<{
+  select: { id: true; codigo: true; descricao: true; modelo: true };
+}>;

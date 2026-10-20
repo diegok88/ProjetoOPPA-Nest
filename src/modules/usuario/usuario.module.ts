@@ -5,7 +5,7 @@ import { UsuarioController } from './usuario.controller';
 import { UsuarioService } from './usuario.service';
 import { CompetenciaSetorialOrquestradorModule } from '@/services-orchestrator/competencia-setorial/competencia-setorial-orquestrador.module';
 import { GenerateTokenModule } from '@/auth/jwt-generate-token/jwt-generate-token.module';
-import { GestorOrquestradorModule } from '@/services-orchestrator/gestor/gestor.module';
+import { GestorOrquestradorModule } from '@/services-orchestrator/gestor/gestor-orquestrador.module';
 
 @Module({
   imports: [

@@ -14,7 +14,6 @@ import {
 import * as bcrypt from 'bcrypt';
 import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
 import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-cracha.dto';
-import { GestorService } from '../gestor/gestor.service';
 import {
   CreateUsuarioDto,
   CreateUsuarioMaster,
@@ -30,7 +29,7 @@ import {
 } from './dto/query-usuario.dto';
 import { Contador } from '@/interfaces/counter.interface';
 import { CompetenciaSetorialOrquestradorService } from '@/services-orchestrator/competencia-setorial/competencia-setorial-orquestrador.service';
-import { GestorOrquestradorService } from '@/services-orchestrator/gestor/gestor.service';
+import { GestorOrquestradorService } from '@/services-orchestrator/gestor/gestor-orquestrador.service';
 
 @Injectable()
 export class UsuarioService {

@@ -19,8 +19,16 @@ import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import { plainToInstance } from 'class-transformer';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
-import { QueryDispensaFilterDto } from './dto/query-dispensas.dto';
-import { ResponseDispensaDto } from './dto/response-dispensas.dto';
+import {
+  QueryDispensaCounterDto,
+  QueryDispensaDateFilterDto,
+  QueryDispensaFilterDto,
+} from './dto/query-dispensas.dto';
+import {
+  ResponseAlertDispensaDto,
+  ResponseDispensaContadorDto,
+  ResponseDispensaDto,
+} from './dto/response-dispensas.dto';
 
 @Controller('dispensas')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -28,7 +36,7 @@ export class DispensasController {
   constructor(private readonly dispensasService: DispensasService) {}
 
   @Post()
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async create(
     @Body() createDispensaDto: CreateDispensaDto,
   ): Promise<ResponseDispensaDto> {
@@ -37,7 +45,7 @@ export class DispensasController {
   }
 
   @Get()
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findAll(
     @Query() query: QueryDispensaFilterDto,
   ): Promise<ResponseDispensaDto[]> {
@@ -45,8 +53,26 @@ export class DispensasController {
     return plainToInstance(ResponseDispensaDto, dados);
   }
 
+  @Get('check-date')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async checkAlertManagerDismissal(
+    @Query() query: QueryDispensaDateFilterDto,
+  ): Promise<ResponseAlertDispensaDto> {
+    const dados = await this.dispensasService.checkAlertManagerDismissal(query);
+    return plainToInstance(ResponseAlertDispensaDto, dados);
+  }
+
+  @Get('counter')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async counter(
+    @Query() query: QueryDispensaCounterDto, 
+  ): Promise<ResponseDispensaContadorDto> {
+    const contador = await this.dispensasService.counter(query);
+    return plainToInstance(ResponseDispensaContadorDto, contador);
+  }
+
   @Get(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseDispensaDto> {
@@ -55,7 +81,7 @@ export class DispensasController {
   }
 
   @Patch(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDispensaDto: UpdateDispensaDto,
@@ -64,8 +90,26 @@ export class DispensasController {
     return plainToInstance(ResponseDispensaDto, dado);
   }
 
-  @Patch('deactive/:id')
+  @Patch('situation/:id')
   @Roles(ROLES.ASN1)
+  async updateSituation(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseDispensaDto> {
+    const dado = await this.dispensasService.updateSituation(id);
+    return plainToInstance(ResponseDispensaDto, dado);
+  }
+
+  @Patch('active/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async active(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseDispensaDto> {
+    const dado = await this.dispensasService.active(id);
+    return plainToInstance(ResponseDispensaDto, dado);
+  }
+
+  @Patch('deactive/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseDispensaDto> {
