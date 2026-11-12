@@ -1,0 +1,2 @@
+-- CreateEnum
+CREATE TYPE "SituacaoAlocacao" AS ENUM ('ALOCADO', 'DISPONIVEL', 'INDISPONIVEL');

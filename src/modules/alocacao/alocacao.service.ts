@@ -4,67 +4,396 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { CreateAlocacaoDto } from './dto/create-alocacao.dto';
 import { UpdateAlocacaoDto } from './dto/update-alocacao.dto';
 import { PrismaService } from '@/prisma/prisma.service';
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
-import { Alocacao } from './entities/alocacao.entity';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
-import { QueryAlocacaoFilterDto } from './dto/query-alocacao.dto';
-import { Acao, Prisma } from '@/generated/prisma/client';
+import {
+  Acao,
+  CondicaoAlocacao,
+  Prisma,
+  SituacaoAlocacao,
+  TipoTurno,
+} from '@/generated/prisma/client';
+import {
+  AlocacaoListagem,
+  AlocacaoOperacional,
+} from './entities/alocacao.entity';
+import {
+  QueryAlocacaoOperacionalCounterDto,
+  QueryAlocacaoOperacionalFilterDto,
+  QueryQuantidadeAlocacaoOperadorDto,
+} from './dto/query-alocacao.dto';
+import { QueryTagAtivoSetoresDto } from '../tag-ativo/dto/query-tag-ativo.dto';
+import { TagAtivoService } from '../tag-ativo/tag-ativo.service';
+import {
+  ResponseAlertAlocacaoDto,
+  ResponseAlocacaoContadorDto,
+} from './dto/response-alocacao.dto';
+import { PerfilService } from '../perfil/perfil.service';
+import { ROLES } from '@/auth/guards/roles.const';
+import { PaginatedResponse } from '@/interfaces/paginator.interface';
 
 @Injectable()
 export class AlocacaoService {
   private logger = new Logger(AlocacaoService.name);
 
   constructor(
-    private prisma: PrismaService,
-    private tennant: TenantContextService,
+    private readonly prisma: PrismaService,
+    private readonly perfilService: PerfilService,
+    private readonly tagAtivoService: TagAtivoService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
-  async create(createAlocacaoDto: CreateAlocacaoDto): Promise<Alocacao> {
+  async create(
+    tagAtivoId: string,
+    turno: TipoTurno,
+    gestorId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<AlocacaoListagem> {
     try {
-      const gestor = this.tennant.getStore()!.user;
-      const criar = await this.prisma.client.alocacaoOperacional.create({
-        data: { ...createAlocacaoDto, gestorId: gestor },
+      const client = tx ?? this.prisma.client;
+
+      const criar = await client.alocacaoOperacional.create({
+        data: { tagAtivoId: tagAtivoId, turno: turno, gestorId: gestorId },
       });
+
       this.logger.log(TYPES_NOTICES.CREATE);
       return criar;
     } catch (error) {
-      this.logger.log(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
+      this.logger.log(TYPES_NOTICES.SERVICE_FAILURE, ' - create()');
       throw error;
     }
   }
 
-  async findAll(query: QueryAlocacaoFilterDto): Promise<Alocacao[]> {
+  async createAll(
+    setorId: string,
+    turno: TipoTurno,
+    gestorId: string,
+  ): Promise<Prisma.BatchPayload> {
     try {
-      const condicao: Prisma.AlocacaoOperacionalWhereInput = {};
-      if (query.operadorId) condicao.operadorId = query.operadorId;
-      if (query.gestorId) condicao.gestorId = query.gestorId;
-      if (query.tagAtivoId) condicao.tagAtivoId = query.tagAtivoId;
-      if (query.status) condicao.status = query.status;
+      let criarAlocacao: Prisma.BatchPayload = { count: 0 };
 
-      const listar = await this.prisma.alocacaoOperacional.findMany({
-        where: condicao,
+      const condicao: Prisma.AlocacaoOperacionalWhereInput = {
+        turno: turno,
+        situacao: { not: SituacaoAlocacao.FINALIZADO },
+        condicao: { not: CondicaoAlocacao.RECUSADO },
+        tagAtivo: { ativo: { setorId: setorId } },
+      };
+
+      const listarAlocacao =
+        await this.prisma.client.alocacaoOperacional.findMany({
+          where: condicao,
+        });
+
+      const queryT: QueryTagAtivoSetoresDto = { setorId: setorId };
+      const listarTags = await this.tagAtivoService.findAllSection(queryT);
+
+      if (listarAlocacao.length !== listarTags.length) {
+        const tagsAlocados = new Set(
+          listarAlocacao.map((a: AlocacaoOperacional) => a.tagAtivoId),
+        );
+        const tagsSemAlocados = listarTags
+          .filter((tag) => !tagsAlocados.has(tag.id))
+          .map((tag) => tag.id);
+        if (tagsSemAlocados.length > 0) {
+          criarAlocacao =
+            await this.prisma.client.alocacaoOperacional.createMany({
+              data: tagsSemAlocados.map((tagAtivoId) => ({
+                tagAtivoId: tagAtivoId,
+                turno: turno,
+                gestorId: gestorId,
+              })),
+            });
+        }
+      }
+
+      return criarAlocacao;
+    } catch (error) {
+      this.logger.log(TYPES_NOTICES.SERVICE_FAILURE, ' - createAll()');
+      throw error;
+    }
+  }
+
+  async checkManagerAllocation(
+    query: QueryQuantidadeAlocacaoOperadorDto,
+  ): Promise<ResponseAlertAlocacaoDto> {
+    try {
+      const qtdAlocacao = await this.prisma.client.alocacaoOperacional.count({
+        where: query,
       });
+
+      if (qtdAlocacao === 0) {
+        this.logger.warn(`Operador id possui ${qtdAlocacao} alocações.`);
+      } else {
+        this.logger.log(`Operador id possui ${qtdAlocacao} alocações.`);
+      }
+
+      return { alocacao: qtdAlocacao };
+    } catch (error) {
+      this.logger.log(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - checkManagerAllocation()',
+      );
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO MONTAGEM DE CONDIÇÃO */
+  private async toAssembleCondicao(
+    filtros: Omit<
+      QueryAlocacaoOperacionalFilterDto,
+      'page' | 'size' | 'campos' | 'incluir' | 'ordenacao'
+    >,
+    usuarioId?: string,
+  ): Promise<Prisma.AlocacaoOperacionalWhereInput> {
+    const condicao: Prisma.AlocacaoOperacionalWhereInput = {};
+
+    if (filtros.codigo) condicao.codigo = filtros.codigo;
+    if (filtros.operadorId) condicao.operadorId = filtros.operadorId;
+    if (filtros.gestorId) condicao.gestorId = filtros.gestorId;
+    if (filtros.tagAtivoId) condicao.tagAtivoId = filtros.tagAtivoId;
+    if (filtros.setorId)
+      condicao.tagAtivo = { ativo: { setorId: filtros.setorId } };
+    if (filtros.turno) condicao.turno = filtros.turno;
+    if (filtros.condicao) condicao.condicao = filtros.condicao;
+    if (filtros.situacao) condicao.situacao = filtros.situacao;
+    if (filtros.status !== undefined) condicao.status = filtros.status;
+
+    if (filtros.decisao === 'finalizado') {
+      condicao.AND = { situacao: { not: SituacaoAlocacao.FINALIZADO } };
+    }
+
+    if (filtros.gestor) condicao.gestorId = usuarioId;
+
+    return condicao;
+  }
+
+  /* FUNÇÃO MONTAGEM DE ORDENAÇÃO */
+  private async toAssembleOrderBy(
+    ordenacao?: string,
+  ): Promise<Prisma.AlocacaoOperacionalOrderByWithRelationInput[]> {
+    switch (ordenacao) {
+      case 'filtrar':
+        return [{ codigo: 'desc' }, { situacao: 'asc' }];
+      default:
+        return [{ tagAtivo: { descricao: 'asc' } }];
+    }
+  }
+
+  /* FUNÇÃO MONTAGEM DE INCLUDE */
+  private async toAssembleInclude(
+    incluir?: string,
+  ): Promise<Prisma.AlocacaoOperacionalInclude> {
+    switch (incluir) {
+      case 'todos_relacoes':
+        return { operador: true, gestor: true, tagAtivo: true };
+      default:
+        return {
+          operador: {
+            select: { id: true, cracha: true, nome: true, turno: true },
+          },
+          gestor: { select: { id: true, cracha: true, nome: true } },
+          tagAtivo: {
+            select: {
+              id: true,
+              codigo: true,
+              descricao: true,
+              ativo: {
+                select: {
+                  id: true,
+                  descricao: true,
+                  modelo: true,
+                  setorId: true,
+                  setor: { select: { id: true, descricao: true } },
+                },
+              },
+            },
+          },
+        };
+    }
+  }
+
+  /* METODO DE CONSULTA DINAMICA */
+  private readonly allowedAlocacaoOperacionalFields = [
+    'id',
+    'codigo',
+    'operadorId',
+    'gestorId',
+    'tagAtivoId',
+    'turno',
+    'condicao',
+    'situacao',
+    'status',
+  ];
+
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj: Record<string, true> = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedAlocacaoOperacionalFields.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
+  }
+
+  /* FUNÇÃO DE LISTAGEM COM PAGINAÇÃO */
+  async findAll(
+    query: QueryAlocacaoOperacionalFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<PaginatedResponse<any>> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+      const client = tx ?? this.prisma.client;
+
+      const {
+        page = 1,
+        size = 10,
+        campos,
+        incluir,
+        ordenacao,
+        ...filtros
+      } = query;
+
+      if (filtros.setorId && filtros.turno) {
+        await this.createAll(filtros.setorId, filtros.turno, ctx.user);
+      }
+
+      const condicao = await this.toAssembleCondicao(filtros, ctx.user);
+
+      const selecao = await this.buildSelect(campos);
+
+      const opcoes: Prisma.AlocacaoOperacionalFindManyArgs = {
+        where: condicao,
+        orderBy: await this.toAssembleOrderBy(ordenacao),
+        skip: (page - 1) * size,
+        take: size,
+      };
+
+      if (campos?.length) {
+        opcoes.select = selecao;
+      } else {
+        opcoes.include = await this.toAssembleInclude(incluir);
+      }
+
+      const listar: AlocacaoListagem[] =
+        await client.alocacaoOperacional.findMany(opcoes);
+
+      const total = await client.alocacaoOperacional.count({ where: condicao });
 
       if (listar.length === 0) {
         this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
       }
 
       this.logger.log(TYPES_NOTICES.FIND_ALL);
-      return listar;
+      return { dados: listar, total, pagina: page, tamanho: size };
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
       throw error;
     }
   }
 
-  async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Alocacao> {
+  /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ACEITO, RECUSADO, AGUARDANDO, ALOCADO, DISPONIVEL, INDISPONIVEL E FINALIZADO */
+  async counter(
+    query?: QueryAlocacaoOperacionalCounterDto,
+  ): Promise<ResponseAlocacaoContadorDto> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+
+      const buscarPerfil = await this.perfilService.findOne(ctx.perfil);
+      const perfil = `${buscarPerfil.descricao} - ${buscarPerfil.nivel}`;
+
+      const condicao: Prisma.AlocacaoOperacionalWhereInput = {};
+
+      if (query?.gestor && perfil === ROLES.SUP1) {
+        condicao.gestorId = ctx.user;
+      } else if (!query?.gestor && perfil !== ROLES.ASN1) {
+        this.logger.warn(
+          `Perfil ${perfil} não autorizado. `,
+          TYPES_NOTICES.UNAUTHORIZED,
+        );
+        throw new UnauthorizedException(
+          `Perfil ${perfil} não autorizado. `,
+          TYPES_NOTICES.UNAUTHORIZED,
+        );
+      }
+
+      const totalAlocacao = await this.prisma.client.alocacaoOperacional.count({
+        where: condicao,
+      });
+
+      const gruposCondicao = await this.prisma.alocacaoOperacional.groupBy({
+        by: ['condicao'],
+        where: condicao,
+        _count: { _all: true },
+      });
+
+      const aceito =
+        gruposCondicao.find((g) => g.condicao === CondicaoAlocacao.ACEITO)
+          ?._count._all ?? 0;
+      const recusado =
+        gruposCondicao.find((g) => g.condicao === CondicaoAlocacao.RECUSADO)
+          ?._count._all ?? 0;
+      const aguardando =
+        gruposCondicao.find((g) => g.condicao === CondicaoAlocacao.AGUARDANDO)
+          ?._count._all ?? 0;
+
+      const gruposSituacao = await this.prisma.alocacaoOperacional.groupBy({
+        by: ['situacao'],
+        where: condicao,
+        _count: { _all: true },
+      });
+
+      const alocado =
+        gruposSituacao.find((g) => g.situacao === SituacaoAlocacao.ALOCADO)
+          ?._count._all ?? 0;
+      const disponivel =
+        gruposSituacao.find((g) => g.situacao === SituacaoAlocacao.DISPONIVEL)
+          ?._count._all ?? 0;
+      const indisponivel =
+        gruposSituacao.find((g) => g.situacao === SituacaoAlocacao.INDISPONIVEL)
+          ?._count._all ?? 0;
+      const finalizado =
+        gruposSituacao.find((g) => g.situacao === SituacaoAlocacao.FINALIZADO)
+          ?._count._all ?? 0;
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return {
+        total: totalAlocacao,
+        aceito: aceito,
+        recusado: recusado,
+        aguardando: aguardando,
+        alocado: alocado,
+        disponivel: disponivel,
+        indisponivel: indisponivel,
+        finalizado: finalizado,
+      };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
+  async findOne(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<AlocacaoListagem> {
     try {
       const client = tx ?? this.prisma.client;
       const buscar = await client.alocacaoOperacional.findUnique({
         where: { id: id },
+        include: {
+          tagAtivo: { include: { ativo: true } },
+          operador: true,
+          gestor: true,
+        },
       });
 
       if (!buscar) {
@@ -79,19 +408,64 @@ export class AlocacaoService {
     }
   }
 
+  async findOneAllocation(
+    query: QueryAlocacaoOperacionalFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<AlocacaoListagem> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const {
+        page = 1,
+        size = 10,
+        campos,
+        incluir,
+        ordenacao,
+        ...filtros
+      } = query;
+
+      const condicao = await this.toAssembleCondicao(filtros);
+      const selecao = await this.buildSelect(campos);
+      const opcoes: Prisma.AlocacaoOperacionalFindManyArgs = {
+        where: condicao,
+      };
+
+      if (campos?.length) {
+        opcoes.select = selecao;
+      } else {
+        opcoes.include = await this.toAssembleInclude(incluir);
+      }
+
+      const buscar: AlocacaoListagem =
+        await client.alocacaoOperacional.findFirst(opcoes);
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - findOneAllocation()',
+      );
+      throw error;
+    }
+  }
+
   async update(
     id: string,
-    updateAlocacaoDto: UpdateAlocacaoDto,
-  ): Promise<Alocacao> {
+    update: UpdateAlocacaoDto,
+  ): Promise<AlocacaoListagem> {
     try {
       const atualizarAlocacao = await this.prisma.client.$transaction(
         async (tx: any) => {
-          await this.findOne(id, tx);
+          const alocacao = await this.findOne(id, tx);
+          const { tagAtivoId, turno, gestorId } = alocacao;
 
-          const atualizar = await tx.perfil.update({
+          const atualizar = await tx.alocacaoOperacional.update({
             where: { id: id },
-            data: updateAlocacaoDto,
+            data: update,
           });
+
+          if (update.situacao === SituacaoAlocacao.FINALIZADO) {
+            await this.create(tagAtivoId, turno, gestorId!, tx);
+          }
 
           return atualizar;
         },
@@ -105,7 +479,7 @@ export class AlocacaoService {
     }
   }
 
-  async deactive(id: string): Promise<Alocacao> {
+  async deactive(id: string): Promise<AlocacaoListagem> {
     try {
       const inativarPerfil = await this.prisma.client.$transaction(
         async (tx: any) => {
@@ -133,7 +507,7 @@ export class AlocacaoService {
     }
   }
 
-  async remove(id: string): Promise<Alocacao> {
+  async remove(id: string): Promise<AlocacaoListagem> {
     try {
       const removerAlocacao = await this.prisma.client.$transaction(
         async (tx: any) => {

@@ -4,6 +4,12 @@ import { Expose, Type } from 'class-transformer';
 
 export class ResponseCompSetSetorDto {
   @Expose()
+  id!: string;
+
+  @Expose()
+  codigo!: number;
+
+  @Expose()
   descricao!: string;
 }
 
@@ -49,6 +55,11 @@ export class ResponseCompetenciaSetorialContadorDto {
 
   @Expose()
   inativos!: number;
+}
+
+export class ResponseCompSetContadorSupDto {
+  @Expose()
+  total!: number;
 }
 
 export class ResponseCompSetSectionSelectDto {

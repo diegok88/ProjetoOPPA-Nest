@@ -10,8 +10,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY } from './public.decorator';
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {
-  private logger = new Logger(JwtAuthGuard.name);
+export class HttpJwtGuard extends AuthGuard('jwt') {
+  private logger = new Logger(HttpJwtGuard.name);
 
   constructor(private reflector: Reflector) {
     super();

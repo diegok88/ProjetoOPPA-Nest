@@ -7,5 +7,6 @@ import { PerfilModule } from '../perfil/perfil.module';
   imports: [forwardRef(() => PerfilModule)],
   controllers: [FluxoOcorrenciaController],
   providers: [FluxoOcorrenciaService],
+  exports: [FluxoOcorrenciaService],
 })
 export class FluxoOcorrenciaModule {}

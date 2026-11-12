@@ -13,8 +13,6 @@ import {
 import { PenalidadesService } from './penalidades.service';
 import { CreatePenalidadeDto } from './dto/create-penalidade.dto';
 import { UpdatePenalidadeDto } from './dto/update-penalidade.dto';
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import { plainToInstance } from 'class-transformer';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
@@ -28,14 +26,16 @@ import {
   ResponsePenalidadeContadorDto,
   ResponsePenalidadeDto,
 } from './dto/response-penalidades.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('penalidades')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class PenalidadesController {
   constructor(private readonly penalidadesService: PenalidadesService) {}
 
   @Post()
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async create(
     @Body() createPenalidadeDto: CreatePenalidadeDto,
   ): Promise<ResponsePenalidadeDto> {
@@ -44,7 +44,7 @@ export class PenalidadesController {
   }
 
   @Get()
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async findAll(
     @Query() query: QueryPenalidadeFilterDto,
   ): Promise<ResponsePenalidadeDto[]> {
@@ -53,7 +53,7 @@ export class PenalidadesController {
   }
 
   @Get('check-date')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async checkAlertManagerDismissal(
     @Query() query: QueryPenalidadeDateFilterDto,
   ): Promise<ResponseAlertPenalidadeDto> {
@@ -63,7 +63,7 @@ export class PenalidadesController {
   }
 
   @Get('counter')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async counter(
     @Query() query: QueryPenalidadeCounterDto,
   ): Promise<ResponsePenalidadeContadorDto> {
@@ -72,7 +72,7 @@ export class PenalidadesController {
   }
 
   @Get(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponsePenalidadeDto> {
@@ -81,7 +81,7 @@ export class PenalidadesController {
   }
 
   @Patch(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updatePenalidadeDto: UpdatePenalidadeDto,
@@ -91,7 +91,7 @@ export class PenalidadesController {
   }
 
   @Patch('situation/:id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async updateSituation(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponsePenalidadeDto> {
@@ -100,7 +100,7 @@ export class PenalidadesController {
   }
 
   @Patch('active/:id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async active(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponsePenalidadeDto> {
@@ -109,7 +109,7 @@ export class PenalidadesController {
   }
 
   @Patch('deactive/:id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponsePenalidadeDto> {

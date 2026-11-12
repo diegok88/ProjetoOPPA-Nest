@@ -17,6 +17,7 @@ import { UpdateContadorCrachaDto } from '../contador-cracha/dto/update-contador-
 import {
   CreateUsuarioDto,
   CreateUsuarioMaster,
+  CreateUsuarioTagAtivoDto,
 } from './dto/create-usuario.dto';
 import {
   UpdateUsuarioDto,
@@ -119,6 +120,40 @@ export class UsuarioService {
 
       this.logger.log(TYPES_NOTICES.CREATE);
       return criarUsuario;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATEASSIST');
+      throw error;
+    }
+  }
+
+  /*
+  CRIAR USUARIO COM TODOS OS PERFIS DO SISTEMA: 
+  - o mesmo é criado mediante empresa, contador de cracha e perfil criados.
+  - create padrão de para todos os perfis
+  */
+  async createTagAtivo(
+    create: CreateUsuarioTagAtivoDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Usuario> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+      const client = tx ?? this.prisma.client;
+
+      const senhaHash = await this.generateHash(PasswordPin.password);
+      const pinHash = await this.generateHash(PasswordPin.pin);
+
+      const criar = await client.usuario.create({
+        data: {
+          ...create,
+          empresaId: ctx.empresa,
+          cracha: 0,
+          senha: senhaHash,
+          pin: pinHash,
+        },
+      });
+
+      this.logger.log(TYPES_NOTICES.CREATE);
+      return criar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATEASSIST');
       throw error;
@@ -292,8 +327,9 @@ export class UsuarioService {
       const client = tx ?? this.prisma.client;
 
       const condicao: Prisma.UsuarioWhereInput = {};
-      condicao.cracha = query.cracha;
-      condicao.empresaId = query.empresaId;
+      if (query.codigo) condicao.codigo = query.codigo;
+      if (query.cracha) condicao.cracha = query.cracha;
+      if (query.empresaId) condicao.empresaId = query.empresaId;
 
       const buscar = await client.usuario.findFirst({
         where: condicao,

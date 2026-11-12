@@ -17,7 +17,6 @@ export class PenalidadesScheduleService {
     timeZone: 'America/Sao_Paulo',
   })
   */
-
   async updateSituationPenalty(): Promise<void> {
     try {
       const agora = new Date();

@@ -1,5 +1,3 @@
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
 import {
@@ -24,9 +22,11 @@ import {
 } from './dto/response-perfil.dto';
 import { UpdatePerfilDto } from './dto/update-perfil.dto';
 import { PerfilService } from './perfil.service';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('perfil')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class PerfilController {
   constructor(private readonly perfilService: PerfilService) {}
 
@@ -42,7 +42,7 @@ export class PerfilController {
 
   // LISTAR TODOS OS PERFIS
   @Get()
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async findAll(
     @Query() query: QueryPerfilFilterDto,
   ): Promise<ResponsePerfilDto[]> {
@@ -52,7 +52,7 @@ export class PerfilController {
 
   // LISTAR TODOS OS DADOS PARA TABELA LIST - RETORNA APENAS id, descrição e nivel
   @Get('list')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async findAllList(
     @Query() query: QueryPerfilFilterDto,
   ): Promise<ResponsePerfilListDto[]> {

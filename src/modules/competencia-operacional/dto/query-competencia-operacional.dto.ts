@@ -6,6 +6,8 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Max,
+  Min,
 } from 'class-validator';
 
 export class QueryCompetenciaOperacionalFilterDto {
@@ -35,6 +37,13 @@ export class QueryCompetenciaOperacionalFilterDto {
   status?: boolean;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'Gestor não é do tipo Boolean!' })
+  gestor?: boolean;
+
+  @IsOptional()
   @IsString({ message: 'Campos não é do tipo String!' })
   campos?: string;
 
@@ -43,11 +52,27 @@ export class QueryCompetenciaOperacionalFilterDto {
   incluir?: string;
 
   @IsOptional()
-  @Transform(({ value }) =>
-    value === 'true' ? true : value === 'false' ? false : value,
-  )
-  @IsBoolean({ message: 'Gestor não é do tipo Boolean!' })
-  gestor?: boolean;
+  @IsString({ message: 'Eliminar não é do tipo String.' })
+  decisao?: string;
+
+  /* Parametro que garante a ordenação dinâmica */
+  @IsOptional()
+  @IsString({ message: 'Ordenação não é do tipo String.' })
+  ordenacao?: string;
+
+  /* Paginação da lista do filtro */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Página deve ser um número inteiro.' })
+  @Min(1, { message: 'Página deve ser maior que zero.' })
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Tamanho deve ser um número inteiro.' })
+  @Min(1)
+  @Max(100, { message: 'Tamanho máximo é 100.' })
+  size?: number = 10;
 }
 
 export class QueryCompetenciaOperacionalCounterDto {

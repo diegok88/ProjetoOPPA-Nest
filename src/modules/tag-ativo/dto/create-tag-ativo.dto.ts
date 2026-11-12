@@ -1,8 +1,8 @@
+import { Transform } from 'class-transformer';
 import {
   IsUUID,
   IsString,
   IsNotEmpty,
-  IsBoolean,
   Length,
   Matches,
   MinLength,

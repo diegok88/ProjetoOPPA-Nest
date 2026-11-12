@@ -13,8 +13,7 @@ import {
 import { AtivoService } from './ativo.service';
 import { CreateAtivoDto } from './dto/create-ativo.dto';
 import { UpdateAtivoDto } from './dto/update-ativo.dto';
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
+
 import {
   ResponseAtivoContadorDto,
   ResponseAtivoDto,
@@ -25,18 +24,19 @@ import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
 import { QueryAtivoFilterDto } from './dto/query-ativo.dto';
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
-import { PerfilService } from '../perfil/perfil.service';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('ativo')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class AtivoController {
   constructor(
-    private readonly ativoService: AtivoService, 
+    private readonly ativoService: AtivoService,
     private readonly tennantContext: TenantContextService,
   ) {}
 
   @Post()
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async create(
     @Body() createAtivoDto: CreateAtivoDto,
   ): Promise<ResponseAtivoDto> {
@@ -46,7 +46,7 @@ export class AtivoController {
   }
 
   @Get()
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.SUP1)
   async findAll(
     @Query() query: QueryAtivoFilterDto,
   ): Promise<ResponseAtivoDto[]> {
@@ -55,14 +55,14 @@ export class AtivoController {
   }
 
   @Get('counter')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async counter(): Promise<ResponseAtivoContadorDto> {
     const contador = await this.ativoService.counter();
     return plainToInstance(ResponseAtivoContadorDto, contador);
   }
 
   @Get(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseAtivoRelacaoDto> {
@@ -71,7 +71,7 @@ export class AtivoController {
   }
 
   @Patch(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateAtivoDto: UpdateAtivoDto,
@@ -81,7 +81,7 @@ export class AtivoController {
   }
 
   @Patch('active/:id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async active(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseAtivoDto> {
@@ -90,7 +90,7 @@ export class AtivoController {
   }
 
   @Patch('deactive/:id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1)
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseAtivoDto> {

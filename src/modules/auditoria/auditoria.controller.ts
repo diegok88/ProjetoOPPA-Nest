@@ -1,4 +1,4 @@
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
@@ -17,31 +17,30 @@ import {
   ResponseAuditoriaDto,
   ResponseAuditoriaMessageDto,
 } from './dto/response-auditoria.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
 
 @Controller('auditoria')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class AuditoriaController {
   constructor(private readonly auditoriaService: AuditoriaService) {}
 
   @Get()
-  @UseGuards(RolesGuard)
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async findAll(
     @Query() query: QueryAuditoriaFilterDto,
   ): Promise<ResponseAuditoriaDto[]> {
     const dados = await this.auditoriaService.findAll(query);
-    return plainToInstance(ResponseAuditoriaDto, dados); 
+    return plainToInstance(ResponseAuditoriaDto, dados);
   }
 
   @Get(':id')
-  @UseGuards(RolesGuard)
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async findOne(@Param('id') id: string): Promise<ResponseAuditoriaDto> {
     const dado = await this.auditoriaService.findOne(id);
     return plainToInstance(ResponseAuditoriaDto, dado);
   }
 
   @Delete(':id')
-  @UseGuards(RolesGuard)
   @Roles(ROLES.ASN1)
   async remove(@Param('id') id: string): Promise<ResponseAuditoriaMessageDto> {
     const dado = await this.auditoriaService.remove(id);

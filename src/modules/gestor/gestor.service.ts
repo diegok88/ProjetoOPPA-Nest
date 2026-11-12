@@ -11,10 +11,18 @@ import {
   GestorRelacoes,
   GestorUsuario,
 } from './entities/gestor.entity';
-import { ResponseGestorRelacoesParcialDto } from './dto/response-gestor.dto';
+import {
+  ResponseGestorManagerContadorDto,
+  ResponseGestorRelacoesParcialDto,
+} from './dto/response-gestor.dto';
 import { Contador } from '@/interfaces/counter.interface';
 import { PerfilService } from '../perfil/perfil.service';
 import { ROLES } from '@/auth/guards/roles.const';
+
+export interface IntervaloMesAtual {
+  primeiroDia: Date;
+  ultimoDia: Date;
+}
 
 @Injectable()
 export class GestorService {
@@ -230,9 +238,87 @@ export class GestorService {
       this.logger.log(TYPES_NOTICES.COUNTER);
       return { total: ativos + inativos, ativos, inativos };
     } catch (error) {
-      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - counter()');
       throw error;
     }
+  }
+
+  /* 
+  FUNÇÃO CONTADOR DE REGISTROS PARA DASHBOARD DO GESTOR 
+  - Retorna total de colaboradores.
+  - Retorna penalidades e dispensas em execução.
+  */
+  async counterManager(): Promise<ResponseGestorManagerContadorDto> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+      const datas = await this.obterIntervaloMesAtual();
+
+      const condicaoT: Prisma.GestorWhereInput = {
+        gestorId: ctx.user,
+        status: true,
+      };
+
+      const condicaoP: Prisma.GestorWhereInput = {
+        gestorId: ctx.user,
+        status: true,
+        colaborador: {
+          status: true,
+          penalidadeComoColaborador: {
+            some: {
+              status: true,
+              dataInicial: { lte: datas.ultimoDia },
+              dataFinal: { gte: datas.primeiroDia },
+            },
+          },
+        },
+      };
+
+      const condicaoD: Prisma.GestorWhereInput = {
+        gestorId: ctx.user,
+        status: true,
+        colaborador: {
+          status: true,
+          dispensaComoColaborador: {
+            some: {
+              status: true,
+              dataInicial: { lte: datas.ultimoDia },
+              dataFinal: { gte: datas.primeiroDia },
+            },
+          },
+        },
+      };
+
+      const [totalColaboradores, penalidades, dispensas] = await Promise.all([
+        await this.prisma.client.gestor.count({ where: condicaoT }),
+        await this.prisma.client.gestor.count({ where: condicaoP }),
+        await this.prisma.client.gestor.count({ where: condicaoD }),
+      ]);
+
+      return {
+        total: totalColaboradores,
+        penalidades,
+        dispensas,
+      };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - counterManager()');
+      throw error;
+    }
+  }
+
+  /* 
+  FUNÇÃO QUE RETORNA DATAS: 
+  - Retorna datas baseados no dia atual.
+  - Retorna o primeiro e ultimo dia do mês atual.
+  */
+  private async obterIntervaloMesAtual(): Promise<IntervaloMesAtual> {
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = hoje.getMonth();
+
+    return {
+      primeiroDia: new Date(ano, mes, 1, 0, 0, 0, 0),
+      ultimoDia: new Date(ano, mes + 1, 0, 23, 59, 59, 999),
+    };
   }
 
   /* 

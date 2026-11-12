@@ -13,23 +13,26 @@ import {
 import { ControleJornadaService } from './controle-jornada.service';
 import { CreateControleJornadaDto } from './dto/create-controle-jornada.dto';
 import { UpdateControleJornadaDto } from './dto/update-controle-jornada.dto';
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
-import { ResponseControleJornadaDto } from './dto/response-controle-jornada.dto';
+import {
+  ResponseControleJornadaDto,
+  ResponseControleJornadaPaginadaDto,
+} from './dto/response-controle-jornada.dto';
 import { plainToInstance } from 'class-transformer';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
 import { QueryControleJornadaFilterDto } from './dto/query-controle-jornada.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('controle-jornada')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class ControleJornadaController {
   constructor(
     private readonly controleJornadaService: ControleJornadaService,
   ) {}
 
   @Post()
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.TER1)
   async create(
     @Body() createControleJornadaDto: CreateControleJornadaDto,
   ): Promise<ResponseControleJornadaDto> {
@@ -40,12 +43,31 @@ export class ControleJornadaController {
   }
 
   @Get()
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.TER1)
   async findAll(
     @Query() query: QueryControleJornadaFilterDto,
+  ): Promise<ResponseControleJornadaPaginadaDto> {
+    const resultado =
+      await this.controleJornadaService.findAllPagination(query);
+    return plainToInstance(ResponseControleJornadaPaginadaDto, resultado);
+  }
+
+  @Get('listar')
+  @Roles(ROLES.ASN1, ROLES.TER1)
+  async listarTudo(
+    @Query() query: QueryControleJornadaFilterDto,
   ): Promise<ResponseControleJornadaDto[]> {
-    const dados = await this.controleJornadaService.findAll(query);
-    return plainToInstance(ResponseControleJornadaDto, dados);
+    const resultado = await this.controleJornadaService.findAllList(query);
+    return plainToInstance(ResponseControleJornadaDto, resultado);
+  }
+
+  @Get('unico')
+  @Roles(ROLES.ASN1, ROLES.TER1)
+  async findOneFirst(
+    @Query() query: QueryControleJornadaFilterDto,
+  ): Promise<ResponseControleJornadaDto> {
+    const registro = await this.controleJornadaService.findOneFirst(query)
+    return plainToInstance(ResponseControleJornadaDto, registro);
   }
 
   @Get(':id')

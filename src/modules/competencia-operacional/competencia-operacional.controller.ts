@@ -13,8 +13,6 @@ import {
 import { CompetenciaOperacionalService } from './competencia-operacional.service';
 import { CreateCompetenciaOperacionalDto } from './dto/create-competencia-operacional.dto';
 import { UpdateCompetenciaOperacionalDto } from './dto/update-competencia-operacional.dto';
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import {
   ResponseCompetenciaOperacionalAssetsDto,
   ResponseCompetenciaOperacionalContadorDto,
@@ -28,16 +26,18 @@ import {
   QueryCompetenciaOperacionalFilterDto,
   QueryCompetenciaOperacionalOperadorDto,
 } from './dto/query-competencia-operacional.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('competencia-operacional')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class CompetenciaOperacionalController {
   constructor(
     private readonly competenciaOperacionalService: CompetenciaOperacionalService,
   ) {}
 
   @Post()
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.SUP1)
   async create(
     @Body() createCompetenciaOperacionalDto: CreateCompetenciaOperacionalDto,
   ): Promise<ResponseCompetenciaOperacionalDto> {
@@ -48,7 +48,7 @@ export class CompetenciaOperacionalController {
   }
 
   @Get()
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.SUP1)
   async findAll(
     @Query() query: QueryCompetenciaOperacionalFilterDto,
   ): Promise<ResponseCompetenciaOperacionalDto[]> {
@@ -57,7 +57,7 @@ export class CompetenciaOperacionalController {
   }
 
   @Get('assets')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.SUP1)
   async findAssetsAvailable(
     @Query() query: QueryCompetenciaOperacionalOperadorDto,
   ): Promise<ResponseCompetenciaOperacionalAssetsDto[]> {
@@ -67,7 +67,7 @@ export class CompetenciaOperacionalController {
   }
 
   @Get('counter')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.SUP1)
   async counter(
     @Query() query: QueryCompetenciaOperacionalCounterDto,
   ): Promise<ResponseCompetenciaOperacionalContadorDto> {
@@ -76,7 +76,7 @@ export class CompetenciaOperacionalController {
   }
 
   @Get(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.SUP1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseCompetenciaOperacionalDto> {
@@ -85,7 +85,7 @@ export class CompetenciaOperacionalController {
   }
 
   @Patch(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.SUP1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateCompetenciaOperacionalDto: UpdateCompetenciaOperacionalDto,
@@ -98,7 +98,7 @@ export class CompetenciaOperacionalController {
   }
 
   @Patch('deactive/:id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.SUP1)
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseCompetenciaOperacionalDto> {

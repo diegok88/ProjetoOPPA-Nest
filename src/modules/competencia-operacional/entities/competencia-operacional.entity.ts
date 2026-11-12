@@ -23,7 +23,15 @@ export type CompetenciaOperacionalRelacaoParcial =
     };
   }>;
 
+export type CompetenciaOperacionalRelacaoOperadorParcial =
+  Prisma.CompetenciaOperacionalGetPayload<{
+    include: {
+      operador: { select: { id: true; nome: true; cracha: true } };
+    };
+  }>;
+
 export type CompetenciaOperacionalListagem =
   | CompetenciaOperacional
   | CompetenciaOperacionalRelacao
-  | CompetenciaOperacionalRelacaoParcial;
+  | CompetenciaOperacionalRelacaoParcial
+  | CompetenciaOperacionalRelacaoOperadorParcial;

@@ -1,13 +1,19 @@
-import { TipoOcorrencia } from '@/generated/prisma/enums';
+import {
+  Ocorrencia as OcorrenciaModel,
+  Prisma,
+} from '@/generated/prisma/client';
 
-export class Ocorrencia {
-  id!: string;
-  estadoAtivoId!: string;
-  falhaId?: string;
-  solucaoId?: string;
-  tipoOcorrencia!: TipoOcorrencia;
-  solucionadoId?: string;
-  dataInicial!: Date;
-  dataFinal?: Date;
-  status!: boolean;
-}
+export type Ocorrencia = OcorrenciaModel;
+
+export type OcorrenciaRelacao = Prisma.OcorrenciaGetPayload<{
+  include: {
+    estadoAtivo: {
+      include: { alocacaoOperacional: { include: { operador: true } } };
+    };
+    falhas: true;
+    solucoes: true;
+    solucionado: true;
+  };
+}>;
+
+export type OcorrenciaListagem = Ocorrencia | OcorrenciaRelacao;

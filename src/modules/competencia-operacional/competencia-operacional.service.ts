@@ -10,6 +10,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import {
   CompetenciaOperacional,
   CompetenciaOperacionalListagem,
+  CompetenciaOperacionalRelacao,
 } from './entities/competencia-operacional.entity';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import {
@@ -17,13 +18,20 @@ import {
   QueryCompetenciaOperacionalFilterDto,
   QueryCompetenciaOperacionalOperadorDto,
 } from './dto/query-competencia-operacional.dto';
-import { Acao, Prisma } from '@/generated/prisma/client';
+import {
+  Acao,
+  Prisma,
+  SituacaoDispensa,
+  SituacaoPenalidade,
+  TipoPenalidade,
+} from '@/generated/prisma/client';
 import { ResponseCompetenciaOperacionalContadorDto } from './dto/response-competencia-operacional.dto';
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 import { PerfilService } from '../perfil/perfil.service';
 import { ROLES } from '@/auth/guards/roles.const';
-import { Ativo, AtivoRelacoesParcial } from '../ativo/entities/ativo.entity';
+import { AtivoRelacoesParcial } from '../ativo/entities/ativo.entity';
 import { AtivoService } from '../ativo/ativo.service';
+import { GeradorEscalaService } from '../gerador-escala/gerador-escala.service';
 
 @Injectable()
 export class CompetenciaOperacionalService {
@@ -33,6 +41,7 @@ export class CompetenciaOperacionalService {
     private readonly prisma: PrismaService,
     private readonly perfilService: PerfilService,
     private readonly ativoService: AtivoService,
+    private readonly geradorEscalaService: GeradorEscalaService,
     private readonly tenantContext: TenantContextService,
   ) {}
 
@@ -52,6 +61,104 @@ export class CompetenciaOperacionalService {
     }
   }
 
+  /* ----------------------------------------------------------------------------------------------------------------------------- */
+  /* FUNÇÃO MONTAGEM DE CONDIÇÃO */
+  private async toAssembleCondicao(
+    filtros: Omit<
+      QueryCompetenciaOperacionalFilterDto,
+      'page' | 'size' | 'campos' | 'incluir' | 'ordenacao'
+    >,
+    usuarioId: string,
+  ): Promise<Prisma.CompetenciaOperacionalWhereInput> {
+    const condicao: Prisma.CompetenciaOperacionalWhereInput = {};
+    if (filtros.operadorId) condicao.operadorId = filtros.operadorId;
+    if (filtros.gestorId) condicao.gestorId = filtros.gestorId;
+    if (filtros.ativoId) condicao.ativoId = filtros.ativoId;
+    if (filtros.status !== undefined) condicao.status = filtros.status;
+
+    const escalaAtual = await this.geradorEscalaService.consultarEscala();
+
+    if (filtros.decisao === 'alocacao_sel') {
+      condicao.AND = {
+        operador: {
+          escala: { not: escalaAtual.escala },
+          penalidadeComoColaborador: {
+            none: {
+              tipoPenalidade: TipoPenalidade.SUSPENSAO,
+              situacaoPenalidade: SituacaoPenalidade.EXECUCAO,
+            },
+          },
+          dispensaComoColaborador: {
+            none: { situacaoDispensa: SituacaoDispensa.EXECUCAO },
+          },
+        },
+      };
+    }
+
+    if (filtros.gestor) condicao.gestorId = usuarioId;
+
+    return condicao;
+  }
+
+  /* FUNÇÃO MONTAGEM DE ORDENAÇÃO */
+  private async toAssembleOrderBy(
+    ordenacao?: string,
+  ): Promise<Prisma.CompetenciaOperacionalOrderByWithRelationInput[]> {
+    switch (ordenacao) {
+      case 'filtrar':
+        return [{ codigo: 'desc' }];
+      default:
+        return [{ codigo: 'desc' }];
+    }
+  }
+
+  /* FUNÇÃO MONTAGEM DE INCLUDE */
+  private async toAssembleInclude(
+    incluir?: string,
+  ): Promise<Prisma.CompetenciaOperacionalInclude> {
+    switch (incluir) {
+      case 'todos_relacoes':
+        return { operador: true, gestor: true, ativo: true };
+      case 'todos_parcial':
+        return {
+          operador: { select: { id: true, nome: true, cracha: true } },
+          gestor: { select: { id: true, nome: true, cracha: true } },
+          ativo: { select: { id: true, descricao: true, modelo: true } },
+        };
+      case 'operador_parcial':
+        return { operador: { select: { id: true, nome: true, cracha: true } } };
+      default:
+        return {};
+    }
+  }
+
+  /* FUNÇÃO MONTAGEM DOS CAMPOS */
+  private readonly allowedCompetenciaOperacionalFields = [
+    'id',
+    'codigo',
+    'operadorId',
+    'gestorId',
+    'ativoId',
+    'status',
+  ];
+
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedCompetenciaOperacionalFields.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
+  }
+
   async findAll(
     query: QueryCompetenciaOperacionalFilterDto,
     tx?: Prisma.TransactionClient,
@@ -61,41 +168,28 @@ export class CompetenciaOperacionalService {
 
       const client = tx ?? this.prisma.client;
 
-      const { campos, ...filtros } = query ?? {};
+      const {
+        page = 1,
+        size = 10,
+        campos,
+        incluir,
+        ordenacao,
+        ...filtros
+      } = query ?? {};
 
-      const condicao: Prisma.CompetenciaOperacionalWhereInput = {};
-      if (filtros.operadorId) condicao.operadorId = filtros.operadorId;
-      if (filtros.gestorId) condicao.gestorId = filtros.gestorId;
-      if (filtros.ativoId) condicao.ativoId = filtros.ativoId;
-      if (filtros.status !== undefined) condicao.status = filtros.status;
-
-      if (filtros.gestor) condicao.gestorId = ctx.user;
+      const condicao = await this.toAssembleCondicao(filtros, ctx.user);
 
       const selecao = await this.buildSelect(campos);
 
-      const INCLUDES: Record<string, Prisma.CompetenciaOperacionalInclude> = {
-        todos_relacoes: { operador: true, gestor: true, ativo: true },
-        todos_parcial: {
-          operador: { select: { id: true, nome: true, cracha: true } },
-          gestor: { select: { id: true, nome: true, cracha: true } },
-          ativo: { select: { id: true, descricao: true, modelo: true } },
-        },
-      };
-
       const opcoes: Prisma.CompetenciaOperacionalFindManyArgs = {
         where: condicao,
-        orderBy: { codigo: 'desc' },
+        orderBy: await this.toAssembleOrderBy(ordenacao),
       };
 
       if (campos?.length) {
         opcoes.select = selecao;
       } else {
-        const incluir =
-          filtros.incluir && INCLUDES[filtros.incluir]
-            ? INCLUDES[filtros.incluir]
-            : undefined;
-
-        if (incluir) opcoes.include = incluir;
+        opcoes.include = await this.toAssembleInclude(incluir);
       }
 
       const listar: CompetenciaOperacional[] =
@@ -112,7 +206,9 @@ export class CompetenciaOperacionalService {
       throw error;
     }
   }
+  /* ----------------------------------------------------------------------------------------------------------------------------- */
 
+  /* FUNÇÃO DE RETORNO DE ATIVOS QUE NÃO ESTA ALOCADO DE ACORDO COM O OPERADOR */
   async findAssetsAvailable(
     query: QueryCompetenciaOperacionalOperadorDto,
   ): Promise<AtivoRelacoesParcial[]> {
@@ -184,11 +280,16 @@ export class CompetenciaOperacionalService {
   async findOne(
     id: string,
     tx?: Prisma.TransactionClient,
-  ): Promise<CompetenciaOperacional> {
+  ): Promise<CompetenciaOperacionalRelacao> {
     try {
       const client = tx ?? this.prisma.client;
       const buscar = await client.competenciaOperacional.findUnique({
         where: { id: id },
+        include: {
+          operador: true,
+          gestor: true,
+          ativo: true,
+        },
       });
 
       if (!buscar) {
@@ -282,31 +383,5 @@ export class CompetenciaOperacionalService {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
       throw error;
     }
-  }
-
-  private readonly allowedCompetenciaOperacionalFields = [
-    'id',
-    'codigo',
-    'operadorId',
-    'gestorId',
-    'ativoId',
-    'status',
-  ];
-
-  private async buildSelect(
-    campos?: string,
-  ): Promise<Record<string, true> | undefined> {
-    if (!campos) return undefined;
-
-    const campoArray = campos.split(',').map((c) => c.trim());
-    const selecaoObj = {};
-
-    for (const campo of campoArray) {
-      if (this.allowedCompetenciaOperacionalFields.includes(campo)) {
-        selecaoObj[campo] = true;
-      }
-    }
-
-    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
   }
 }

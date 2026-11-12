@@ -1,6 +1,5 @@
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { Public } from '@/auth/guards/public.decorator';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
+
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
 import {
@@ -36,9 +35,11 @@ import { QueryUsuarioFilterDto } from './dto/query-usuario.dto';
 import { Auth } from '@/auth/entities/auth.entity';
 import type { Response } from 'express';
 import { GenerateTokenService } from '@/auth/jwt-generate-token/jwt-generate-token.service';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('usuario')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class UsuarioController {
   constructor(
     private readonly usuarioService: UsuarioService,
@@ -56,7 +57,7 @@ export class UsuarioController {
 
   // CRIAR USUARIO
   @Post()
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async create(@Body() create: CreateUsuarioDto): Promise<ResponseUsuarioDto> {
     const dado = await this.usuarioService.create(create);
     return plainToInstance(ResponseUsuarioDto, dado);
@@ -64,7 +65,7 @@ export class UsuarioController {
 
   // LISTA OS USUARIOS
   @Get()
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async findAll(
     @Query() query: QueryUsuarioFilterDto,
   ): Promise<ResponseUsuarioDto[]> {
@@ -74,7 +75,7 @@ export class UsuarioController {
 
   // CONTADOR DE REGISTROS TOTAIS, ATIVOS E INATIVOS
   @Get('counter')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async counter(): Promise<ResponseUsuarioContadorDto> {
     const contador = await this.usuarioService.counter();
     return plainToInstance(ResponseUsuarioContadorDto, contador);
@@ -82,7 +83,7 @@ export class UsuarioController {
 
   // BUSCA USUARIO PELO ID
   @Get(':id')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseUsuarioRelacaoDto> {
@@ -156,7 +157,7 @@ export class UsuarioController {
 
   // ATUALIZA USUARIO PELO ID
   @Patch(':id')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() update: UpdateUsuarioDto,
@@ -187,7 +188,7 @@ export class UsuarioController {
 
   // DELETA O USUARIO
   @Delete(':id')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseUsuarioDto> {

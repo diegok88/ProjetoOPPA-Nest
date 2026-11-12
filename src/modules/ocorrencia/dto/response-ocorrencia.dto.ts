@@ -1,4 +1,4 @@
-import { Expose } from 'class-transformer';
+import { Expose, Type } from 'class-transformer';
 
 export class ResponseOcorrenciaDto {
   @Expose() id!: string;
@@ -10,4 +10,16 @@ export class ResponseOcorrenciaDto {
   @Expose() dataInicial!: Date;
   @Expose() dataFinal!: Date;
   @Expose() status!: boolean;
+}
+
+export class ResponseOcorrenciaRelacaoDto extends ResponseOcorrenciaDto {}
+
+export class ResponseOcorrenciaPaginadaDto {
+  @Expose()
+  @Type(() => ResponseOcorrenciaRelacaoDto)
+  dados!: ResponseOcorrenciaRelacaoDto[];
+
+  @Expose() total!: number;
+  @Expose() pagina!: number;
+  @Expose() tamanho!: number;
 }

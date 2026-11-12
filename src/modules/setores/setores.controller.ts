@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   ParseUUIDPipe,
+  UseGuards,
 } from '@nestjs/common';
 import { SetoresService } from './setores.service';
 import { CreateSetoresDto } from './dto/create-setores.dto';
@@ -23,8 +24,11 @@ import { ROLES } from '@/auth/guards/roles.const';
 import { QuerySetoresDto } from './dto/query-setores.dto';
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
 import { PerfilService } from '../perfil/perfil.service';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('setores')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class SetoresController {
   constructor(
     private readonly setoresService: SetoresService,

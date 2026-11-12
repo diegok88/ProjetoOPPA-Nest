@@ -82,3 +82,9 @@ export class ResponseGestorCompetenciaRelacaoDto extends ResponseGestorDto {
   @Type(() => ResponseUsuarioGestorCompetenciaDto)
   colaborador?: ResponseUsuarioGestorCompetenciaDto;
 }
+
+export class ResponseGestorManagerContadorDto {
+  @Expose() total!: number;
+  @Expose() penalidades!: number;
+  @Expose() dispensas!: number;
+}

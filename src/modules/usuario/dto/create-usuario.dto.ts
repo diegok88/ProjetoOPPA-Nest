@@ -57,6 +57,34 @@ export class CreateUsuarioDto {
   empresaId?: string;
 }
 
+export class CreateUsuarioTagAtivoDto {
+  @IsString({ message: 'Nome não é do tipo String.' })
+  @IsNotEmpty({ message: 'Nome é um campo obrigatório.' })
+  @Length(10, 100, {
+    message:
+      'Nome deve conter no minimo 10 caracteres e no maximo 100 caracteres.',
+  })
+  @Transform(({ value }) => value.toUpperCase())
+  nome!: string;
+
+  @IsString({ message: 'Nome não é do tipo String.' })
+  @IsNotEmpty({ message: 'Nome é um campo obrigatório.' })
+  @Length(10, 100, {
+    message:
+      'Nome deve conter no minimo 10 caracteres e no maximo 100 caracteres.',
+  })
+  @Transform(({ value }) => value.toUpperCase())
+  codigo!: string;
+
+  @IsUUID('all', { message: 'Perfil id inválido.' })
+  @IsNotEmpty({ message: 'Perfil é um campo obrigatório.' })
+  perfilId!: string;
+
+  @IsUUID('all', { message: 'Tag ativo id inválido.' })
+  @IsNotEmpty({ message: 'Tag ativo id é um campo obrigatório.' })
+  tagAtivoId!: string;
+}
+
 export class CreateUsuarioMaster extends PickType(CreateUsuarioDto, ['nome']) {
   @IsString({ message: 'Senha não é do tipo String.' })
   @MinLength(6, { message: 'Senha deve conter no minimo 6 caracteres.' })

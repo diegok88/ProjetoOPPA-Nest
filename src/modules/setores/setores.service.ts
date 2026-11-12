@@ -77,7 +77,7 @@ export class SetoresService {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
       throw error;
     }
-  }
+  } 
 
   /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS */
   async counter(): Promise<Contador> {

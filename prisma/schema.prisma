@@ -36,8 +36,10 @@ enum Acao {
 model Usuario {
   id               String      @id @default(uuid())
   cracha           Int?
+  codigo           String?
   nome             String?
-  cpf              String?
+  tagAtivoId       String?
+  tagAtivo         TagAtivo?   @relation("tag_ativo", fields: [tagAtivoId], references: [id])
   dataNascimento   DateTime?
   dataAdmissao     DateTime?
   dataDesligamento DateTime?
@@ -184,6 +186,7 @@ enum SituacaoDispensa {
 
 model ControleJornada {
   id            String            @id @default(uuid())
+  codigo        Int               @default(autoincrement())
   usuarioId     String
   colaborador   Usuario           @relation("colaborador", fields: [usuarioId], references: [id])
   tipoJornada   TipoJornada
@@ -206,6 +209,7 @@ enum TipoEstadoJornada {
   CONFORME
   ATRASO
   FALTA
+  ANTECIPADO
 }
 
 model Empresa {
@@ -256,6 +260,8 @@ model CompetenciaSetorial {
   setorId       String
   setor         Setores   @relation("setores", fields: [setorId], references: [id])
   turno         TipoTurno
+  ativadoEm     DateTime  @default(now())
+  inativadoEm   DateTime?
   status        Boolean   @default(true)
 
   @@map("competencia_setorial")
@@ -291,16 +297,20 @@ model TipoSolicitacao {
 }
 
 model AlocacaoOperacional {
-  id         String           @id @default(uuid())
-  codigo     Int              @default(autoincrement())
-  operadorId String
-  operador   Usuario          @relation("operador", fields: [operadorId], references: [id])
-  gestorId   String
-  gestor     Usuario          @relation("gestor", fields: [gestorId], references: [id])
-  tagAtivoId String
-  tagAtivo   TagAtivo         @relation("tag-ativo", fields: [tagAtivoId], references: [id])
-  condicao   CondicaoAlocacao @default(AGUARDANDO)
-  status     Boolean          @default(true)
+  id           String           @id @default(uuid())
+  codigo       Int              @default(autoincrement())
+  operadorId   String?
+  operador     Usuario?         @relation("operador", fields: [operadorId], references: [id])
+  gestorId     String?
+  gestor       Usuario?         @relation("gestor", fields: [gestorId], references: [id])
+  tagAtivoId   String
+  tagAtivo     TagAtivo         @relation("tag-ativo", fields: [tagAtivoId], references: [id])
+  turno        TipoTurno
+  alocadoEm    DateTime?
+  finalizadoEm DateTime?
+  condicao     CondicaoAlocacao @default(AGUARDANDO)
+  situacao     SituacaoAlocacao @default(DISPONIVEL)
+  status       Boolean          @default(true)
 
   estadoAtivo EstadoAtivo[] @relation("estado_ativo")
 
@@ -311,6 +321,15 @@ enum CondicaoAlocacao {
   ACEITO
   RECUSADO
   AGUARDANDO
+  DISPENSADO
+  INDISPONIBILIDADE
+}
+
+enum SituacaoAlocacao {
+  ALOCADO
+  DISPONIVEL
+  INDISPONIVEL
+  FINALIZADO
 }
 
 /**
@@ -318,12 +337,15 @@ enum CondicaoAlocacao {
  */
 model EstadoAtivo {
   id                  String              @id @default(uuid())
+  codigo              Int                 @default(autoincrement())
   alocacaoId          String
   alocacaoOperacional AlocacaoOperacional @relation("estado_ativo", fields: [alocacaoId], references: [id])
   tagAtivoId          String
+  tagAtivo            TagAtivo            @relation("tag_ativo", fields: [tagAtivoId], references: [id])
   tipoEstado          TipoEstadoAtivo
-  dataInicial         DateTime
+  dataInicial         DateTime            @default(now())
   dataFinal           DateTime?
+  duracao             Int?
   status              Boolean             @default(true)
 
   ocorrencia Ocorrencia? @relation("ocorrencia")
@@ -338,45 +360,55 @@ enum TipoEstadoAtivo {
 }
 
 model Ocorrencia {
-  id             String         @id @default(uuid())
-  estadoAtivoId  String         @unique
-  estadoAtivo    EstadoAtivo    @relation("ocorrencia", fields: [estadoAtivoId], references: [id])
-  falhaId        String
-  falhas         Falhas         @relation("falhas", fields: [falhaId], references: [id])
-  solucaoId      String
-  solucoes       Solucoes       @relation("solucoes", fields: [solucaoId], references: [id])
-  tipoOcorrencia TipoOcorrencia
-  solucionadoId  String
-  solucionado    Usuario        @relation("usuario", fields: [solucionadoId], references: [id])
-  dataInicial    DateTime       @default(now())
-  dataFinal      DateTime
-  status         Boolean        @default(true)
+  id                  String             @id @default(uuid())
+  codigo              Int                @default(autoincrement())
+  estadoAtivoId       String             @unique
+  estadoAtivo         EstadoAtivo        @relation("ocorrencia", fields: [estadoAtivoId], references: [id])
+  falhaId             String?
+  falhas              Falhas?            @relation("falhas", fields: [falhaId], references: [id])
+  solucaoId           String?
+  solucoes            Solucoes?          @relation("solucoes", fields: [solucaoId], references: [id])
+  tipoOcorrencia      TipoOcorrencia?
+  condicaoOcorrencia  CondicaoOcorrencia @default(EXECUCAO)
+  solucionadoId       String?
+  solucionado         Usuario?           @relation("usuario", fields: [solucionadoId], references: [id])
+  dataInicial         DateTime           @default(now())
+  dataFalhaRegistrado DateTime?
+  dataFinal           DateTime?
+  statusFalha         Boolean            @default(false)
+  status              Boolean            @default(true)
 
   fluxoOcorrencia FluxoOcorrencia[] @relation("ocorrencia")
 
   @@map("ocorrencia")
 }
 
-model FluxoOcorrencia {
-  id                  String     @id @default(uuid())
-  ocorrenciaId        String
-  ocorrencia          Ocorrencia @relation("ocorrencia", fields: [ocorrenciaId], references: [id])
-  usuarioId           String
-  usuario             Usuario    @relation("usuario", fields: [usuarioId], references: [id])
-  transferidoPerfilId String
-  transferidoPerfil   Perfil     @relation("perfil", fields: [transferidoPerfilId], references: [id])
-  dataInicial         DateTime   @default(now())
-  dataFinal           DateTime
-  duracao             Int
-  status              Boolean    @default(true)
-
-  @@map("fluxo_ocorrencia")
+enum CondicaoOcorrencia {
+  EXECUCAO
+  FINALIZADO
 }
 
 enum TipoOcorrencia {
   OPERACIONAL
   MANUTENCAO
   QUALIDADE
+}
+
+model FluxoOcorrencia {
+  id                  String     @id @default(uuid())
+  codigo              Int        @default(autoincrement())
+  ocorrenciaId        String
+  ocorrencia          Ocorrencia @relation("ocorrencia", fields: [ocorrenciaId], references: [id])
+  usuarioId           String?
+  usuario             Usuario?   @relation("usuario", fields: [usuarioId], references: [id])
+  transferidoPerfilId String
+  transferidoPerfil   Perfil     @relation("perfil", fields: [transferidoPerfilId], references: [id])
+  dataInicial         DateTime   @default(now())
+  dataFinal           DateTime?
+  duracao             Int?
+  status              Boolean    @default(true)
+
+  @@map("fluxo_ocorrencia")
 }
 
 model Ativo {
@@ -408,7 +440,9 @@ model TagAtivo {
   senha     String
   status    Boolean @default(true)
 
-  alocacaoTagAtivo AlocacaoOperacional[] @relation("tag-ativo")
+  alocacaoTagAtivo    AlocacaoOperacional[] @relation("tag-ativo")
+  estadoAtivoTagAtivo EstadoAtivo[]         @relation("tag_ativo")
+  usuarioTagAtivo     Usuario[]             @relation("tag_ativo")
 
   @@map("tag_ativo")
 }

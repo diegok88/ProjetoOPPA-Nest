@@ -7,3 +7,5 @@ export type TagAtivoRelacoes = Prisma.TagAtivoGetPayload<{
     ativo: true;
   };
 }>;
+
+export type TagAtivoListagem = TagAtivo | TagAtivoRelacoes;

@@ -19,6 +19,7 @@ import { QueryCompetenciaSetorialFilterDto } from './dto/query-competencia-setor
 import { Contador } from '@/interfaces/counter.interface';
 import { SetoresCompetencia } from '../setores/entities/setores.entity';
 import { UsuarioService } from '../usuario/usuario.service';
+import { ResponseCompSetContadorSupDto } from './dto/response-competencia-setorial.dto';
 
 @Injectable()
 export class CompetenciaSetorialService {
@@ -46,7 +47,6 @@ export class CompetenciaSetorialService {
           create.colaboradorId,
           tx,
         );
-
         /* verificação para não haver alocação de dois gestores do mesmo turno no setor */
         const queryCS: QueryCompetenciaSetorialFilterDto = {
           setorId: create.setorId,
@@ -55,13 +55,12 @@ export class CompetenciaSetorialService {
         };
 
         const alocacao = await this.findAll(queryCS, tx);
-
         if (alocacao.length > 0) {
           this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
           throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
         }
 
-        /* busca o ultimo registro de competencia */
+        /* busca o ultimo registro de competencia caso estiver ativo*/
         const ultimo = await this.findLast(
           usuario.id,
           create.setorId,
@@ -74,24 +73,32 @@ export class CompetenciaSetorialService {
           await this.deactive(ultimo.id, tx);
         }
 
-        /* query de consulta da lista de gestor */
-        const queryU: QueryGestorFilterDto = {
-          gestorId: usuario.id,
-          status: true,
-        };
+        const gestorUltimo = await this.findLastDate(
+          create.setorId,
+          usuario.turno!,
+          tx,
+        );
 
-        /* busca a lista do gestor atual */
-        const listaGestor = await this.gestorService.findAll(queryU, tx);
+        if (gestorUltimo) {
+          /* query de consulta da lista de gestor */
+          const queryU: QueryGestorFilterDto = {
+            gestorId: gestorUltimo.colaboradorId,
+            status: true,
+          };
 
-        /* lista somente dos ids do gestor atual */
-        const ids = listaGestor.map((lista) => lista.id);
+          /* busca a lista do gestor atual */
+          const listaGestor = await this.gestorService.findAll(queryU, tx);
+          /* lista somente dos ids do gestor atual */
+          const ids = listaGestor
+            .filter((lista) => lista.gestorId !== create.colaboradorId)
+            .map((lista) => lista.colaboradorId);
+          if (ids.length > 0) {
+            /* inativa todos os colaboradores do gestor atual */
+            await this.gestorService.deactiveAll(ids, tx);
 
-        if (ids.length > 0) {
-          /* inativa todos os colaboradores do gestor atual */
-          await this.gestorService.deactiveAll(ids, tx);
-
-          /* cria novo registro de gestor para os colaboradores cadastrador com gestor anterior */
-          await this.gestorService.createAll(ids, create.colaboradorId, tx);
+            /* cria novo registro de gestor para os colaboradores cadastrador com gestor anterior */
+            await this.gestorService.createAll(ids, create.colaboradorId, tx);
+          }
         }
 
         /* verifica se o gestor alocado pertence a gestão do alocador */
@@ -132,6 +139,8 @@ export class CompetenciaSetorialService {
     tx?: Prisma.TransactionClient,
   ): Promise<CompetenciaSetorialRelacao[]> {
     try {
+      const ctx = this.tenantContext.getStore()!;
+
       let inclusao: boolean = false;
 
       const client = tx ?? this.prisma.client;
@@ -145,6 +154,7 @@ export class CompetenciaSetorialService {
       if (filtros.turno) condicao.turno = filtros.turno;
       if (filtros.status !== undefined) condicao.status = filtros.status;
       // Validação separada para determinar o retorno de que tipo de dados
+      if (filtros.gestor === true) condicao.colaboradorId = ctx.user;
       if (filtros.incluir) inclusao = true;
 
       const selecao = await this.buildSelect(campos);
@@ -159,7 +169,7 @@ export class CompetenciaSetorialService {
       } else {
         opcoes.include =
           filtros.incluir === 'setores_parcial'
-            ? { setor: { select: { descricao: true } } }
+            ? { setor: { select: { id: true, codigo: true, descricao: true } } }
             : { setor: inclusao };
       }
 
@@ -216,7 +226,35 @@ export class CompetenciaSetorialService {
 
       return setores;
     } catch (error) {
-      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - findSectionAvailable()',
+      );
+      throw error;
+    }
+  }
+
+  /* 
+  FUNÇÃO CONTADOR DE COMPETENCIAS DE SETORIAL DO GESTOR LOGADO:
+  - retorna a quantidade de competência setorial do gestor.
+  - sendo parametro dentro da função.
+  */
+  async findCounterManager(): Promise<ResponseCompSetContadorSupDto> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+      const condicao: Prisma.CompetenciaSetorialWhereInput = {
+        colaboradorId: ctx.user,
+        status: true,
+      };
+      const contador = await this.prisma.client.competenciaSetorial.count({
+        where: condicao,
+      });
+      return { total: contador };
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - findCounterManager()',
+      );
       throw error;
     }
   }
@@ -295,6 +333,26 @@ export class CompetenciaSetorialService {
     }
   }
 
+  async findLastDate(
+    setorId: string,
+    turno: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<CompetenciaSetorial> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const ultimo = await client.competenciaSetorial.findFirst({
+        where: { setorId: setorId, turno: turno, status: false },
+        orderBy: { codigo: 'desc' },
+      });
+
+      return ultimo;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDLASTDATE');
+      throw error;
+    }
+  }
+
   async deactive(
     id: string,
     tx?: Prisma.TransactionClient,
@@ -305,6 +363,7 @@ export class CompetenciaSetorialService {
       const inativar = await client.competenciaSetorial.update({
         where: { id: id },
         data: {
+          inativadoEm: new Date(),
           status: false,
           _auditAction: Acao.DEACTIVATE,
         },

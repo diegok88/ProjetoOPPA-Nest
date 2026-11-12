@@ -41,6 +41,13 @@ export class QueryCompetenciaSetorialFilterDto {
   status?: boolean;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  )
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
+  gestor?: boolean;
+
+  @IsOptional()
   @IsString({ message: 'Campos não é do tipo String.' })
   campos?: string;
 

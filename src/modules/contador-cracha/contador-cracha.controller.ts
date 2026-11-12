@@ -1,5 +1,3 @@
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
 import {
@@ -14,9 +12,11 @@ import { plainToInstance } from 'class-transformer';
 import { ContadorCrachaService } from './contador-cracha.service';
 import { QueryContadorCrachaFilterDto } from './dto/query-contador-cracha.dto';
 import { ResponseContadorCrachaDto } from './dto/response-contador-cracha.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('contador-cracha')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class ContadorCrachaController {
   constructor(private readonly contadorCrachaService: ContadorCrachaService) {}
 

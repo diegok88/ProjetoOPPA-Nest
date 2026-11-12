@@ -10,8 +10,8 @@ import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from './roles.decorator';
 
 @Injectable()
-export class RolesGuard implements CanActivate {
-  private logger = new Logger(RolesGuard.name);
+export class HttpRolesGuard implements CanActivate {
+  private logger = new Logger(HttpRolesGuard.name);
 
   constructor(
     private reflector: Reflector,

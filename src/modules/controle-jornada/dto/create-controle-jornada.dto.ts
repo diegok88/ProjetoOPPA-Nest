@@ -20,17 +20,6 @@ export class CreateControleJornadaDto {
   })
   tipoJornada!: TipoJornada;
 
-  @IsString({ message: 'O estado da jornada não é do tipo String.' })
-  @IsNotEmpty({ message: 'O estado da jornada é um campo obrigatório.' })
-  @IsEnum(TipoEstadoJornada, {
-    message: 'Estado jornada não pertence ao enum TipoEstadoJornada.',
-  })
-  estadoJornada!: TipoEstadoJornada;
-
-  @IsDate({ message: 'A data de registro não é do tipo Date.' })
-  @IsNotEmpty({ message: 'A data de registro é um campo obrigatório.' })
-  dataRegistro!: Date;
-
   @IsUUID('all', { message: 'Tag ativo id inválido.' })
   @IsNotEmpty({ message: 'A tag do ativo é um campo obrigatório.' })
   tagAtivoId!: string;

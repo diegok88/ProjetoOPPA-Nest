@@ -13,8 +13,6 @@ import {
 import { FalhasService } from './falhas.service';
 import { CreateFalhaDto } from './dto/create-falha.dto';
 import { UpdateFalhaDto } from './dto/update-falha.dto';
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import {
   ResponseFalhasContadorDto,
   ResponseFalhasDto,
@@ -23,10 +21,15 @@ import {
 import { plainToInstance } from 'class-transformer';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
-import { QueryFalhasFilterDto } from './dto/query-falhas.dto';
+import {
+  QueryFalhaFilterDto,
+  QueryFalhasFilterDto,
+} from './dto/query-falhas.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('falhas')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class FalhasController {
   constructor(private readonly falhasService: FalhasService) {}
 
@@ -53,6 +56,15 @@ export class FalhasController {
   async counter(): Promise<ResponseFalhasContadorDto> {
     const contador = await this.falhasService.counter();
     return plainToInstance(ResponseFalhasContadorDto, contador);
+  }
+
+  @Get('unico')
+  @Roles(ROLES.ASN1, ROLES.TER1)
+  async findOneFirst(
+    @Query() query: QueryFalhaFilterDto,
+  ): Promise<ResponseFalhasDto> {
+    const registro = await this.falhasService.findOneFirst(query);
+    return plainToInstance(ResponseFalhasDto, registro);
   }
 
   @Get(':id')

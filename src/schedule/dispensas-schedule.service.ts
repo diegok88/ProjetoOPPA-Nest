@@ -17,7 +17,6 @@ export class DispensasScheduleService {
     timeZone: 'America/Sao_Paulo',
   })
   */
-
   async updateSituationDismissal(): Promise<void> {
     try {
       const agora = new Date();

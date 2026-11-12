@@ -36,3 +36,9 @@ export class ResponseAuthMessageDto {
   @Expose()
   message!: string;
 }
+
+// Adicionado para teste do android
+export class ResponseLoginDto extends ResponseAuthMessageDto {
+  @Expose()
+  accessToken!: string;
+}

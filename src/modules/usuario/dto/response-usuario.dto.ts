@@ -40,6 +40,12 @@ export class ResponseUsuarioDto {
   id!: string;
 
   @Expose()
+  codigo!: string;
+
+  @Expose()
+  tagAtivoId!: string;
+
+  @Expose()
   cracha!: number;
 
   @Expose()

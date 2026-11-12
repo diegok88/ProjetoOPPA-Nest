@@ -1,9 +1,15 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateOcorrenciaDto } from './create-ocorrencia.dto';
-import { IsUUID, IsString, IsEnum, IsOptional } from 'class-validator';
+import {
+  IsUUID,
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsDate,
+  IsBoolean,
+} from 'class-validator';
 import { TipoOcorrencia } from '@/generated/prisma/enums';
+import { Type } from 'class-transformer';
 
-export class UpdateOcorrenciaDto extends PartialType(CreateOcorrenciaDto) {
+export class UpdateOcorrenciaDto {
   @IsOptional()
   @IsUUID('all', { message: 'Falha id inválida.' })
   falhaId?: string;
@@ -23,3 +29,4 @@ export class UpdateOcorrenciaDto extends PartialType(CreateOcorrenciaDto) {
   @IsUUID('all', { message: 'Usuário id inválido.' })
   solucionadoId?: string;
 }
+

@@ -1,15 +1,19 @@
 import { Module } from '@nestjs/common';
-import { GenerateTokenService } from './jwt-generate-token.service';
 import { JwtModule } from '@nestjs/jwt';
+import { GenerateTokenService } from './jwt-generate-token.service';
+import { jwtAsyncOptions } from './jwt.config';
 
 @Module({
-  imports: [
-    JwtModule.register({
-      secret: process.env.JWT_SECRET ?? 'projeto_oppa',
-      signOptions: { expiresIn: '1d' },
-    }),
-  ],
+  imports: [JwtModule.registerAsync(jwtAsyncOptions)],
   providers: [GenerateTokenService],
-  exports: [GenerateTokenService],
+  exports: [GenerateTokenService, JwtModule],
 })
 export class GenerateTokenModule {}
+
+/*
+- alterado:
+JwtModule.register({
+  secret: process.env.JWT_SECRET ?? 'projeto_oppa',
+  signOptions: { expiresIn: '1d' },
+}),
+*/

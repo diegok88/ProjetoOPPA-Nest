@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import { IsUUID, IsString, IsNotEmpty, Length, Matches } from 'class-validator';
 
 export class CreateSolucoesDto {
@@ -19,5 +20,6 @@ export class CreateSolucoesDto {
     message:
       'A descrição deve conter letras maisculas e minusculas, sem numeros e caracteres especiais.',
   })
+  @Transform(({ value }) => value.toUpperCase())
   descricao!: string;
 }

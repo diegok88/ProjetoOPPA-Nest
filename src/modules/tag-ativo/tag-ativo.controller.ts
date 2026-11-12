@@ -13,38 +13,34 @@ import {
 import { TagAtivoService } from './tag-ativo.service';
 import { CreateTagAtivoDto } from './dto/create-tag-ativo.dto';
 import { UpdateTagAtivoDto } from './dto/update-tag-ativo.dto';
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
+
 import {
   ResponseTagAtivoContadorDto,
   ResponseTagAtivoDto,
+  ResponseTagAtivoPaginadaDto,
   ResponseTagAtivoRelacaoDto,
 } from './dto/response-tag-ativo.dto';
 import { plainToInstance } from 'class-transformer';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
-import { QueryTagAtivoFilterDto } from './dto/query-tag-ativo.dto';
-import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import {
+  QueryTagAtivoFilterDto,
+  QueryTagAtivoSetoresDto,
+} from './dto/query-tag-ativo.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('tag-ativo')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class TagAtivoController {
-  constructor(
-    private readonly tagAtivoService: TagAtivoService,
-    private readonly tennantContext: TenantContextService,
-  ) {}
+  constructor(private readonly tagAtivoService: TagAtivoService) {}
 
   @Post()
   @Roles(ROLES.ASN1, ROLES.ADN1)
   async create(
     @Body() createTagAtivoDto: CreateTagAtivoDto,
   ): Promise<ResponseTagAtivoDto> {
-    const ctx = this.tennantContext.getStore()!;
-
-    const dado = await this.tagAtivoService.create(
-      createTagAtivoDto,
-      ctx.empresa,
-    );
+    const dado = await this.tagAtivoService.create(createTagAtivoDto);
     return plainToInstance(ResponseTagAtivoDto, dado);
   }
 
@@ -52,9 +48,20 @@ export class TagAtivoController {
   @Roles(ROLES.ASN1, ROLES.ADN1)
   async findAll(
     @Query() query: QueryTagAtivoFilterDto,
-  ): Promise<ResponseTagAtivoDto[]> {
+  ): Promise<ResponseTagAtivoRelacaoDto[] | ResponseTagAtivoPaginadaDto> {
     const dados = await this.tagAtivoService.findAll(query);
-    return plainToInstance(ResponseTagAtivoDto, dados);
+    return query.decisao === 'listar'
+      ? plainToInstance(ResponseTagAtivoRelacaoDto, dados.dados)
+      : plainToInstance(ResponseTagAtivoPaginadaDto, dados);
+  }
+
+  @Get('setor')
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async findAllSection(
+    @Query() query: QueryTagAtivoSetoresDto,
+  ): Promise<ResponseTagAtivoRelacaoDto[]> {
+    const dados = await this.tagAtivoService.findAllSection(query);
+    return plainToInstance(ResponseTagAtivoRelacaoDto, dados);
   }
 
   @Get('counter')
@@ -66,7 +73,7 @@ export class TagAtivoController {
 
   @Get(':id')
   @Roles(ROLES.ASN1, ROLES.ADN1)
-  async findOne( 
+  async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseTagAtivoRelacaoDto> {
     const dado = await this.tagAtivoService.findOne(id);

@@ -13,16 +13,16 @@ import {
 import { OcorrenciaService } from './ocorrencia.service';
 import { CreateOcorrenciaDto } from './dto/create-ocorrencia.dto';
 import { UpdateOcorrenciaDto } from './dto/update-ocorrencia.dto';
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import { ResponseOcorrenciaDto } from './dto/response-ocorrencia.dto';
 import { plainToInstance } from 'class-transformer';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 import { QueryOcorrenciaFilterDto } from './dto/query-ocorrencia.dto';
 
 @Controller('ocorrencia')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class OcorrenciaController {
   constructor(private readonly ocorrenciaService: OcorrenciaService) {}
 
@@ -35,13 +35,24 @@ export class OcorrenciaController {
     return plainToInstance(ResponseOcorrenciaDto, dado);
   }
 
-  @Get()
+  /*
+    @Get()
   @Roles(ROLES.ASN1)
   async findAll(
     @Query() query: QueryOcorrenciaFilterDto,
   ): Promise<ResponseOcorrenciaDto[]> {
     const dados = await this.ocorrenciaService.findAll(query);
     return plainToInstance(ResponseOcorrenciaDto, dados);
+  }
+  */
+
+  @Get('unico')
+  @Roles(ROLES.ASN1, ROLES.TER1)
+  async findOneFirst(
+    @Query() query: QueryOcorrenciaFilterDto,
+  ): Promise<ResponseOcorrenciaDto> {
+    const registro = await this.ocorrenciaService.findOneFirst(query);
+    return plainToInstance(ResponseOcorrenciaDto, registro);
   }
 
   @Get(':id')
@@ -54,7 +65,7 @@ export class OcorrenciaController {
   }
 
   @Patch(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.TER1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateOcorrenciaDto: UpdateOcorrenciaDto,

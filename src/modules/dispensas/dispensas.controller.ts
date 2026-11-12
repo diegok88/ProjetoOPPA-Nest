@@ -13,8 +13,6 @@ import {
 import { DispensasService } from './dispensas.service';
 import { CreateDispensaDto } from './dto/create-dispensa.dto';
 import { UpdateDispensaDto } from './dto/update-dispensa.dto';
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 
 import { plainToInstance } from 'class-transformer';
 import { ROLES } from '@/auth/guards/roles.const';
@@ -29,14 +27,16 @@ import {
   ResponseDispensaContadorDto,
   ResponseDispensaDto,
 } from './dto/response-dispensas.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('dispensas')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class DispensasController {
   constructor(private readonly dispensasService: DispensasService) {}
 
   @Post()
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async create(
     @Body() createDispensaDto: CreateDispensaDto,
   ): Promise<ResponseDispensaDto> {
@@ -45,7 +45,7 @@ export class DispensasController {
   }
 
   @Get()
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async findAll(
     @Query() query: QueryDispensaFilterDto,
   ): Promise<ResponseDispensaDto[]> {
@@ -54,7 +54,7 @@ export class DispensasController {
   }
 
   @Get('check-date')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async checkAlertManagerDismissal(
     @Query() query: QueryDispensaDateFilterDto,
   ): Promise<ResponseAlertDispensaDto> {
@@ -63,16 +63,16 @@ export class DispensasController {
   }
 
   @Get('counter')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async counter(
-    @Query() query: QueryDispensaCounterDto, 
+    @Query() query: QueryDispensaCounterDto,
   ): Promise<ResponseDispensaContadorDto> {
     const contador = await this.dispensasService.counter(query);
     return plainToInstance(ResponseDispensaContadorDto, contador);
   }
 
   @Get(':id')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseDispensaDto> {
@@ -81,7 +81,7 @@ export class DispensasController {
   }
 
   @Patch(':id')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDispensaDto: UpdateDispensaDto,
@@ -91,7 +91,7 @@ export class DispensasController {
   }
 
   @Patch('situation/:id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async updateSituation(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseDispensaDto> {

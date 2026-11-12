@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Post,
   Body,
   Patch,
   Param,
@@ -11,50 +10,77 @@ import {
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { AlocacaoService } from './alocacao.service';
-import { CreateAlocacaoDto } from './dto/create-alocacao.dto';
 import { UpdateAlocacaoDto } from './dto/update-alocacao.dto';
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
-import { ResponseAlocacaoDto } from './dto/response-alocacao.dto';
+import {
+  ResponseAlertAlocacaoDto,
+  ResponseAlocacaoContadorDto,
+  ResponseAlocacaoDto,
+  ResponseAlocacaoPaginadaDto,
+  ResponseAlocacaoRelacaoDto,
+} from './dto/response-alocacao.dto';
 import { plainToInstance } from 'class-transformer';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
-import { QueryAlocacaoFilterDto } from './dto/query-alocacao.dto';
+import {
+  QueryAlocacaoOperacionalCounterDto,
+  QueryAlocacaoOperacionalFilterDto,
+  QueryQuantidadeAlocacaoOperadorDto,
+} from './dto/query-alocacao.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('alocacao')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class AlocacaoController {
   constructor(private readonly alocacaoService: AlocacaoService) {}
 
-  @Post()
-  @Roles(ROLES.ASN1)
-  async create(
-    @Body() createAlocacaoDto: CreateAlocacaoDto,
-  ): Promise<ResponseAlocacaoDto> {
-    const dado = await this.alocacaoService.create(createAlocacaoDto);
-    return plainToInstance(ResponseAlocacaoDto, dado);
+  @Get()
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async findAll(
+    @Query() query: QueryAlocacaoOperacionalFilterDto,
+  ): Promise<ResponseAlocacaoPaginadaDto> {
+    const resultado = await this.alocacaoService.findAll(query);
+    return plainToInstance(ResponseAlocacaoPaginadaDto, resultado);
   }
 
-  @Get()
-  @Roles(ROLES.ASN1)
-  async findAll(
-    @Query() query: QueryAlocacaoFilterDto,
-  ): Promise<ResponseAlocacaoDto[]> {
-    const dados = await this.alocacaoService.findAll(query);
-    return plainToInstance(ResponseAlocacaoDto, dados);
+  @Get('allocation')
+  @Roles(ROLES.ASN1, ROLES.SUP1, ROLES.TER1)
+  async findOneAllocation(
+    @Query() query: QueryAlocacaoOperacionalFilterDto,
+  ): Promise<ResponseAlocacaoRelacaoDto> {
+    const resultado = await this.alocacaoService.findOneAllocation(query);
+    return plainToInstance(ResponseAlocacaoRelacaoDto, resultado);
+  }
+
+  @Get('check-allocation')
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async checkManagerAllocation(
+    @Query() query: QueryQuantidadeAlocacaoOperadorDto,
+  ): Promise<ResponseAlertAlocacaoDto> {
+    const dados = await this.alocacaoService.checkManagerAllocation(query);
+    return plainToInstance(ResponseAlertAlocacaoDto, dados);
+  }
+
+  @Get('counter')
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async counter(
+    @Query() query: QueryAlocacaoOperacionalCounterDto,
+  ): Promise<ResponseAlocacaoContadorDto> {
+    const contador = await this.alocacaoService.counter(query);
+    return plainToInstance(ResponseAlocacaoContadorDto, contador);
   }
 
   @Get(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.SUP1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<ResponseAlocacaoDto> {
+  ): Promise<ResponseAlocacaoRelacaoDto> {
     const dado = await this.alocacaoService.findOne(id);
-    return plainToInstance(ResponseAlocacaoDto, dado);
+    return plainToInstance(ResponseAlocacaoRelacaoDto, dado);
   }
 
   @Patch(':id')
-  @Roles(ROLES.ASN1)
+  @Roles(ROLES.ASN1, ROLES.SUP1)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateAlocacaoDto: UpdateAlocacaoDto,

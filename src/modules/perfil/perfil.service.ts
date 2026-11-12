@@ -7,7 +7,6 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { UsuarioService } from '../usuario/usuario.service';
 import { CreatePerfilDto } from './dto/create-perfil.dto';
 import { UpdatePerfilDto } from './dto/update-perfil.dto';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
@@ -44,9 +43,13 @@ export class PerfilService {
   }
 
   // LISTAR PERFIS
-  async findAll(query: QueryPerfilFilterDto): Promise<Perfil[]> {
+  async findAll(
+    query: QueryPerfilFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Perfil[]> {
     try {
       const ctx = this.tennant.getStore()!;
+      const client = tx ?? this.prisma.client;
 
       const { campos, ...filtros } = query ?? {};
 
@@ -69,7 +72,7 @@ export class PerfilService {
 
       const selecao = await this.buildSelect(campos);
 
-      const listar = await this.prisma.client.perfil.findMany({
+      const listar = await client.perfil.findMany({
         where: condicao,
         select: selecao,
         orderBy: { descricao: 'asc' },
@@ -83,6 +86,30 @@ export class PerfilService {
       return listar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO DE BUSCA DO ID DO PERFIL:
+  - Paramentros: descrição, nivel, status.
+  - Usado na entidade TagAtivoService.
+  */
+  async findOneProfile(
+    descricao: string,
+    nivel: string,
+    status: boolean,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Perfil> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const buscar = await client.perfil.findFirst({
+        where: { descricao: descricao, nivel: nivel, status: status },
+      });
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findOneProfile()');
       throw error;
     }
   }
@@ -117,7 +144,6 @@ export class PerfilService {
         this.logger.warn(TYPES_NOTICES.NOT_FOUND);
         throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
       }
-
       this.logger.log(TYPES_NOTICES.FIND_ONE);
       return buscar;
     } catch (error) {

@@ -1,29 +1,61 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsNotEmpty,
   IsNumber,
   IsString,
+  IsUUID,
   Matches,
   Min,
   MinLength,
 } from 'class-validator';
 
-export class LoginDto {
+export class LoginColaboradorDto {
   @Type(() => Number)
-  @IsNumber({}, { message: 'Crachá não é do tipo Number!' })
-  @Min(0, { message: 'Crachá não deve ser um valor negativo' })
+  @IsNumber({}, { message: 'Crachá deve ser um número.' })
+  @IsNotEmpty({ message: 'Crachá é obrigatório.' })
+  @Min(0, { message: 'Crachá não pode ser negativo.' })
   cracha!: number;
 
-  @IsString({ message: 'Nome não é do tipo String!' })
-  @MinLength(6, { message: 'Senha deve conter no minimo 6 caracteres.' })
-  @IsNotEmpty({ message: 'Senha é um campo obrigatório.' })
-  @Matches(/^[a-zA-Z0-9]+$/, {
-    message: 'Senha deve conter apenas letras e números',
-  })
+  @IsString({ message: 'Senha deve ser um texto.' })
+  @IsNotEmpty({ message: 'Senha é obrigatória.' })
+  @MinLength(6, { message: 'Senha deve ter no mínimo 6 caracteres.' })
   senha!: string;
 
   @Type(() => Number)
-  @IsNumber({}, { message: 'Empresa código não é do tipo Number!.' })
-  @IsNotEmpty({ message: 'Empresa é um campo obrigatório.' })
+  @IsNumber({}, { message: 'Código da empresa deve ser um número.' })
+  @IsNotEmpty({ message: 'Empresa é obrigatória.' })
   codEmpresa!: number;
+}
+
+export class LoginTagAtivoDto {
+  @IsString({ message: 'Código deve ser um texto.' })
+  @IsNotEmpty({ message: 'Código é obrigatório.' })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
+  )
+  codigo!: string;
+
+  @IsString({ message: 'Senha deve ser um texto.' })
+  @IsNotEmpty({ message: 'Senha é obrigatória.' })
+  @MinLength(6, { message: 'Senha deve ter no mínimo 6 caracteres.' })
+  senha!: string;
+
+  @Type(() => Number)
+  @IsNumber({}, { message: 'Código da empresa deve ser um número.' })
+  @IsNotEmpty({ message: 'Empresa é obrigatória.' })
+  codEmpresa!: number;
+}
+
+export class AutenticarAcaoDto {
+  @IsNotEmpty({ message: 'Código é obrigatório.' })
+  @IsUUID('all', { message: 'Usuario id inválido.' })
+  usuarioId!: string;
+
+  @IsString({ message: 'Senha deve ser um texto.' })
+  @IsNotEmpty({ message: 'Senha é obrigatória.' })
+  @MinLength(4, { message: 'Senha deve ter no mínimo 4 caracteres.' })
+  @Matches(/^\d+$/, {
+    message: 'Pin deve conter apenas números',
+  })
+  pin!: string;
 }

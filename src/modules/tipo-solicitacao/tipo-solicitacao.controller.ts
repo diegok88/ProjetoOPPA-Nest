@@ -13,19 +13,21 @@ import {
 import { TipoSolicitacaoService } from './tipo-solicitacao.service';
 import { CreateTipoSolicitacaoDto } from './dto/create-tipo-solicitacao.dto';
 import { UpdateTipoSolicitacaoDto } from './dto/update-tipo-solicitacao.dto';
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
+
 import { ResponseTipoSolicitacaoDto } from './dto/response-tipo-solicitacao.dto';
 import { plainToInstance } from 'class-transformer';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
 import { QueryTipoSolicitacaoFilterDto } from './dto/query-tipo-solicitacao.dto';
-
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('tipo-solicitacao')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class TipoSolicitacaoController {
-  constructor(private readonly tipoSolicitacaoService: TipoSolicitacaoService) {}
+  constructor(
+    private readonly tipoSolicitacaoService: TipoSolicitacaoService,
+  ) {}
 
   @Post()
   @Roles(ROLES.ASN1)

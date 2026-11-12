@@ -7,10 +7,22 @@ import {
 import { CreateFluxoOcorrenciaDto } from './dto/create-fluxo-ocorrencia.dto';
 import { UpdateFluxoOcorrenciaDto } from './dto/update-fluxo-ocorrencia.dto';
 import { PrismaService } from '@/prisma/prisma.service';
-import { FluxoOcorrencia } from './entities/fluxo-ocorrencia.entity';
+import {
+  FluxoOcorrencia,
+  FluxoOcorrenciaListagem,
+} from './entities/fluxo-ocorrencia.entity';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import { QueryFluxoOcorrenciaFilterDto } from './dto/query-fluxo-ocorrencia.dto';
 import { Acao, Prisma } from '@/generated/prisma/client';
+import {
+  ConsultaConfig,
+  ConsultaFluxoOcorrencia,
+  CONSULTAS,
+  DESVIOS,
+} from '@/constants/query-fluxo-ocorrencia.const';
+import { PaginatedResponse } from '@/interfaces/paginator.interface';
+
+const LIMITE_LISTA_COMPLETA = 100;
 
 @Injectable()
 export class FluxoOcorrenciaService {
@@ -19,11 +31,13 @@ export class FluxoOcorrenciaService {
   constructor(private prisma: PrismaService) {}
 
   async create(
-    createFluxoOcorrenciaDto: CreateFluxoOcorrenciaDto,
+    create: CreateFluxoOcorrenciaDto,
+    tx?: Prisma.TransactionClient,
   ): Promise<FluxoOcorrencia> {
     try {
-      const criar = await this.prisma.client.fluxoOcorrencia.create({
-        data: { ...createFluxoOcorrenciaDto },
+      const client = tx ?? this.prisma.client;
+      const criar = await client.fluxoOcorrencia.create({
+        data: create,
       });
       this.logger.log(TYPES_NOTICES.CREATE);
       return criar;
@@ -33,31 +47,122 @@ export class FluxoOcorrenciaService {
     }
   }
 
-  async findAll(
-    query: QueryFluxoOcorrenciaFilterDto,
-  ): Promise<FluxoOcorrencia[]> {
-    try {
-      const condicao: Prisma.FluxoOcorrenciaWhereInput = {};
-      if (query.ocorrenciaId) condicao.ocorrenciaId = query.ocorrenciaId;
-      if (query.usuarioId) condicao.usuarioId = query.usuarioId;
-      if (query.transferidoPerfilId) {
-        condicao.transferidoPerfilId = query.transferidoPerfilId;
-      }
-      if (query.dataInicial) condicao.dataInicial = query.dataInicial;
-      if (query.status !== undefined) condicao.status = query.status;
+  private toAssembleCondicao(
+    filtros: QueryFluxoOcorrenciaFilterDto,
+  ): Prisma.FluxoOcorrenciaWhereInput {
+    const condicao: Prisma.FluxoOcorrenciaWhereInput = {};
 
-      const listar = await this.prisma.client.fluxoOcorrencia.findMany({
-        where: condicao,
-      });
+    if (filtros.codigo) condicao.ocorrencia = { codigo: filtros.codigo };
+    if (filtros.ocorrenciaId) condicao.ocorrenciaId = filtros.ocorrenciaId;
+    if (filtros.usuarioId) condicao.usuarioId = filtros.usuarioId;
+    if (filtros.transferidoPerfilId)
+      condicao.transferidoPerfilId = filtros.transferidoPerfilId;
+
+    if (filtros.dataInicial || filtros.dataFinal) {
+      const periodo: Prisma.DateTimeNullableFilter = {};
+      if (filtros.dataInicial) periodo.gte = filtros.dataInicial;
+      if (filtros.dataFinal) periodo.lte = filtros.dataFinal;
+    }
+
+    if (filtros.duracao) condicao.duracao = filtros.duracao;
+    if (filtros.status !== undefined) condicao.status = filtros.status;
+
+    return condicao;
+  }
+
+  private resolverConfig(consulta?: ConsultaFluxoOcorrencia): ConsultaConfig {
+    return consulta ? CONSULTAS[consulta] : CONSULTAS.fluxo_padrao;
+  }
+
+  private toAssembleQuery(
+    query: QueryFluxoOcorrenciaFilterDto,
+  ): Prisma.FluxoOcorrenciaFindManyArgs {
+    const desvios = query.desvios ? DESVIOS[query.desvios]() : undefined;
+    const filtros = this.toAssembleCondicao(query);
+
+    return {
+      ...this.resolverConfig(query.consulta),
+      where: desvios ? { AND: [desvios, filtros] } : filtros,
+    };
+  }
+
+  async findAllPagination(
+    query: QueryFluxoOcorrenciaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<PaginatedResponse<FluxoOcorrenciaListagem>> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const pagina = query.page ?? 1;
+      const tamanho = query.size ?? 10;
+      const base = this.toAssembleQuery(query);
+
+      const [listar, total] = await client.$transaction([
+        client.fluxoOcorrencia.findMany({
+          ...base,
+          skip: (pagina - 1) * tamanho,
+          take: tamanho,
+        }),
+        client.fluxoOcorrencia.count({ where: base.where }),
+      ]);
 
       if (listar.length === 0) {
         this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
       }
 
       this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return { dados: listar, total, pagina, tamanho };
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - findAllPagination()',
+      );
+      throw error;
+    }
+  }
+
+  async findAllList(
+    query: QueryFluxoOcorrenciaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<FluxoOcorrenciaListagem[]> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const listar = await client.fluxoOcorrencia.findMany({
+        ...this.toAssembleQuery(query),
+        take: LIMITE_LISTA_COMPLETA,
+      });
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+
       return listar;
     } catch (error) {
-      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findAllList()');
+      throw error;
+    }
+  }
+
+  async findOneFirst(
+    query: QueryFluxoOcorrenciaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<FluxoOcorrenciaListagem | null> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const dados = this.toAssembleQuery(query);
+      this.logger.debug(dados);
+
+      const buscar = await client.fluxoOcorrencia.findFirst(dados);
+      this.logger.debug(buscar);
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findOneFirst()');
       throw error;
     }
   }

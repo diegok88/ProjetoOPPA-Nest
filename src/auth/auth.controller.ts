@@ -1,75 +1,85 @@
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
-import {
-  Body,
-  Controller,
-  Get,
-  Logger,
-  Post,
-  Res,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Logger, Post, Req, Res } from '@nestjs/common';
 import { plainToClass, plainToInstance } from 'class-transformer';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dto/create-auth.dto';
 import {
   ResponseAuthDto,
   ResponseAuthMessageDto,
+  ResponseLoginDto,
 } from './dto/response-auth.dto';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './guards/public.decorator';
 import { TenantContextService } from './tenant-context/tenant-context.service';
-import { UserContext } from './tenant-context/user-context.interface';
+import {
+  AutenticarAcaoDto,
+  LoginColaboradorDto,
+  LoginTagAtivoDto,
+} from './dto/create-auth.dto';
+import {
+  getJwtClearCookieOptions,
+  getJwtCookieOptions,
+} from './jwt-generate-token/jwt-cookie.config';
+import { AuthUser } from './entities/auth-user.interface';
 
 @Controller('auth')
-@UseGuards(JwtAuthGuard)
 export class AuthController {
   private logger = new Logger(AuthController.name);
 
-  constructor(
-    private readonly authService: AuthService,
-    private readonly tenantContext: TenantContextService,
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
   @Post('login')
   @Public()
   async login(
-    @Body() loginDto: LoginDto,
+    @Body() loginDto: LoginColaboradorDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<ResponseAuthMessageDto> {
-    const token = await this.authService.login(loginDto); 
-    res.cookie('jwt', token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 24 * 60 * 60 * 1000,
-    });
-    return plainToClass(ResponseAuthMessageDto, {
+  ): Promise<ResponseLoginDto> {
+    const token = await this.authService.login(loginDto);
+    res.cookie('jwt', token, getJwtCookieOptions());
+    return plainToClass(ResponseLoginDto, {
       message: TYPES_NOTICES.LOGIN,
+      accessToken: token,
+    });
+  }
+
+  @Post('login_tag')
+  @Public()
+  async loginTag(
+    @Body() loginDto: LoginTagAtivoDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<ResponseLoginDto> {
+    const token = await this.authService.loginTag(loginDto);
+    res.cookie('jwt', token, getJwtCookieOptions());
+    return plainToClass(ResponseLoginDto, {
+      message: TYPES_NOTICES.LOGIN,
+      accessToken: token,
     });
   }
 
   @Post('logout')
   async logout(
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<ResponseAuthMessageDto> {
-    const usuario: UserContext = this.tenantContext.getStore()!;
-    await this.authService.logout(usuario);
-    res.clearCookie('jwt', {
-      httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
-      path: '/',
+    await this.authService.logout(req.user as AuthUser);
+    res.clearCookie('jwt', getJwtClearCookieOptions());
+    return plainToClass(ResponseAuthMessageDto, {
+      message: TYPES_NOTICES.LOGOUT,
     });
-    return plainToClass(ResponseAuthMessageDto, TYPES_NOTICES.LOGOUT);
+  }
+
+  @Post('autenticar')
+  async AutenticarAcao(
+    @Body() autenticar: AutenticarAcaoDto,
+  ): Promise<boolean> {
+    const autenticado = await this.authService.authenticateAction(autenticar);
+    return autenticado;
   }
 
   @Get('profile')
-  async getIt(): Promise<ResponseAuthDto> {
-    const usuario = this.tenantContext.getStore()!;
+  async getIt(@Req() req: Request): Promise<ResponseAuthDto> {
+    const usuario = req.user as AuthUser;
     this.logger.log('getIt()');
-    const usuarioPerfil = this.authService.findProfile(usuario.user);
-    return plainToInstance(ResponseAuthDto, usuarioPerfil);
+    const perfil = await this.authService.findProfile(usuario.userId);
+    return plainToInstance(ResponseAuthDto, perfil);
   }
 }

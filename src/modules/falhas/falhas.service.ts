@@ -10,10 +10,26 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 
 import { Acao, Prisma } from '@/generated/prisma/client';
-import { QueryFalhasFilterDto } from './dto/query-falhas.dto';
-import { Falhas, FalhasRelacoes } from './entities/falha.entity';
+import {
+  QueryFalhaFilterDto,
+  QueryFalhasFilterDto,
+} from './dto/query-falhas.dto';
+import {
+  Falhas,
+  FalhasListagem,
+  FalhasRelacoes,
+} from './entities/falha.entity';
 import { Contador } from '@/interfaces/counter.interface';
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import {
+  ConsultaConfig,
+  ConsultaFalhas,
+  CONSULTAS,
+  DESVIOS,
+} from '@/constants/query-falha.const';
+import { PaginatedResponse } from '@/interfaces/paginator.interface';
+
+const LIMITE_LISTA_COMPLETA = 100;
 
 @Injectable()
 export class FalhasService {
@@ -33,6 +49,28 @@ export class FalhasService {
       return criar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO CONTADOR DE REGISTROS: TOTAL, ATIVOS E INATIVOS EM UMA ÚNICA QUERY */
+  async counter(): Promise<Contador> {
+    try {
+      const ctx = this.tenantContext.getStore()?.empresa;
+
+      const grupos = await this.prisma.falhas.groupBy({
+        by: ['status'],
+        where: { ativo: { empresaId: ctx } },
+        _count: { _all: true },
+      });
+
+      const ativos = grupos.find((g) => g.status === true)?._count._all ?? 0;
+      const inativos = grupos.find((g) => g.status === false)?._count._all ?? 0;
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return { total: ativos + inativos, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
       throw error;
     }
   }
@@ -94,24 +132,115 @@ export class FalhasService {
     }
   }
 
-  /* FUNÇÃO CONTADOR DE REGISTROS: TOTAL, ATIVOS E INATIVOS EM UMA ÚNICA QUERY */
-  async counter(): Promise<Contador> {
-    try {
-      const ctx = this.tenantContext.getStore()?.empresa;
+  private toAssembleCondicao(
+    filtros: QueryFalhaFilterDto,
+  ): Prisma.FalhasWhereInput {
+    const condicao: Prisma.FalhasWhereInput = {};
 
-      const grupos = await this.prisma.falhas.groupBy({
-        by: ['status'],
-        where: { ativo: { empresaId: ctx } },
-        _count: { _all: true },
+    if (filtros.codigo) condicao.codigo = filtros.codigo;
+    if (filtros.descricao) condicao.descricao = filtros.descricao;
+    if (filtros.ativoId) condicao.ativoId = filtros.ativoId;
+    if (filtros.direcionamentoId)
+      condicao.direcionamentoId = filtros.direcionamentoId;
+    if (filtros.status !== undefined) condicao.status = filtros.status;
+
+    return condicao;
+  }
+
+  private resolverConfig(consulta?: ConsultaFalhas): ConsultaConfig {
+    return consulta ? CONSULTAS[consulta] : CONSULTAS.falhas_padrao;
+  }
+
+  private toAssembleQuery(
+    query: QueryFalhaFilterDto,
+  ): Prisma.FalhasFindManyArgs {
+    const desvios = query.desvios ? DESVIOS[query.desvios]() : undefined;
+    const filtros = this.toAssembleCondicao(query);
+
+    return {
+      ...this.resolverConfig(query.consulta),
+      where: desvios ? { AND: [desvios, filtros] } : filtros,
+    };
+  }
+
+  async findAllPagination(
+    query: QueryFalhaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<PaginatedResponse<FalhasListagem>> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const pagina = query.page ?? 1;
+      const tamanho = query.size ?? 10;
+      const base = this.toAssembleQuery(query);
+
+      const [listar, total] = await client.$transaction([
+        client.falhas.findMany({
+          ...base,
+          skip: (pagina - 1) * tamanho,
+          take: tamanho,
+        }),
+        client.falhas.count({ where: base.where }),
+      ]);
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+
+      return { dados: listar, total, pagina, tamanho };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  async findAllList(
+    query: QueryFalhaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<FalhasListagem[]> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const listar = await client.falhas.findMany({
+        ...this.toAssembleQuery(query),
+        take: LIMITE_LISTA_COMPLETA,
       });
 
-      const ativos = grupos.find((g) => g.status === true)?._count._all ?? 0;
-      const inativos = grupos.find((g) => g.status === false)?._count._all ?? 0;
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
 
-      this.logger.log(TYPES_NOTICES.COUNTER);
-      return { total: ativos + inativos, ativos, inativos };
+      return listar;
     } catch (error) {
-      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findAllList()');
+      throw error;
+    }
+  }
+
+  async findOneFirst(
+    query: QueryFalhaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<FalhasListagem | null> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const dados = this.toAssembleQuery(query);
+      this.logger.debug(dados);
+
+      const buscar = await client.falhas.findFirst(this.toAssembleQuery(query));
+
+      this.logger.debug(buscar);
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - async findOneFirst()',
+      );
       throw error;
     }
   }

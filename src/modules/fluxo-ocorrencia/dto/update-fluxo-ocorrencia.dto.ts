@@ -1,7 +1,7 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateFluxoOcorrenciaDto } from './create-fluxo-ocorrencia.dto';
-import { IsDate, IsInt, IsNotEmpty, IsOptional, Min } from 'class-validator';
+import { IsOptional, IsUUID } from 'class-validator';
 
-export class UpdateFluxoOcorrenciaDto extends PartialType(
-  CreateFluxoOcorrenciaDto,
-) {}
+export class UpdateFluxoOcorrenciaDto {
+  @IsOptional()
+  @IsUUID('all', { message: 'Usuário id inválido.' })
+  usuarioId?: string;
+}

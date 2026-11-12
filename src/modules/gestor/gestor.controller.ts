@@ -5,23 +5,24 @@ import {
   ResponseGestorCompetenciaRelacaoDto,
   ResponseGestorContadorDto,
   ResponseGestorDto,
+  ResponseGestorManagerContadorDto,
   ResponseGestorRelacoesDto,
   ResponseGestorRelacoesParcialDto,
   ResponseGestorUsuarioDto,
 } from './dto/response-gestor.dto';
 import { plainToInstance } from 'class-transformer';
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles-auth.guard';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('gestor')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class GestorController {
   constructor(private readonly gestorService: GestorService) {}
 
   @Get()
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async findAll(
     @Query() query: QueryGestorFilterDto,
   ): Promise<ResponseGestorRelacoesParcialDto[]> {
@@ -48,7 +49,7 @@ export class GestorController {
   }
 
   @Get('list_competencia')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.GER1)
   async findAllGestorCompetencia(
     @Query() query: QueryGestorFilterDto,
   ): Promise<ResponseGestorCompetenciaRelacaoDto[]> {
@@ -57,10 +58,17 @@ export class GestorController {
   }
 
   @Get('counter')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
   async counter(): Promise<ResponseGestorContadorDto> {
     const contador = await this.gestorService.counter();
     return plainToInstance(ResponseGestorContadorDto, contador);
+  }
+
+  @Get('counter_manager')
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async counterManager(): Promise<ResponseGestorManagerContadorDto> {
+    const contador = await this.gestorService.counterManager();
+    return plainToInstance(ResponseGestorManagerContadorDto, contador);
   }
 
   @Get(':id')

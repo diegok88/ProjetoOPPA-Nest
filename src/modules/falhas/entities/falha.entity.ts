@@ -10,3 +10,5 @@ export type FalhasRelacoes = Prisma.FalhasGetPayload<{
     ocorrenciaFalha: true;
   };
 }>;
+
+export type FalhasListagem = Falhas | FalhasRelacoes;

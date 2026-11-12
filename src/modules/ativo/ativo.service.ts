@@ -49,6 +49,7 @@ export class AtivoService {
   ): Promise<AtivoRelacoes[]> {
     try {
       const ctx = this.tenantContext.getStore()!;
+      this.logger.debug(query);
 
       const client = tx ?? this.prisma.client;
 
@@ -100,6 +101,7 @@ export class AtivoService {
         this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
       }
 
+      this.logger.debug(listar);
       this.logger.log(TYPES_NOTICES.FIND_ALL);
       return listar;
     } catch (error) {

@@ -14,14 +14,20 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { plainToClass } from 'class-transformer';
-import { LoginDto } from './dto/create-auth.dto';
 import { ResponseAuthDto } from './dto/response-auth.dto';
 import { Auth } from './entities/auth.entity';
 import { UserContext } from './tenant-context/user-context.interface';
 import { QueryUsuarioFilterDto } from '@/modules/usuario/dto/query-usuario.dto';
 import { GenerateTokenService } from './jwt-generate-token/jwt-generate-token.service';
+import {
+  AutenticarAcaoDto,
+  LoginColaboradorDto,
+  LoginTagAtivoDto,
+} from './dto/create-auth.dto';
+import { AuthUser } from './entities/auth-user.interface';
+
+const MENSAGEM_CREDENCIAIS_INVALIDAS = 'Credenciais inválidas.';
 
 @Injectable()
 export class AuthService {
@@ -31,7 +37,6 @@ export class AuthService {
     private readonly usuario: UsuarioService,
     private readonly empresa: EmpresaService,
     private readonly auditoria: AuditoriaService,
-    private readonly prisma: PrismaService,
     private readonly generateToken: GenerateTokenService,
   ) {}
 
@@ -42,102 +47,102 @@ export class AuthService {
     return plainToClass(ResponseAuthDto, usuario);
   }
 
-  // LOGIN DO USUARIO
-  async login(login: LoginDto) {
-    try {
-      const loginUsuario = await this.prisma.$transaction(async (tx) => {
-        this.logger.log('login()');
-        const filtro: QueryEmpresaFilterDto = { codigo: login.codEmpresa };
-        const empresa = await this.empresa.findEnterpriceOne(filtro);
-        const verificar: QueryUsuarioFilterDto = {
-          cracha: login.cracha,
-          empresaId: empresa.id,
-        };
-        const validarUsuario =
-          await this.usuario.findOneBadgeAndEnterprice(verificar);
-        if (!validarUsuario) {
-          this.logger.warn(`Usuário crachá ${login.cracha} não encontrado.`);
-          throw new NotFoundException();
-        }
-        const { senha, perfilId, id, empresaId, cracha, versaoToken } =
-          validarUsuario;
-        if (verificar.cracha !== cracha || verificar.empresaId !== empresaId) {
-          this.logger.warn('Usuário com credenciais não autorizado.');
-          throw new UnauthorizedException();
-        }
-        const validarSenha = await this.usuario.compareHash(login.senha, senha);
-        if (!validarSenha) {
-          this.logger.warn(`Usuário crachá ${login.cracha} não autorizado.`);
-          throw new UnauthorizedException();
-        }
-
-        if (!perfilId) {
-          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
-          throw new BadRequestException(TYPES_NOTICES.NOT_FOUND);
-        }
-
-        if (!empresaId) {
-          this.logger.warn(TYPES_NOTICES.NOT_FOUND);
-          throw new BadRequestException(TYPES_NOTICES.NOT_FOUND);
-        }
-
-        const dadosToken: Auth = {
-          userId: id,
-          perfil: perfilId,
-          empresa: empresaId,
-          versaoToken: versaoToken,
-        };
-        const token = await this.generateToken.generateToken(dadosToken);
-
-        this.logger.log('Token gerado com sucesso!');
-
-        const dadosAuditoria: CreateAuditoriaDto = {
-          entidade: 'AUTH',
-          registroId: id,
-          acao: Acao.LOGIN,
-          dadosRegistrados: JSON.stringify(token),
-          empresaId: empresaId,
-          registradoPorId: id,
-        };
-        await this.auditoria.create(dadosAuditoria, tx);
-        return token;
-      });
-      this.logger.log('Login realizado com sucesso!');
-      return loginUsuario;
-    } catch (error) {
-      this.logger.error('Falha ao logar o usuário!');
-      throw error;
-    }
+  // LOGIN DO USUARIO COLABORADOR
+  login(dto: LoginColaboradorDto): Promise<string> {
+    return this.autenticar(dto.codEmpresa, { cracha: dto.cracha }, dto.senha);
   }
 
-  // LOGOUT DO USUARIO
-  async logout(usuario: UserContext): Promise<void> {
-    try {
-      /* Função de busca unica pelo id, arquivo: UsuarioService */
-      const buscar = await this.usuario.findOne(usuario.user);
-      /* Função que incrementa a versão do token a cada logout do usuario, arquivo: UsuarioService */
-      await this.usuario.incrementarVersaoToken(buscar.id, buscar.versaoToken);
+  // LOGIN DO USUARIO DISPOSITIVO
+  loginTag(dto: LoginTagAtivoDto): Promise<string> {
+    return this.autenticar(dto.codEmpresa, { codigo: dto.codigo }, dto.senha);
+  }
 
-      const queryAuditoria: QueryAuditoriaFindOneLastDto = {
-        acao: Acao.LOGIN,
-        empresaId: usuario.empresa,
-        registradoPorId: usuario.user,
-      };
-      const auditoria = await this.auditoria.findOneLast(queryAuditoria);
+  // FUNÇÃO DE AUTENTICAÇÃO DOS DOIS LOGINS
+  private async autenticar(
+    codEmpresa: number,
+    identificador: Pick<QueryUsuarioFilterDto, 'cracha' | 'codigo'>,
+    senha: string,
+  ): Promise<string> {
+    const empresaFiltro: QueryEmpresaFilterDto = { codigo: codEmpresa };
+    const empresa = await this.empresa.findEnterpriceOne(empresaFiltro);
 
-      const dadosAuditoria: CreateAuditoriaDto = {
-        entidade: 'AUTH',
-        registroId: buscar.id,
-        acao: Acao.LOGOUT,
-        dadosRegistrados: auditoria.dadosRegistrados,
-        empresaId: usuario.empresa,
-        registradoPorId: usuario.user,
-      };
-      await this.auditoria.create(dadosAuditoria);
-      this.logger.log(TYPES_NOTICES.LOGOUT);
-    } catch (error) {
-      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE);
-      throw error;
+    const usuario = await this.usuario.findOneBadgeAndEnterprice({
+      ...identificador,
+      empresaId: empresa.id,
+    });
+
+    if (!usuario) {
+      this.logger.warn('Tentativa de login com credenciais inválidas.');
+      throw new UnauthorizedException(MENSAGEM_CREDENCIAIS_INVALIDAS);
     }
+
+    const senhaValida = await this.usuario.compareHash(senha, usuario.senha);
+    if (!senhaValida) {
+      this.logger.warn('Tentativa de login com credenciais inválidas.');
+      throw new UnauthorizedException(MENSAGEM_CREDENCIAIS_INVALIDAS);
+    }
+
+    if (!usuario.perfilId || !usuario.empresaId) {
+      this.logger.warn('Usuário sem perfil ou empresa vinculados.');
+      throw new UnauthorizedException(MENSAGEM_CREDENCIAIS_INVALIDAS);
+    }
+
+    const dadosToken: Auth = {
+      userId: usuario.id,
+      perfil: usuario.perfilId,
+      empresa: usuario.empresaId,
+      versaoToken: usuario.versaoToken,
+    };
+    const token = await this.generateToken.generateToken(dadosToken);
+
+    const dadosAuditoria: CreateAuditoriaDto = {
+      entidade: 'AUTH',
+      registroId: usuario.id,
+      acao: Acao.LOGIN,
+      dadosRegistrados: JSON.stringify({
+        perfil: usuario.perfilId,
+        empresa: usuario.empresaId,
+      }),
+      empresaId: usuario.empresaId,
+      registradoPorId: usuario.id,
+    };
+    await this.auditoria.create(dadosAuditoria);
+
+    this.logger.log('Login realizado com sucesso.');
+    return token;
+  }
+
+  // LOGOUT DO USUARIO TODOS
+  async logout(usuario: AuthUser): Promise<void> {
+    const atual = await this.usuario.findOne(usuario.userId);
+    if (!atual) throw new UnauthorizedException();
+
+    await this.usuario.incrementarVersaoToken(atual.id, atual.versaoToken);
+
+    const dadosAuditoria: CreateAuditoriaDto = {
+      entidade: 'AUTH',
+      registroId: atual.id,
+      acao: Acao.LOGOUT,
+      dadosRegistrados: JSON.stringify({
+        perfil: usuario.perfil,
+        empresa: usuario.empresa,
+      }),
+      empresaId: usuario.empresa,
+      registradoPorId: usuario.userId,
+    };
+    await this.auditoria.create(dadosAuditoria);
+    this.logger.log(TYPES_NOTICES.LOGOUT);
+  }
+
+  async authenticateAction(dto: AutenticarAcaoDto): Promise<boolean> {
+    this.logger.debug(dto);
+    const { usuarioId, pin } = dto;
+    const usuario = await this.usuario.findOne(usuarioId);
+    const pinValida = await this.usuario.compareHash(pin, usuario.pin);
+    if (!pinValida) {
+      this.logger.warn('Tentativa de autenticação com credenciais inválidas.');
+      throw new UnauthorizedException(MENSAGEM_CREDENCIAIS_INVALIDAS);
+    }
+    return pinValida;
   }
 }

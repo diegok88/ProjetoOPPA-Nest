@@ -22,6 +22,15 @@ export class QueryUsuarioFilterDto {
   cracha?: number;
 
   @IsOptional()
+  @IsString({ message: 'Código não é do tipo String.' })
+  @Length(10, 100, {
+    message:
+      'Código deve conter no minimo 10 caracteres e no maximo 100 caracteres.',
+  })
+  @Transform(({ value }) => value.toUpperCase())
+  codigo?: string;
+
+  @IsOptional()
   @IsString({ message: 'Nome não é do tipo String.' })
   @Length(10, 100, {
     message:
@@ -86,10 +95,11 @@ export class QueryUsuarioFilterDto {
 
 export class QueryBagdeEnterpriceDto {
   @IsNumber({}, { message: 'Crachá não é do tipo Number' })
-  @IsNotEmpty({ message: 'Empresa é um campo obrigatório.' })
   cracha?: number;
 
+  @IsString({ message: 'Crachá não é do tipo String' })
+  codigo?: string;
+
   @IsUUID('all', { message: 'Empresa id inválido.' })
-  @IsNotEmpty({ message: 'Empresa é um campo obrigatório.' })
   empresaId?: string;
 }

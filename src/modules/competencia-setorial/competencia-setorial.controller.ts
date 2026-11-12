@@ -7,6 +7,8 @@ import {
   Delete,
   ParseUUIDPipe,
   Patch,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { CompetenciaSetorialService } from './competencia-setorial.service';
 import { CreateCompetenciaSetorialDto } from './dto/create-competencia-setorial.dto';
@@ -14,6 +16,7 @@ import {
   ResponseCompetenciaRelacaoDto,
   ResponseCompetenciaSetorialContadorDto,
   ResponseCompetenciaSetorialDto,
+  ResponseCompSetContadorSupDto,
   ResponseCompSetSectionSelectDto,
 } from './dto/response-competencia-setorial.dto';
 import { plainToInstance } from 'class-transformer';
@@ -21,8 +24,11 @@ import { QueryCompetenciaSetorialFilterDto } from './dto/query-competencia-setor
 import { Roles } from '@/auth/guards/roles.decorator';
 import { ROLES } from '@/auth/guards/roles.const';
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
 @Controller('competencia-setorial')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class CompetenciaSetorialController {
   constructor(
     private readonly competenciaSetorialService: CompetenciaSetorialService,
@@ -30,7 +36,7 @@ export class CompetenciaSetorialController {
   ) {}
 
   @Post()
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.GER1)
   async create(
     @Body() create: CreateCompetenciaSetorialDto,
   ): Promise<ResponseCompetenciaSetorialDto> {
@@ -39,15 +45,16 @@ export class CompetenciaSetorialController {
   }
 
   @Get()
-  @Roles(ROLES.ASN1, ROLES.ADN1)
-  async findAll(): Promise<ResponseCompetenciaSetorialDto[]> {
-    const query: QueryCompetenciaSetorialFilterDto = {};
+  @Roles(ROLES.ASN1, ROLES.GER1, ROLES.SUP1)
+  async findAll(
+    @Query() query: QueryCompetenciaSetorialFilterDto,
+  ): Promise<ResponseCompetenciaRelacaoDto[]> {
     const dados = await this.competenciaSetorialService.findAll(query);
-    return plainToInstance(ResponseCompetenciaSetorialDto, dados);
+    return plainToInstance(ResponseCompetenciaRelacaoDto, dados);
   }
 
   @Get('list/:id')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.GER1)
   async findAllList(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseCompetenciaRelacaoDto[]> {
@@ -64,7 +71,7 @@ export class CompetenciaSetorialController {
   }
 
   @Get('section_available/:id')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.GER1)
   async findSectionAvailable(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseCompSetSectionSelectDto[]> {
@@ -74,14 +81,21 @@ export class CompetenciaSetorialController {
   }
 
   @Get('counter')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.GER1)
   async counter(): Promise<ResponseCompetenciaSetorialContadorDto> {
     const contador = await this.competenciaSetorialService.counter();
     return plainToInstance(ResponseCompetenciaSetorialContadorDto, contador);
   }
 
+  @Get('counter_manager')
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async findCounterManager(): Promise<ResponseCompSetContadorSupDto> {
+    const contador = await this.competenciaSetorialService.findCounterManager();
+    return plainToInstance(ResponseCompSetContadorSupDto, contador);
+  }
+
   @Get(':id')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.GER1)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseCompetenciaSetorialDto> {
@@ -90,7 +104,7 @@ export class CompetenciaSetorialController {
   }
 
   @Patch('deactive/:id')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1, ROLES.GER1)
   async deactive(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ResponseCompetenciaSetorialDto> {
@@ -99,7 +113,7 @@ export class CompetenciaSetorialController {
   }
 
   @Delete(':id')
-  @Roles(ROLES.ASN1, ROLES.ADN1)
+  @Roles(ROLES.ASN1)
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.competenciaSetorialService.remove(id);
   }
