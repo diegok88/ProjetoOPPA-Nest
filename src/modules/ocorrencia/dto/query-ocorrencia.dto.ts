@@ -10,15 +10,16 @@ import {
   Min,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { CONSULTAS, DESVIOS } from '@/constants/query-controle-jornada.const';
 import {
   fimDoDiaBrasilia,
   inicioDoDiaBrasilia,
 } from '@/utils/data-brasilia.util';
 import { CondicaoOcorrencia, TipoOcorrencia } from '@/generated/prisma/enums';
-import type {
-  ConsultaOcorrencia,
-  RecorteOcorrencia,
+import {
+  CONSULTAS,
+  DESVIOS,
+  type ConsultaOcorrencia,
+  type RecorteOcorrencia,
 } from '@/constants/query-ocorrencia.const';
 
 export class QueryOcorrenciaFilterDto {
@@ -61,7 +62,7 @@ export class QueryOcorrenciaFilterDto {
   solucionadoId?: string;
 
   @IsOptional()
-  @Transform(({ value }) => inicioDoDiaBrasilia(value)) 
+  @Transform(({ value }) => inicioDoDiaBrasilia(value))
   @IsDate({ message: 'DataInicial não está em formato de data válido!' })
   dataInicial?: Date;
 

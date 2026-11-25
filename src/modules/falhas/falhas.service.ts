@@ -261,6 +261,7 @@ export class FalhasService {
         throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
       }
 
+      this.logger.debug(buscar);
       return buscar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');

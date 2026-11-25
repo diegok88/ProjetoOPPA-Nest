@@ -9,10 +9,22 @@ import { UpdateSolucoeDto } from './dto/update-solucoes.dto';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Solucoes, SolucoesListagem } from './entities/solucoes.entity';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
-import { QuerySolucoesFilterDto } from './dto/query-solucoes.dto';
+import {
+  QuerySolucaoFilterDto,
+  QuerySolucoesFilterDto,
+} from './dto/query-solucoes.dto';
 import { Acao, Prisma } from '@/generated/prisma/client';
 import { Contador } from '@/interfaces/counter.interface';
 import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import {
+  ConsultaConfig,
+  CONSULTAS,
+  ConsultaSolucoes,
+  DESVIOS,
+} from '@/constants/solucoes.const';
+import { PaginatedResponse } from '@/interfaces/paginator.interface';
+
+const LIMITE_LISTA_COMPLETA = 100;
 
 @Injectable()
 export class SolucoesService {
@@ -116,6 +128,129 @@ export class SolucoesService {
       return { total: ativos + inativos, ativos, inativos };
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
+  private toAssembleCondicao(
+    filtros: QuerySolucaoFilterDto,
+  ): Prisma.SolucoesWhereInput {
+    const condicao: Prisma.SolucoesWhereInput = {};
+
+    if (filtros.codigo !== undefined) condicao.codigo = filtros.codigo;
+    if (filtros.descricao) condicao.descricao = filtros.descricao;
+    if (filtros.falhaId) condicao.falhaId = filtros.falhaId;
+    if (filtros.direcionamentoId)
+      condicao.direcionamentoId = filtros.direcionamentoId;
+    if (filtros.status !== undefined) condicao.status = filtros.status;
+
+    // `solucoes` não possui `ativoId`: o vínculo é indireto, via falha.
+    if (filtros.ativoId) condicao.falha = { ativoId: filtros.ativoId };
+    if (filtros.desPerfil === 'OPERADOR') {
+      if (filtros.desPerfil) condicao.perfil = { descricao: filtros.desPerfil };
+    } else if (filtros.desPerfil === 'SUPERVISOR') {
+      if (filtros.desPerfil)
+        condicao.perfil = {
+          descricao: { in: [filtros.desPerfil, 'OPERADOR'] },
+        };
+    }
+
+    return condicao;
+  }
+
+  private resolverConfig(consulta?: ConsultaSolucoes): ConsultaConfig {
+    return consulta ? CONSULTAS[consulta] : CONSULTAS.solucoes_padrao;
+  }
+
+  private toAssembleQuery(
+    query: QuerySolucaoFilterDto,
+  ): Prisma.SolucoesFindManyArgs {
+    const desvios = query.desvios ? DESVIOS[query.desvios]() : undefined;
+    const filtros = this.toAssembleCondicao(query);
+    const config = this.resolverConfig(query.consulta);
+
+    return {
+      ...config,
+      where: desvios ? { AND: [desvios, filtros] } : filtros,
+    };
+  }
+
+  async findAllPagination(
+    query: QuerySolucaoFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<PaginatedResponse<SolucoesListagem>> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const pagina = query.page ?? 1;
+      const tamanho = query.size ?? 10;
+      const base = this.toAssembleQuery(query);
+
+      const [dados, total] = await client.$transaction([
+        client.solucoes.findMany({
+          ...base,
+          skip: (pagina - 1) * tamanho,
+          take: tamanho,
+        }),
+        client.solucoes.count({ where: base.where }),
+      ]);
+
+      if (dados.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+
+      return { dados, total, pagina, tamanho };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  async findAllList(
+    query: QuerySolucaoFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<SolucoesListagem[]> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const listar = await client.solucoes.findMany({
+        ...this.toAssembleQuery(query),
+        take: LIMITE_LISTA_COMPLETA,
+      });
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+
+      return listar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findAllList()');
+      throw error;
+    }
+  }
+
+  async findOneFirst(
+    query: QuerySolucaoFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<SolucoesListagem | null> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const args = this.toAssembleQuery(query);
+
+      const buscar = await client.solucoes.findFirst(args);
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - async findOneFirst()',
+      );
       throw error;
     }
   }

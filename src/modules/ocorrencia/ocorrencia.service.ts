@@ -13,7 +13,7 @@ import {
   OcorrenciaRelacao,
 } from './entities/ocorrencia.entity';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
-import { Acao, Prisma } from '@/generated/prisma/client';
+import { Acao, CondicaoOcorrencia, Prisma } from '@/generated/prisma/client';
 import { QueryOcorrenciaFilterDto } from './dto/query-ocorrencia.dto';
 import {
   ConsultaConfig,
@@ -24,8 +24,28 @@ import {
 import { PaginatedResponse } from '@/interfaces/paginator.interface';
 import { FluxoOcorrenciaService } from '../fluxo-ocorrencia/fluxo-ocorrencia.service';
 import { CreateFluxoOcorrenciaDto } from '../fluxo-ocorrencia/dto/create-fluxo-ocorrencia.dto';
+import { QueryFluxoOcorrenciaFilterDto } from '../fluxo-ocorrencia/dto/query-fluxo-ocorrencia.dto';
+import { FalhasService } from '../falhas/falhas.service';
 
 const LIMITE_LISTA_COMPLETA = 100;
+
+const DTO = {
+  FLUXO_OCORRENCIA_QUERY_A: (
+    ocorrenciaId: string,
+    solicionadoId: string,
+    dataInicial: Date,
+  ): QueryFluxoOcorrenciaFilterDto => ({
+    ocorrenciaId: ocorrenciaId,
+    usuarioId: solicionadoId,
+    dataInicial: dataInicial,
+  }),
+  FLUXO_OCORRENCIA_QUERY_B: (
+    ocorrenciaId: string,
+  ): QueryFluxoOcorrenciaFilterDto => ({
+    ocorrenciaId: ocorrenciaId,
+    dataFinal: undefined,
+  }),
+};
 
 export interface UpdateOcorrenciaInternoDto {
   dataFalhaRegistrado?: Date;
@@ -40,6 +60,7 @@ export class OcorrenciaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fluxoOcorrenciaService: FluxoOcorrenciaService,
+    private readonly falhaService: FalhasService,
   ) {}
 
   async create(
@@ -166,17 +187,15 @@ export class OcorrenciaService {
   ): Promise<OcorrenciaListagem | null> {
     try {
       const client = tx ?? this.prisma.client;
-      const dados = this.toAssembleQuery(query);
-      this.logger.debug(dados);
 
       const buscar = await client.ocorrencia.findFirst(
         this.toAssembleQuery(query),
       );
-      this.logger.debug(buscar);
       if (!buscar) {
         this.logger.warn(TYPES_NOTICES.NOT_FOUND);
       }
 
+      this.logger.debug(buscar);
       return buscar;
     } catch (error) {
       this.logger.error(
@@ -225,9 +244,24 @@ export class OcorrenciaService {
           const internos: UpdateOcorrenciaInternoDto = {};
 
           const dados: Prisma.OcorrenciaUpdateInput = { ...internos };
-          if (update.falhaId) {
+          if (update.falhaId && !ocorrencia.falhaId) {
             dados.falhas = { connect: { id: update.falhaId } };
+            if (!ocorrencia.dataFalhaRegistrado) {
+              dados.dataFalhaRegistrado = new Date();
+              dados.duracaoFalhaRegistrado = Math.floor(
+                (Date.now() - ocorrencia.dataInicial.getTime()) / 1000,
+              );
+            }
           }
+          if (
+            update.falhaId &&
+            ocorrencia.falhaId &&
+            ocorrencia.falhaId !== update.falhaId
+          ) {
+            dados.falhas = { connect: { id: update.falhaId } };
+            dados.statusFalha = true;
+          }
+
           if (update.solucaoId) {
             dados.solucoes = { connect: { id: update.solucaoId } };
           }
@@ -237,6 +271,10 @@ export class OcorrenciaService {
           if (update.tipoOcorrencia !== undefined) {
             dados.tipoOcorrencia = update.tipoOcorrencia;
           }
+          if (update.solucaoId) {
+            dados.dataFinal = new Date();
+            dados.condicaoOcorrencia = CondicaoOcorrencia.FINALIZADO;
+          }
 
           const atualizar = await tx.ocorrencia.update({
             where: { id: id },
@@ -244,16 +282,63 @@ export class OcorrenciaService {
           });
 
           if (atualizar.falhaId && update.falhaId && !ocorrencia.falhaId) {
-            const perfil = await this.findOne(id, tx);
+            const perfil = await this.falhaService.findOne(
+              atualizar.falhaId,
+              tx,
+            );
             internos.dataFalhaRegistrado = new Date();
-            if (perfil.estadoAtivo.alocacaoOperacional.operador?.perfilId) {
+            if (perfil.direcionamentoId) {
               const fluxo: CreateFluxoOcorrenciaDto = {
                 ocorrenciaId: atualizar.id,
-                transferidoPerfilId:
-                  perfil.estadoAtivo.alocacaoOperacional.operador.perfilId,
+                transferidoPerfilId: perfil.direcionamentoId,
               };
               await this.fluxoOcorrenciaService.create(fluxo, tx);
             }
+          }
+          if (
+            ocorrencia.falhaId &&
+            atualizar.falhaId !== ocorrencia.falhaId &&
+            update.falhaId
+          ) {
+            const perfil = await this.falhaService.findOne(
+              atualizar.falhaId,
+              tx,
+            );
+            const query = DTO.FLUXO_OCORRENCIA_QUERY_B(ocorrencia.id);
+            const atualizarfluxo =
+              await this.fluxoOcorrenciaService.findOneFirst(query, tx);
+
+            internos.dataFalhaRegistrado = new Date();
+            if (perfil.direcionamentoId) {
+              const fluxo: CreateFluxoOcorrenciaDto = {
+                ocorrenciaId: atualizar.id,
+                transferidoPerfilId: perfil.direcionamentoId,
+              };
+              await this.fluxoOcorrenciaService.create(fluxo, tx);
+            }
+            if (atualizarfluxo) {
+              await this.fluxoOcorrenciaService.updateInternal(
+                atualizarfluxo.id,
+                tx,
+              );
+            }
+          }
+          if (atualizar.solucionadoId && update.solucaoId) {
+            const queryF = DTO.FLUXO_OCORRENCIA_QUERY_A(
+              atualizar.id,
+              atualizar.solicionadoId,
+              atualizar.dataInicial,
+            );
+            const fluxo = await this.fluxoOcorrenciaService.findOneFirst(
+              queryF,
+              tx,
+            );
+            if (!fluxo) {
+              throw new NotFoundException(
+                `Fluxo de ocorrência não encontrado.`,
+              );
+            }
+            await this.fluxoOcorrenciaService.updateInternal(fluxo.id, tx);
           }
 
           return atualizar;

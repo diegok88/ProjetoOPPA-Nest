@@ -7,5 +7,6 @@ import { PerfilModule } from '../perfil/perfil.module';
   imports: [forwardRef(() => PerfilModule)],
   controllers: [FalhasController],
   providers: [FalhasService],
+  exports: [FalhasService],
 })
 export class FalhasModule {}

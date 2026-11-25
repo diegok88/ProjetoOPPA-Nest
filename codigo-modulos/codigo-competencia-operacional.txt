@@ -1,0 +1,732 @@
+
+===== src/modules/competencia-operacional/competencia-operacional.controller.ts =====
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import { CompetenciaOperacionalService } from './competencia-operacional.service';
+import { CreateCompetenciaOperacionalDto } from './dto/create-competencia-operacional.dto';
+import { UpdateCompetenciaOperacionalDto } from './dto/update-competencia-operacional.dto';
+import {
+  ResponseCompetenciaOperacionalAssetsDto,
+  ResponseCompetenciaOperacionalContadorDto,
+  ResponseCompetenciaOperacionalDto,
+} from './dto/response-competencia-operacional.dto';
+import { plainToInstance } from 'class-transformer';
+import { ROLES } from '@/auth/guards/roles.const';
+import { Roles } from '@/auth/guards/roles.decorator';
+import {
+  QueryCompetenciaOperacionalCounterDto,
+  QueryCompetenciaOperacionalFilterDto,
+  QueryCompetenciaOperacionalOperadorDto,
+} from './dto/query-competencia-operacional.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
+
+@Controller('competencia-operacional')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
+export class CompetenciaOperacionalController {
+  constructor(
+    private readonly competenciaOperacionalService: CompetenciaOperacionalService,
+  ) {}
+
+  @Post()
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async create(
+    @Body() createCompetenciaOperacionalDto: CreateCompetenciaOperacionalDto,
+  ): Promise<ResponseCompetenciaOperacionalDto> {
+    const dado = await this.competenciaOperacionalService.create(
+      createCompetenciaOperacionalDto,
+    );
+    return plainToInstance(ResponseCompetenciaOperacionalDto, dado);
+  }
+
+  @Get()
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async findAll(
+    @Query() query: QueryCompetenciaOperacionalFilterDto,
+  ): Promise<ResponseCompetenciaOperacionalDto[]> {
+    const dados = await this.competenciaOperacionalService.findAll(query);
+    return plainToInstance(ResponseCompetenciaOperacionalDto, dados);
+  }
+
+  @Get('assets')
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async findAssetsAvailable(
+    @Query() query: QueryCompetenciaOperacionalOperadorDto,
+  ): Promise<ResponseCompetenciaOperacionalAssetsDto[]> {
+    const dados =
+      await this.competenciaOperacionalService.findAssetsAvailable(query);
+    return plainToInstance(ResponseCompetenciaOperacionalAssetsDto, dados);
+  }
+
+  @Get('counter')
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async counter(
+    @Query() query: QueryCompetenciaOperacionalCounterDto,
+  ): Promise<ResponseCompetenciaOperacionalContadorDto> {
+    const contador = await this.competenciaOperacionalService.counter(query);
+    return plainToInstance(ResponseCompetenciaOperacionalContadorDto, contador);
+  }
+
+  @Get(':id')
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseCompetenciaOperacionalDto> {
+    const dado = await this.competenciaOperacionalService.findOne(id);
+    return plainToInstance(ResponseCompetenciaOperacionalDto, dado);
+  }
+
+  @Patch(':id')
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateCompetenciaOperacionalDto: UpdateCompetenciaOperacionalDto,
+  ): Promise<ResponseCompetenciaOperacionalDto> {
+    const dado = await this.competenciaOperacionalService.update(
+      id,
+      updateCompetenciaOperacionalDto,
+    );
+    return plainToInstance(ResponseCompetenciaOperacionalDto, dado);
+  }
+
+  @Patch('deactive/:id')
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async deactive(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseCompetenciaOperacionalDto> {
+    const dado = await this.competenciaOperacionalService.deactive(id);
+    return plainToInstance(ResponseCompetenciaOperacionalDto, dado);
+  }
+
+  @Delete(':id')
+  @Roles(ROLES.ASN1)
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseCompetenciaOperacionalDto> {
+    const dado = await this.competenciaOperacionalService.remove(id);
+    return plainToInstance(ResponseCompetenciaOperacionalDto, dado);
+  }
+}
+
+===== src/modules/competencia-operacional/competencia-operacional.module.ts =====
+
+import { forwardRef, Module } from '@nestjs/common';
+import { CompetenciaOperacionalService } from './competencia-operacional.service';
+import { CompetenciaOperacionalController } from './competencia-operacional.controller';
+import { PerfilModule } from '../perfil/perfil.module';
+import { AtivoModule } from '../ativo/ativo.module';
+import { GeradorEscalaModule } from '../gerador-escala/gerador-escala.module';
+
+@Module({
+  imports: [forwardRef(() => PerfilModule), AtivoModule, GeradorEscalaModule],
+  controllers: [CompetenciaOperacionalController],
+  providers: [CompetenciaOperacionalService],
+  exports: [CompetenciaOperacionalService],
+})
+export class CompetenciaOperacionalModule {}
+
+===== src/modules/competencia-operacional/competencia-operacional.service.ts =====
+
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { CreateCompetenciaOperacionalDto } from './dto/create-competencia-operacional.dto';
+import { UpdateCompetenciaOperacionalDto } from './dto/update-competencia-operacional.dto';
+import { PrismaService } from '@/prisma/prisma.service';
+import {
+  CompetenciaOperacional,
+  CompetenciaOperacionalListagem,
+  CompetenciaOperacionalRelacao,
+} from './entities/competencia-operacional.entity';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+import {
+  QueryCompetenciaOperacionalCounterDto,
+  QueryCompetenciaOperacionalFilterDto,
+  QueryCompetenciaOperacionalOperadorDto,
+} from './dto/query-competencia-operacional.dto';
+import {
+  Acao,
+  Prisma,
+  SituacaoDispensa,
+  SituacaoPenalidade,
+  TipoPenalidade,
+} from '@/generated/prisma/client';
+import { ResponseCompetenciaOperacionalContadorDto } from './dto/response-competencia-operacional.dto';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { PerfilService } from '../perfil/perfil.service';
+import { ROLES } from '@/auth/guards/roles.const';
+import { AtivoRelacoesParcial } from '../ativo/entities/ativo.entity';
+import { AtivoService } from '../ativo/ativo.service';
+import { GeradorEscalaService } from '../gerador-escala/gerador-escala.service';
+
+@Injectable()
+export class CompetenciaOperacionalService {
+  private logger = new Logger(CompetenciaOperacionalService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly perfilService: PerfilService,
+    private readonly ativoService: AtivoService,
+    private readonly geradorEscalaService: GeradorEscalaService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
+
+  async create(
+    create: CreateCompetenciaOperacionalDto,
+  ): Promise<CompetenciaOperacional> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+      const criar = await this.prisma.client.competenciaOperacional.create({
+        data: { ...create, gestorId: ctx.user },
+      });
+      this.logger.log(TYPES_NOTICES.CREATE);
+      return criar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
+      throw error;
+    }
+  }
+
+  /* ----------------------------------------------------------------------------------------------------------------------------- */
+  /* FUNÇÃO MONTAGEM DE CONDIÇÃO */
+  private async toAssembleCondicao(
+    filtros: Omit<
+      QueryCompetenciaOperacionalFilterDto,
+      'page' | 'size' | 'campos' | 'incluir' | 'ordenacao'
+    >,
+    usuarioId: string,
+  ): Promise<Prisma.CompetenciaOperacionalWhereInput> {
+    const condicao: Prisma.CompetenciaOperacionalWhereInput = {};
+    if (filtros.operadorId) condicao.operadorId = filtros.operadorId;
+    if (filtros.gestorId) condicao.gestorId = filtros.gestorId;
+    if (filtros.ativoId) condicao.ativoId = filtros.ativoId;
+    if (filtros.status !== undefined) condicao.status = filtros.status;
+
+    const escalaAtual = await this.geradorEscalaService.consultarEscala();
+
+    if (filtros.decisao === 'alocacao_sel') {
+      condicao.AND = {
+        operador: {
+          escala: { not: escalaAtual.escala },
+          penalidadeComoColaborador: {
+            none: {
+              tipoPenalidade: TipoPenalidade.SUSPENSAO,
+              situacaoPenalidade: SituacaoPenalidade.EXECUCAO,
+            },
+          },
+          dispensaComoColaborador: {
+            none: { situacaoDispensa: SituacaoDispensa.EXECUCAO },
+          },
+        },
+      };
+    }
+
+    if (filtros.gestor) condicao.gestorId = usuarioId;
+
+    return condicao;
+  }
+
+  /* FUNÇÃO MONTAGEM DE ORDENAÇÃO */
+  private async toAssembleOrderBy(
+    ordenacao?: string,
+  ): Promise<Prisma.CompetenciaOperacionalOrderByWithRelationInput[]> {
+    switch (ordenacao) {
+      case 'filtrar':
+        return [{ codigo: 'desc' }];
+      default:
+        return [{ codigo: 'desc' }];
+    }
+  }
+
+  /* FUNÇÃO MONTAGEM DE INCLUDE */
+  private async toAssembleInclude(
+    incluir?: string,
+  ): Promise<Prisma.CompetenciaOperacionalInclude> {
+    switch (incluir) {
+      case 'todos_relacoes':
+        return { operador: true, gestor: true, ativo: true };
+      case 'todos_parcial':
+        return {
+          operador: { select: { id: true, nome: true, cracha: true } },
+          gestor: { select: { id: true, nome: true, cracha: true } },
+          ativo: { select: { id: true, descricao: true, modelo: true } },
+        };
+      case 'operador_parcial':
+        return { operador: { select: { id: true, nome: true, cracha: true } } };
+      default:
+        return {};
+    }
+  }
+
+  /* FUNÇÃO MONTAGEM DOS CAMPOS */
+  private readonly allowedCompetenciaOperacionalFields = [
+    'id',
+    'codigo',
+    'operadorId',
+    'gestorId',
+    'ativoId',
+    'status',
+  ];
+
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedCompetenciaOperacionalFields.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
+  }
+
+  async findAll(
+    query: QueryCompetenciaOperacionalFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<CompetenciaOperacionalListagem[]> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+
+      const client = tx ?? this.prisma.client;
+
+      const {
+        page = 1,
+        size = 10,
+        campos,
+        incluir,
+        ordenacao,
+        ...filtros
+      } = query ?? {};
+
+      const condicao = await this.toAssembleCondicao(filtros, ctx.user);
+
+      const selecao = await this.buildSelect(campos);
+
+      const opcoes: Prisma.CompetenciaOperacionalFindManyArgs = {
+        where: condicao,
+        orderBy: await this.toAssembleOrderBy(ordenacao),
+      };
+
+      if (campos?.length) {
+        opcoes.select = selecao;
+      } else {
+        opcoes.include = await this.toAssembleInclude(incluir);
+      }
+
+      const listar: CompetenciaOperacional[] =
+        await client.competenciaOperacional.findMany(opcoes);
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+  /* ----------------------------------------------------------------------------------------------------------------------------- */
+
+  /* FUNÇÃO DE RETORNO DE ATIVOS QUE NÃO ESTA ALOCADO DE ACORDO COM O OPERADOR */
+  async findAssetsAvailable(
+    query: QueryCompetenciaOperacionalOperadorDto,
+  ): Promise<AtivoRelacoesParcial[]> {
+    try {
+      const queryCO: QueryCompetenciaOperacionalFilterDto = {
+        operadorId: query.operadorId,
+        status: true,
+      };
+      const competencia = await this.findAll(queryCO);
+      const ids = competencia.map((c) => c.ativoId);
+
+      const ativos = await this.ativoService.findAssetsAvailable(ids);
+
+      return ativos;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL,  PENDENTE, CANCELADO, EXECUÇÃO, FINALIZADOS, BANCO DE HORAS, FERIAS E ATESTADOS */
+  async counter(
+    query?: QueryCompetenciaOperacionalCounterDto,
+  ): Promise<ResponseCompetenciaOperacionalContadorDto> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+
+      const buscarPerfil = await this.perfilService.findOne(ctx.perfil);
+      const perfil = `${buscarPerfil.descricao} - ${buscarPerfil.nivel}`;
+
+      const condicao: Prisma.CompetenciaOperacionalWhereInput = {};
+
+      if (query && query.gestor) {
+        condicao.gestorId = ctx.user;
+      } else if (query && !query.gestor) {
+        if (perfil === ROLES.ADN1) {
+          const filtroEmpresa: Prisma.CompetenciaOperacionalWhereInput['operador'] =
+            {};
+          if (!filtroEmpresa.empresaId) filtroEmpresa.empresaId = ctx.empresa;
+          if (Object.keys(filtroEmpresa).length > 0)
+            condicao.operador = filtroEmpresa;
+        }
+      }
+
+      const gruposCompetencia =
+        await this.prisma.competenciaOperacional.groupBy({
+          by: ['status'],
+          where: condicao,
+          _count: { _all: true },
+        });
+
+      const ativos =
+        gruposCompetencia.find((g) => g.status === true)?._count._all ?? 0;
+      const inativos =
+        gruposCompetencia.find((g) => g.status === false)?._count._all ?? 0;
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return {
+        total: ativos + inativos,
+        ativos: ativos,
+        inativos: inativos,
+      };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
+  async findOne(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<CompetenciaOperacionalRelacao> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const buscar = await client.competenciaOperacional.findUnique({
+        where: { id: id },
+        include: {
+          operador: true,
+          gestor: true,
+          ativo: true,
+        },
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
+      throw error;
+    }
+  }
+
+  async update(
+    id: string,
+    updateCompetenciaOperacionalDto: UpdateCompetenciaOperacionalDto,
+  ): Promise<CompetenciaOperacional> {
+    try {
+      const atualizarCompetencia = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          await this.findOne(id, tx);
+
+          const atualizar = await tx.competenciaOperacional.update({
+            where: { id: id },
+            data: updateCompetenciaOperacionalDto,
+          });
+
+          return atualizar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.UPDATE);
+      return atualizarCompetencia;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
+      throw error;
+    }
+  }
+
+  async deactive(id: string): Promise<CompetenciaOperacional> {
+    try {
+      const inativarCompetencia = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (!verificar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_DEACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_DEACTIVE);
+          }
+
+          const inativar = await tx.competenciaOperacional.update({
+            where: { id: id },
+            data: { status: false, _auditAction: Acao.DEACTIVATE },
+          });
+
+          return inativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
+      return inativarCompetencia;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE');
+      throw error;
+    }
+  }
+
+  async remove(id: string): Promise<CompetenciaOperacional> {
+    try {
+      const removerCompetencia = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (verificar.status) {
+            this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+            throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+          }
+
+          const remover = await tx.competenciaOperacional.delete({
+            where: { id: id },
+          });
+
+          return remover;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return removerCompetencia;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
+      throw error;
+    }
+  }
+}
+
+===== src/modules/competencia-operacional/dto/create-competencia-operacional.dto.ts =====
+
+import { IsUUID, IsNotEmpty } from 'class-validator';
+
+export class CreateCompetenciaOperacionalDto {
+  @IsUUID('all', { message: 'Operador id inválido.' })
+  @IsNotEmpty({ message: 'O operador id é um campo obrigatório.' })
+  operadorId!: string;
+
+  @IsUUID('all', { message: 'Ativo id inválido.' })
+  @IsNotEmpty({ message: 'O ativo é um campo obrigatório.' })
+  ativoId!: string;
+}
+
+===== src/modules/competencia-operacional/dto/query-competencia-operacional.dto.ts =====
+
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
+
+export class QueryCompetenciaOperacionalFilterDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Código não é do tipo Inteiro!' })
+  @IsNumber({}, { message: 'Código não é do tipo Number!' })
+  codigo?: number;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Operador id inválido.' })
+  operadorId?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Gestor id inválido.' })
+  gestorId?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Ativo id inválido.' })
+  ativoId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  )
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
+  status?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'Gestor não é do tipo Boolean!' })
+  gestor?: boolean;
+
+  @IsOptional()
+  @IsString({ message: 'Campos não é do tipo String!' })
+  campos?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Incluir não é do tipo String!' })
+  incluir?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Eliminar não é do tipo String.' })
+  decisao?: string;
+
+  /* Parametro que garante a ordenação dinâmica */
+  @IsOptional()
+  @IsString({ message: 'Ordenação não é do tipo String.' })
+  ordenacao?: string;
+
+  /* Paginação da lista do filtro */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Página deve ser um número inteiro.' })
+  @Min(1, { message: 'Página deve ser maior que zero.' })
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Tamanho deve ser um número inteiro.' })
+  @Min(1)
+  @Max(100, { message: 'Tamanho máximo é 100.' })
+  size?: number = 10;
+}
+
+export class QueryCompetenciaOperacionalCounterDto {
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'Gestor não é do tipo Boolean!' })
+  gestor?: boolean;
+}
+
+export class QueryCompetenciaOperacionalOperadorDto {
+  @IsOptional()
+  @IsUUID('all', { message: 'Operador id inválido.' })
+  operadorId?: string;
+}
+
+===== src/modules/competencia-operacional/dto/response-competencia-operacional.dto.ts =====
+
+import { Expose, Type } from 'class-transformer';
+
+export class ResponseCompOperUsuarioDto {
+  @Expose() id!: string;
+  @Expose() nome!: string;
+  @Expose() cracha!: number;
+}
+
+export class ResponseCompOperAtivoDto {
+  @Expose() id!: string;
+  @Expose() descricao!: string;
+  @Expose() modelo!: string;
+}
+
+export class ResponseCompetenciaOperacionalDto {
+  @Expose() id!: string;
+  @Expose() codigo?: number;
+  @Expose() operadorId!: string;
+  @Expose() gestorId!: string;
+  @Expose() ativoId?: string;
+  @Expose() status!: boolean;
+
+  @Expose()
+  @Type(() => ResponseCompOperUsuarioDto)
+  operador!: ResponseCompOperUsuarioDto;
+  @Expose()
+  @Type(() => ResponseCompOperUsuarioDto)
+  gestor!: ResponseCompOperUsuarioDto;
+  @Expose()
+  @Type(() => ResponseCompOperAtivoDto)
+  ativo!: ResponseCompOperAtivoDto;
+}
+
+/* DTO DO CONTADOR: retorna total, ativos e inativos */
+export class ResponseCompetenciaOperacionalContadorDto {
+  @Expose() total!: number;
+  @Expose() ativos!: number;
+  @Expose() inativos!: number;
+}
+
+/* DTO DE ATIVOS NÃO ALOCADOS PARA O COLABORADOR */
+export class ResponseCompetenciaOperacionalAssetsDto {
+  @Expose() id!: string;
+  @Expose() codigo!: number;
+  @Expose() descricao!: string;
+  @Expose() modelo!: string;
+}
+
+===== src/modules/competencia-operacional/dto/update-competencia-operacional.dto.ts =====
+
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateCompetenciaOperacionalDto } from './create-competencia-operacional.dto';
+
+export class UpdateCompetenciaOperacionalDto extends PartialType(CreateCompetenciaOperacionalDto) {}
+
+===== src/modules/competencia-operacional/entities/competencia-operacional.entity.ts =====
+
+import {
+  CompetenciaOperacional as CompetenciaOperacionalModel,
+  Prisma,
+} from '@/generated/prisma/client';
+
+export type CompetenciaOperacional = CompetenciaOperacionalModel;
+
+export type CompetenciaOperacionalRelacao =
+  Prisma.CompetenciaOperacionalGetPayload<{
+    include: {
+      operador: true;
+      gestor: true;
+      ativo: true;
+    };
+  }>;
+
+export type CompetenciaOperacionalRelacaoParcial =
+  Prisma.CompetenciaOperacionalGetPayload<{
+    include: {
+      operador: { select: { id: true; nome: true; cracha: true } };
+      gestor: { select: { id: true; nome: true; cracha: true } };
+      ativo: { select: { id: true; descricao: true; modelo: true } };
+    };
+  }>;
+
+export type CompetenciaOperacionalRelacaoOperadorParcial =
+  Prisma.CompetenciaOperacionalGetPayload<{
+    include: {
+      operador: { select: { id: true; nome: true; cracha: true } };
+    };
+  }>;
+
+export type CompetenciaOperacionalListagem =
+  | CompetenciaOperacional
+  | CompetenciaOperacionalRelacao
+  | CompetenciaOperacionalRelacaoParcial
+  | CompetenciaOperacionalRelacaoOperadorParcial;

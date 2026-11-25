@@ -1,0 +1,168 @@
+
+===== src/modules/gerador-escala/dto/response-gerador-escala.dto.ts =====
+
+import { TipoEscala } from '@/generated/prisma/enums';
+import { Expose } from 'class-transformer';
+
+export class ResponseGeradorEscalaDto {
+  @Expose() data!: string;
+  @Expose() escala!: TipoEscala;
+  @Expose() posicaoNoCiclo!: number;
+  @Expose() dataReferencia!: string;
+}
+
+===== src/modules/gerador-escala/entities/gerador-escala.entity.ts =====
+
+import { TipoEscala } from '@/generated/prisma/enums';
+
+export interface ResultadoEscala {
+  data: string;
+  escala: TipoEscala;
+  posicaoNoCiclo: number;
+  dataReferencia: string;
+}
+
+===== src/modules/gerador-escala/gerador-escala.controller.ts =====
+
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { GeradorEscalaService } from './gerador-escala.service';
+import { ResponseGeradorEscalaDto } from './dto/response-gerador-escala.dto';
+import { Roles } from '@/auth/guards/roles.decorator';
+import { ROLES } from '@/auth/guards/roles.const';
+import { plainToInstance } from 'class-transformer';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
+
+@Controller('gerador-escala')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
+export class GeradorEscalaController {
+  constructor(private readonly geradorEscalaService: GeradorEscalaService) {}
+
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  @Get('atual')
+  async atual(): Promise<ResponseGeradorEscalaDto> {
+    const escala = await this.geradorEscalaService.consultarEscala();
+    return plainToInstance(ResponseGeradorEscalaDto, escala);
+  }
+
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  @Get()
+  async porData(
+    @Query('data') data?: string,
+  ): Promise<ResponseGeradorEscalaDto> {
+    const escala = await this.geradorEscalaService.consultarEscala(data);
+    return plainToInstance(ResponseGeradorEscalaDto, escala);
+  }
+}
+
+===== src/modules/gerador-escala/gerador-escala.module.ts =====
+
+import { forwardRef, Module } from '@nestjs/common';
+import { GeradorEscalaService } from './gerador-escala.service';
+import { GeradorEscalaController } from './gerador-escala.controller';
+import { PerfilModule } from '../perfil/perfil.module';
+
+@Module({
+  imports: [forwardRef(() => PerfilModule)],
+  controllers: [GeradorEscalaController],
+  providers: [GeradorEscalaService],
+  exports: [GeradorEscalaService],
+})
+export class GeradorEscalaModule {}
+
+===== src/modules/gerador-escala/gerador-escala.service.ts =====
+
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { TipoEscala } from '@/generated/prisma/enums';
+import { ResultadoEscala } from './entities/gerador-escala.entity';
+
+const MS_POR_DIA = 24 * 60 * 60 * 1000;
+const TAMANHO_CICLO = 8;
+const FUSO_PADRAO = 'America/Sao_Paulo';
+
+const CICLO_ESCALAS: readonly TipoEscala[] = [
+  TipoEscala.A,
+  TipoEscala.A,
+  TipoEscala.B,
+  TipoEscala.B,
+  TipoEscala.C,
+  TipoEscala.C,
+  TipoEscala.D,
+  TipoEscala.D,
+];
+
+@Injectable()
+export class GeradorEscalaService {
+  private readonly dataReferencia: Date;
+
+  constructor() {
+    const referenciaEnv = process.env.ESCALA_DATA_INICIAL ?? '2026-01-01';
+    const data = this.parseIsoUTC(referenciaEnv);
+    if (!data) {
+      throw new Error(
+        `ESCALA_DATA_INICIAL inválida: "${referenciaEnv}". Use o formato YYYY-MM-DD.`,
+      );
+    }
+    this.dataReferencia = data;
+  }
+
+  async consultarEscala(dataIso?: string): Promise<ResultadoEscala> {
+    let data: Date;
+
+    if (dataIso === undefined) {
+      data = this.hojeNoFuso(FUSO_PADRAO);
+    } else {
+      const parsed = this.parseIsoUTC(dataIso);
+      if (!parsed) {
+        throw new BadRequestException(
+          'Parâmetro "data" deve estar no formato YYYY-MM-DD.',
+        );
+      }
+      data = parsed;
+    }
+
+    const dias = Math.round(
+      (data.getTime() - this.dataReferencia.getTime()) / MS_POR_DIA,
+    );
+    const indice = ((dias % TAMANHO_CICLO) + TAMANHO_CICLO) % TAMANHO_CICLO;
+
+    return {
+      data: this.formatarIso(data),
+      escala: CICLO_ESCALAS[indice],
+      posicaoNoCiclo: indice + 1,
+      dataReferencia: this.formatarIso(this.dataReferencia),
+    };
+  }
+
+  private hojeNoFuso(fuso: string): Date {
+    const hoje = new Intl.DateTimeFormat('en-CA', {
+      timeZone: fuso,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    return this.parseIsoUTC(hoje)!;
+  }
+
+  private parseIsoUTC(valor: string): Date | null {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(valor);
+    if (!match) return null;
+
+    const [, ano, mes, dia] = match.map(Number);
+    const data = new Date(Date.UTC(ano, mes - 1, dia));
+
+    if (
+      data.getUTCFullYear() !== ano ||
+      data.getUTCMonth() !== mes - 1 ||
+      data.getUTCDate() !== dia
+    ) {
+      return null;
+    }
+    return data;
+  }
+
+  private formatarIso(data: Date): string {
+    return data.toISOString().slice(0, 10);
+  }
+}

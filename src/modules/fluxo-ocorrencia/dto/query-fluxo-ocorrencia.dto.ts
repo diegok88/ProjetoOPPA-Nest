@@ -1,6 +1,7 @@
 import {
   IsBoolean,
   IsDate,
+  IsEnum,
   IsIn,
   IsInt,
   IsOptional,
@@ -19,6 +20,7 @@ import {
   type ConsultaFluxoOcorrencia,
   type RecorteFluxoOcorrencia,
 } from '@/constants/query-fluxo-ocorrencia.const';
+import { CondicaoFluxo } from '@/generated/prisma/enums';
 
 export class QueryFluxoOcorrenciaFilterDto {
   @IsOptional()
@@ -54,6 +56,12 @@ export class QueryFluxoOcorrenciaFilterDto {
   @IsInt({ message: 'Código deve ser um número inteiro.' })
   @Min(1, { message: 'Código deve ser maior que zero.' })
   duracao?: number;
+
+  @IsOptional()
+  @IsEnum(CondicaoFluxo, {
+    message: 'CondicaoFluxo não pertence ao enum CondicaoFluxo.',
+  })
+  condicaoFluxo?: CondicaoFluxo;
 
   @IsOptional()
   @Transform(({ value }) => {

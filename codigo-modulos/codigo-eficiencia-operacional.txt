@@ -1,0 +1,93 @@
+
+===== src/modules/eficiencia-operacional/dto/create-eficiencia-operacional.dto.ts =====
+
+export class CreateEficienciaOperacionalDto {}
+
+===== src/modules/eficiencia-operacional/dto/update-eficiencia-operacional.dto.ts =====
+
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateEficienciaOperacionalDto } from './create-eficiencia-operacional.dto';
+
+export class UpdateEficienciaOperacionalDto extends PartialType(CreateEficienciaOperacionalDto) {}
+
+===== src/modules/eficiencia-operacional/eficiencia-operacional.controller.ts =====
+
+import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { EficienciaOperacionalService } from './eficiencia-operacional.service';
+import { CreateEficienciaOperacionalDto } from './dto/create-eficiencia-operacional.dto';
+import { UpdateEficienciaOperacionalDto } from './dto/update-eficiencia-operacional.dto';
+
+@Controller('eficiencia-operacional')
+export class EficienciaOperacionalController {
+  constructor(private readonly eficienciaOperacionalService: EficienciaOperacionalService) {}
+
+  @Post()
+  create(@Body() createEficienciaOperacionalDto: CreateEficienciaOperacionalDto) {
+    return this.eficienciaOperacionalService.create(createEficienciaOperacionalDto);
+  }
+
+  @Get()
+  findAll() {
+    return this.eficienciaOperacionalService.findAll();
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.eficienciaOperacionalService.findOne(+id);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() updateEficienciaOperacionalDto: UpdateEficienciaOperacionalDto) {
+    return this.eficienciaOperacionalService.update(+id, updateEficienciaOperacionalDto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.eficienciaOperacionalService.remove(+id);
+  }
+}
+
+===== src/modules/eficiencia-operacional/eficiencia-operacional.module.ts =====
+
+import { Module } from '@nestjs/common';
+import { EficienciaOperacionalService } from './eficiencia-operacional.service';
+import { EficienciaOperacionalController } from './eficiencia-operacional.controller';
+
+@Module({
+  controllers: [EficienciaOperacionalController],
+  providers: [EficienciaOperacionalService],
+})
+export class EficienciaOperacionalModule {}
+
+===== src/modules/eficiencia-operacional/eficiencia-operacional.service.ts =====
+
+import { Injectable } from '@nestjs/common';
+import { CreateEficienciaOperacionalDto } from './dto/create-eficiencia-operacional.dto';
+import { UpdateEficienciaOperacionalDto } from './dto/update-eficiencia-operacional.dto';
+
+@Injectable()
+export class EficienciaOperacionalService {
+  create(createEficienciaOperacionalDto: CreateEficienciaOperacionalDto) {
+    return 'This action adds a new eficienciaOperacional';
+  }
+
+  findAll() {
+    return `This action returns all eficienciaOperacional`;
+  }
+
+  findOne(id: number) {
+    return `This action returns a #${id} eficienciaOperacional`;
+  }
+
+  update(id: number, updateEficienciaOperacionalDto: UpdateEficienciaOperacionalDto) {
+    return `This action updates a #${id} eficienciaOperacional`;
+  }
+
+  remove(id: number) {
+    return `This action removes a #${id} eficienciaOperacional`;
+  }
+}
+
+===== src/modules/eficiencia-operacional/entities/eficiencia-operacional.entity.ts =====
+
+export class EficienciaOperacional {}

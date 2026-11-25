@@ -1,24 +1,21 @@
 import { Acao } from '@/generated/prisma/enums';
 import { AuditoriaService } from '@/modules/auditoria/auditoria.service';
 import { CreateAuditoriaDto } from '@/modules/auditoria/dto/create-auditoria.dto';
-import { QueryAuditoriaFindOneLastDto } from '@/modules/auditoria/dto/query-auditoria.dto';
 import { QueryEmpresaFilterDto } from '@/modules/empresa/dto/query-empresa.dto';
 import { EmpresaService } from '@/modules/empresa/empresa.service';
 import { UsuarioService } from '@/modules/usuario/usuario.service';
-import { PrismaService } from '@/prisma/prisma.service';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
-import { ResponseAuthDto } from './dto/response-auth.dto';
+import {
+  ResponseAuthDto,
+  ResponseUsuarioAutenticar,
+} from './dto/response-auth.dto';
 import { Auth } from './entities/auth.entity';
-import { UserContext } from './tenant-context/user-context.interface';
-import { QueryUsuarioFilterDto } from '@/modules/usuario/dto/query-usuario.dto';
+import {
+  QueryBagdeEnterpriceDto,
+  QueryUsuarioFilterDto,
+} from '@/modules/usuario/dto/query-usuario.dto';
 import { GenerateTokenService } from './jwt-generate-token/jwt-generate-token.service';
 import {
   AutenticarAcaoDto,
@@ -134,15 +131,26 @@ export class AuthService {
     this.logger.log(TYPES_NOTICES.LOGOUT);
   }
 
-  async authenticateAction(dto: AutenticarAcaoDto): Promise<boolean> {
-    this.logger.debug(dto);
-    const { usuarioId, pin } = dto;
-    const usuario = await this.usuario.findOne(usuarioId);
+  async authenticateAction(
+    dto: AutenticarAcaoDto,
+  ): Promise<ResponseUsuarioAutenticar> {
+    const { cracha, pin, empresaId } = dto;
+    const query = {
+      cracha: cracha,
+      empresaId: empresaId,
+    } as QueryBagdeEnterpriceDto;
+    const usuario = await this.usuario.findOneBadgeAndEnterprice(query);
     const pinValida = await this.usuario.compareHash(pin, usuario.pin);
     if (!pinValida) {
       this.logger.warn('Tentativa de autenticação com credenciais inválidas.');
       throw new UnauthorizedException(MENSAGEM_CREDENCIAIS_INVALIDAS);
     }
-    return pinValida;
+    const usuarioAutenticado = {
+      id: usuario.id,
+      cracha: usuario.cracha!,
+      perfil: usuario.perfil?.descricao!,
+    };
+    //this.logger.debug(usuarioAutenticado);
+    return usuarioAutenticado;
   }
 }

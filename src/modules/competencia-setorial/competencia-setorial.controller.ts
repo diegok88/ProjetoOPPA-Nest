@@ -1,3 +1,142 @@
+// import {
+//   Controller,
+//   Get,
+//   Post,
+//   Body,
+//   Param,
+//   Delete,
+//   ParseUUIDPipe,
+//   Patch,
+//   Query,
+//   UseGuards,
+// } from '@nestjs/common';
+// import { CompetenciaSetorialService } from './competencia-setorial.service';
+// import { CreateCompetenciaSetorialDto } from './dto/create-competencia-setorial.dto';
+// import {
+//   ResponseCompetenciaRelacaoDto,
+//   ResponseCompetenciaSetorialContadorDto,
+//   ResponseCompetenciaSetorialDto,
+//   ResponseCompetenciaSetorialTagsDto,
+//   ResponseCompSetContadorSupDto,
+//   ResponseCompSetSectionSelectDto,
+//   ResponseSetorGestorDto,
+// } from './dto/response-competencia-setorial.dto';
+// import { plainToInstance } from 'class-transformer';
+// import { QueryCompetenciaSetorialFilterDto } from './dto/query-competencia-setorial.dto';
+// import { Roles } from '@/auth/guards/roles.decorator';
+// import { ROLES } from '@/auth/guards/roles.const';
+// import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+// import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+// import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
+
+// @Controller('competencia-setorial')
+// @UseGuards(HttpJwtGuard, HttpRolesGuard)
+// export class CompetenciaSetorialController {
+//   constructor(
+//     private readonly competenciaSetorialService: CompetenciaSetorialService,
+//     private readonly tennantContext: TenantContextService,
+//   ) {}
+
+//   @Post()
+//   @Roles(ROLES.ASN1, ROLES.GER1)
+//   async create(
+//     @Body() create: CreateCompetenciaSetorialDto,
+//   ): Promise<ResponseCompetenciaSetorialDto> {
+//     const dado = this.competenciaSetorialService.create(create);
+//     return plainToInstance(ResponseCompetenciaSetorialDto, dado);
+//   }
+
+//   @Get('list_tags')
+//   @Roles(ROLES.ASN1, ROLES.GER1, ROLES.SUP1)
+//   async findListTag(
+//     @Query() query: QueryCompetenciaSetorialFilterDto,
+//   ): Promise<ResponseCompetenciaSetorialTagsDto[]> {
+//     const dados = await this.competenciaSetorialService.findListTag(query);
+//     return plainToInstance(ResponseCompetenciaSetorialTagsDto, dados);
+//   }
+
+//   @Get('setores_gestor')
+//   @Roles(ROLES.ASN1, ROLES.GER1, ROLES.SUP1)
+//   async findSetoresDoGestor(): Promise<ResponseSetorGestorDto[]> {
+//     const dados = await this.competenciaSetorialService.findSetoresDoGestor();
+//     return plainToInstance(ResponseSetorGestorDto, dados);
+//   }
+
+//   @Get()
+//   @Roles(ROLES.ASN1, ROLES.GER1, ROLES.SUP1)
+//   async findAll(
+//     @Query() query: QueryCompetenciaSetorialFilterDto,
+//   ): Promise<ResponseCompetenciaRelacaoDto[]> {
+//     const dados = await this.competenciaSetorialService.findAll(query);
+//     return plainToInstance(ResponseCompetenciaRelacaoDto, dados);
+//   }
+
+//   @Get('list/:id')
+//   @Roles(ROLES.ASN1, ROLES.GER1)
+//   async findAllList(
+//     @Param('id', ParseUUIDPipe) id: string,
+//   ): Promise<ResponseCompetenciaRelacaoDto[]> {
+//     const ctx = this.tennantContext.getStore()!;
+
+//     const query: QueryCompetenciaSetorialFilterDto = {
+//       colaboradorId: id,
+//       gestorId: ctx.user,
+//       status: true,
+//       incluir: 'setores_parcial',
+//     };
+//     const dados = await this.competenciaSetorialService.findAll(query);
+//     return plainToInstance(ResponseCompetenciaRelacaoDto, dados);
+//   }
+
+//   @Get('section_available/:id')
+//   @Roles(ROLES.ASN1, ROLES.GER1)
+//   async findSectionAvailable(
+//     @Param('id', ParseUUIDPipe) id: string,
+//   ): Promise<ResponseCompSetSectionSelectDto[]> {
+//     const dados =
+//       await this.competenciaSetorialService.findSectionAvailable(id);
+//     return plainToInstance(ResponseCompSetSectionSelectDto, dados);
+//   }
+
+//   @Get('counter')
+//   @Roles(ROLES.ASN1, ROLES.GER1)
+//   async counter(): Promise<ResponseCompetenciaSetorialContadorDto> {
+//     const contador = await this.competenciaSetorialService.counter();
+//     return plainToInstance(ResponseCompetenciaSetorialContadorDto, contador);
+//   }
+
+//   @Get('counter_manager')
+//   @Roles(ROLES.ASN1, ROLES.SUP1)
+//   async findCounterManager(): Promise<ResponseCompSetContadorSupDto> {
+//     const contador = await this.competenciaSetorialService.findCounterManager();
+//     return plainToInstance(ResponseCompSetContadorSupDto, contador);
+//   }
+
+//   @Get(':id')
+//   @Roles(ROLES.ASN1, ROLES.GER1)
+//   async findOne(
+//     @Param('id', ParseUUIDPipe) id: string,
+//   ): Promise<ResponseCompetenciaSetorialDto> {
+//     const dado = await this.competenciaSetorialService.findOne(id);
+//     return plainToInstance(ResponseCompetenciaSetorialDto, dado);
+//   }
+
+//   @Patch('deactive/:id')
+//   @Roles(ROLES.ASN1, ROLES.GER1)
+//   async deactive(
+//     @Param('id', ParseUUIDPipe) id: string,
+//   ): Promise<ResponseCompetenciaSetorialDto> {
+//     const dado = await this.competenciaSetorialService.deactive(id);
+//     return plainToInstance(ResponseCompetenciaSetorialDto, dado);
+//   }
+
+//   @Delete(':id')
+//   @Roles(ROLES.ASN1)
+//   remove(@Param('id', ParseUUIDPipe) id: string) {
+//     return this.competenciaSetorialService.remove(id);
+//   }
+// }
+
 import {
   Controller,
   Get,
@@ -16,8 +155,10 @@ import {
   ResponseCompetenciaRelacaoDto,
   ResponseCompetenciaSetorialContadorDto,
   ResponseCompetenciaSetorialDto,
+  ResponseCompetenciaSetorialTagsDto,
   ResponseCompSetContadorSupDto,
   ResponseCompSetSectionSelectDto,
+  ResponseSetorGestorDto,
 } from './dto/response-competencia-setorial.dto';
 import { plainToInstance } from 'class-transformer';
 import { QueryCompetenciaSetorialFilterDto } from './dto/query-competencia-setorial.dto';
@@ -42,6 +183,27 @@ export class CompetenciaSetorialController {
   ): Promise<ResponseCompetenciaSetorialDto> {
     const dado = this.competenciaSetorialService.create(create);
     return plainToInstance(ResponseCompetenciaSetorialDto, dado);
+  }
+
+  @Get('list_tags')
+  @Roles(ROLES.ASN1, ROLES.GER1, ROLES.SUP1)
+  async findListTag(
+    @Query() query: QueryCompetenciaSetorialFilterDto,
+  ): Promise<ResponseCompetenciaSetorialTagsDto[]> {
+    const dados = await this.competenciaSetorialService.findListTag(query);
+    return plainToInstance(ResponseCompetenciaSetorialTagsDto, dados);
+  }
+
+  /*
+    SETORES DO GESTOR LOGADO — tela inicial do mobile.
+    Declarado ANTES de @Get(':id') e com dois segmentos para não colidir
+    com o ParseUUIDPipe de :id.
+  */
+  @Get('setores-gestor')
+  @Roles(ROLES.ASN1, ROLES.GER1, ROLES.SUP1)
+  async findSetoresDoGestor(): Promise<ResponseSetorGestorDto[]> {
+    const dados = await this.competenciaSetorialService.findSetoresDoGestor();
+    return plainToInstance(ResponseSetorGestorDto, dados);
   }
 
   @Get()

@@ -47,9 +47,11 @@ export class LoginTagAtivoDto {
 }
 
 export class AutenticarAcaoDto {
-  @IsNotEmpty({ message: 'Código é obrigatório.' })
-  @IsUUID('all', { message: 'Usuario id inválido.' })
-  usuarioId!: string;
+  @Type(() => Number)
+  @IsNumber({}, { message: 'Crachá deve ser um número.' })
+  @IsNotEmpty({ message: 'Crachá é obrigatório.' })
+  @Min(0, { message: 'Crachá não pode ser negativo.' })
+  cracha!: number;
 
   @IsString({ message: 'Senha deve ser um texto.' })
   @IsNotEmpty({ message: 'Senha é obrigatória.' })
@@ -58,4 +60,8 @@ export class AutenticarAcaoDto {
     message: 'Pin deve conter apenas números',
   })
   pin!: string;
+
+  @IsNotEmpty({ message: 'EmpresaId é obrigatório.' })
+  @IsUUID('all', { message: 'EmpresaId id inválido.' })
+  empresaId!: string;
 }

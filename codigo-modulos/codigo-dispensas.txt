@@ -1,0 +1,928 @@
+
+===== src/modules/dispensas/dispensas.controller.ts =====
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import { DispensasService } from './dispensas.service';
+import { CreateDispensaDto } from './dto/create-dispensa.dto';
+import { UpdateDispensaDto } from './dto/update-dispensa.dto';
+
+import { plainToInstance } from 'class-transformer';
+import { ROLES } from '@/auth/guards/roles.const';
+import { Roles } from '@/auth/guards/roles.decorator';
+import {
+  QueryDispensaCounterDto,
+  QueryDispensaDateFilterDto,
+  QueryDispensaFilterDto,
+} from './dto/query-dispensas.dto';
+import {
+  ResponseAlertDispensaDto,
+  ResponseDispensaContadorDto,
+  ResponseDispensaDto,
+} from './dto/response-dispensas.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
+
+@Controller('dispensas')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
+export class DispensasController {
+  constructor(private readonly dispensasService: DispensasService) {}
+
+  @Post()
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async create(
+    @Body() createDispensaDto: CreateDispensaDto,
+  ): Promise<ResponseDispensaDto> {
+    const dado = await this.dispensasService.create(createDispensaDto);
+    return plainToInstance(ResponseDispensaDto, dado);
+  }
+
+  @Get()
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async findAll(
+    @Query() query: QueryDispensaFilterDto,
+  ): Promise<ResponseDispensaDto[]> {
+    const dados = await this.dispensasService.findAll(query);
+    return plainToInstance(ResponseDispensaDto, dados);
+  }
+
+  @Get('check-date')
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async checkAlertManagerDismissal(
+    @Query() query: QueryDispensaDateFilterDto,
+  ): Promise<ResponseAlertDispensaDto> {
+    const dados = await this.dispensasService.checkAlertManagerDismissal(query);
+    return plainToInstance(ResponseAlertDispensaDto, dados);
+  }
+
+  @Get('counter')
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async counter(
+    @Query() query: QueryDispensaCounterDto,
+  ): Promise<ResponseDispensaContadorDto> {
+    const contador = await this.dispensasService.counter(query);
+    return plainToInstance(ResponseDispensaContadorDto, contador);
+  }
+
+  @Get(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseDispensaDto> {
+    const dado = await this.dispensasService.findOne(id);
+    return plainToInstance(ResponseDispensaDto, dado);
+  }
+
+  @Patch(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateDispensaDto: UpdateDispensaDto,
+  ): Promise<ResponseDispensaDto> {
+    const dado = await this.dispensasService.update(id, updateDispensaDto);
+    return plainToInstance(ResponseDispensaDto, dado);
+  }
+
+  @Patch('situation/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async updateSituation(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseDispensaDto> {
+    const dado = await this.dispensasService.updateSituation(id);
+    return plainToInstance(ResponseDispensaDto, dado);
+  }
+
+  @Patch('active/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async active(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseDispensaDto> {
+    const dado = await this.dispensasService.active(id);
+    return plainToInstance(ResponseDispensaDto, dado);
+  }
+
+  @Patch('deactive/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async deactive(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseDispensaDto> {
+    const dado = await this.dispensasService.deactive(id);
+    return plainToInstance(ResponseDispensaDto, dado);
+  }
+
+  @Delete(':id')
+  @Roles(ROLES.ASN1)
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseDispensaDto> {
+    const dado = await this.dispensasService.remove(id);
+    return plainToInstance(ResponseDispensaDto, dado);
+  }
+}
+
+===== src/modules/dispensas/dispensas.module.ts =====
+
+import { forwardRef, Module } from '@nestjs/common';
+import { DispensasService } from './dispensas.service';
+import { DispensasController } from './dispensas.controller';
+import { PerfilModule } from '../perfil/perfil.module';
+import { PenalidadesModule } from '../penalidades/penalidades.module';
+
+@Module({
+  imports: [forwardRef(() => PerfilModule), PenalidadesModule],
+  controllers: [DispensasController],
+  providers: [DispensasService],
+  exports: [DispensasService],
+})
+export class DispensasModule {}
+
+===== src/modules/dispensas/dispensas.service.ts =====
+
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { CreateDispensaDto } from './dto/create-dispensa.dto';
+import { UpdateDispensaDto } from './dto/update-dispensa.dto';
+import { PrismaService } from '@/prisma/prisma.service';
+import { Dispensa, DispensaListagem } from './entities/dispensa.entity';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+
+import {
+  Acao,
+  Prisma,
+  SituacaoDispensa,
+  TipoDispensa,
+} from '@/generated/prisma/client';
+import {
+  QueryDispensaCounterDto,
+  QueryDispensaDateFilterDto,
+  QueryDispensaFilterDto,
+} from './dto/query-dispensas.dto';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import {
+  ResponseAlertDispensaDto,
+  ResponseDispensaContadorDto,
+} from './dto/response-dispensas.dto';
+import { PenalidadesService } from '../penalidades/penalidades.service';
+import { PerfilService } from '../perfil/perfil.service';
+import { ROLES } from '@/auth/guards/roles.const';
+
+interface CheckDismissal {
+  usuarioId: string;
+  dataInicial: Date;
+  dataFinal: Date;
+  dispensaId?: string;
+}
+
+@Injectable()
+export class DispensasService {
+  private logger = new Logger(DispensasService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly penalidadeService: PenalidadesService,
+    private readonly perfilService: PerfilService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
+
+  /* SERVIÇO DE CRIAÇÃO DE DISPENSA
+  - Cria a dispensa.
+  - Verifica se o colaborador possui dispensas ou penalidades nas datas solicitadas.
+  */
+  async create(create: CreateDispensaDto): Promise<Dispensa> {
+    try {
+      const criarDispensa = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const ctx = this.tenantContext.getStore()!;
+
+          const verificarColaborador = {
+            usuarioId: create.colaboradorId,
+            dataInicial: create.dataInicial,
+            dataFinal: create.dataFinal,
+          };
+          await this.checkEmployeeDismissal(verificarColaborador, tx);
+          await this.penalidadeService.checkEmployeePenalty(
+            verificarColaborador,
+            tx,
+          );
+
+          const criar = await this.prisma.client.dispensa.create({
+            data: {
+              ...create,
+              gestorId: ctx.user,
+              situacaoDispensa: SituacaoDispensa.PENDENTE,
+            },
+          });
+          this.logger.log(TYPES_NOTICES.CREATE);
+          return criar;
+        },
+      );
+      return criarDispensa;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - create()');
+      throw error;
+    }
+  }
+
+  /* FUNÇÕES DE VERIFICAÇÃO DE EXITENCIA DE DISPENSAS EM EXECUÇÃO 
+  - aplicado internamente no serviço.
+  */
+  async checkEmployeeDismissal(
+    verificar: CheckDismissal,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const condicao: Prisma.DispensaWhereInput = {};
+      condicao.colaboradorId = verificar.usuarioId;
+      condicao.AND = [
+        { id: { not: verificar.dispensaId } },
+        { dataInicial: { lte: verificar.dataFinal } },
+        { dataFinal: { gte: verificar.dataInicial } },
+        {
+          situacaoDispensa: {
+            notIn: [SituacaoDispensa.FINALIZADA, SituacaoDispensa.CANCELADA],
+          },
+        },
+      ];
+
+      const qtdDispensas = await client.dispensa.count({ where: condicao });
+
+      if (qtdDispensas > 0) {
+        this.logger.error(
+          `O colaborador possui ${qtdDispensas} dispensas nas datas solicitadas`,
+        );
+        throw new UnauthorizedException(
+          `O colaborador possui ${qtdDispensas} dispensas nas datas solicitadas`,
+        );
+      }
+
+      this.logger.log(TYPES_NOTICES.EMPTY_LIST);
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - checkEmployeeDismissal()',
+      );
+      throw error;
+    }
+  }
+
+  async checkManagerDismissal(
+    verificar: CheckDismissal,
+    tx?: Prisma.TransactionClient,
+  ): Promise<number> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const condicao: Prisma.DispensaWhereInput = {};
+      condicao.gestorId = verificar.usuarioId;
+      condicao.AND = [
+        { dataInicial: { lte: verificar.dataFinal } },
+        { dataFinal: { gte: verificar.dataInicial } },
+        {
+          situacaoDispensa: {
+            notIn: [SituacaoDispensa.FINALIZADA, SituacaoDispensa.CANCELADA],
+          },
+        },
+      ];
+
+      const qtdDispensas = await client.dispensa.count({ where: condicao });
+
+      if (qtdDispensas > 0) {
+        this.logger.log(TYPES_NOTICES.EMPTY_NOT, ` - ${qtdDispensas}`);
+      }
+
+      return qtdDispensas;
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - checkManagerDismissal()',
+      );
+      throw error;
+    }
+  }
+
+  /* SERVIÇO DE BUSCA DE QUANTIDADE DE DISPENSAS E PENALIDADES 
+  - Usado para alertar antes de um cadastro ou alteração a quantidade de registro nas datas consultadas.
+  */
+  async checkAlertManagerDismissal(
+    query: QueryDispensaDateFilterDto,
+  ): Promise<ResponseAlertDispensaDto> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+
+      const verificarGestor = {
+        usuarioId: ctx.user,
+        dataInicial: query.dataInicial!,
+        dataFinal: query.dataFinal!,
+      };
+
+      const dispensas = await this.checkManagerDismissal(verificarGestor);
+      const penalidades =
+        await this.penalidadeService.checkManagerPenalty(verificarGestor);
+
+      return { penalidade: penalidades, dispensa: dispensas };
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - checkAlertManagerDismissal()',
+      );
+      throw error;
+    }
+  }
+
+  async findAll(
+    query: QueryDispensaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<DispensaListagem[]> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+
+      const client = tx ?? this.prisma.client;
+
+      const { campos, ...filtros } = query ?? {};
+
+      const condicao: Prisma.DispensaWhereInput = {};
+      if (filtros.colaboradorId) condicao.colaboradorId = filtros.colaboradorId;
+      if (filtros.gestorId) condicao.gestorId = filtros.gestorId;
+      if (filtros.tipoDispensa) condicao.tipoDispensa = filtros.tipoDispensa;
+      if (filtros.situacaoDispensa)
+        condicao.situacaoDispensa = filtros.situacaoDispensa;
+      if (filtros.dataInicial || filtros.dataFinal) {
+        condicao.dataInicial = {
+          ...(filtros.dataInicial && { gte: filtros.dataInicial }),
+          ...(filtros.dataFinal && { lte: filtros.dataFinal }),
+        };
+      }
+      if (filtros.status !== undefined) condicao.status = filtros.status;
+      if (filtros.gestor) condicao.gestorId = ctx.user;
+
+      const selecao = await this.buildSelect(campos);
+
+      const INCLUDES: Record<string, Prisma.DispensaInclude> = {
+        todos_relacoes: { colaborador: true, gestor: true },
+        colaborador: { colaborador: true },
+        gestor: { gestor: true },
+        usuario_parcial: {
+          colaborador: { select: { nome: true, cracha: true } },
+        },
+        gestor_parcial: {
+          gestor: { select: { nome: true, cracha: true } },
+        },
+      };
+
+      const opcoes: Prisma.DispensaFindManyArgs = {
+        where: condicao,
+        orderBy: { dataInicial: 'desc' },
+      };
+
+      if (campos?.length) {
+        opcoes.select = selecao;
+      } else {
+        const incluir =
+          filtros.incluir && INCLUDES[filtros.incluir]
+            ? INCLUDES[filtros.incluir]
+            : undefined;
+
+        if (incluir) opcoes.include = incluir;
+      }
+
+      const listar: Dispensa[] = await client.dispensa.findMany(opcoes);
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL,  PENDENTE, CANCELADO, EXECUÇÃO, FINALIZADOS, BANCO DE HORAS, FERIAS E ATESTADOS */
+  async counter(
+    query?: QueryDispensaCounterDto,
+  ): Promise<ResponseDispensaContadorDto> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+
+      const buscarPerfil = await this.perfilService.findOne(ctx.perfil);
+      const perfil = `${buscarPerfil.descricao} - ${buscarPerfil.nivel}`;
+
+      const condicao: Prisma.DispensaWhereInput = {};
+
+      if (query && query.gestor) {
+        condicao.gestorId = ctx.user;
+      } else if (query && !query.gestor) {
+        if (perfil === ROLES.ADN1) {
+          const filtroEmpresa: Prisma.DispensaWhereInput['colaborador'] = {};
+          if (!filtroEmpresa.empresaId) filtroEmpresa.empresaId = ctx.empresa;
+          if (Object.keys(filtroEmpresa).length > 0)
+            condicao.colaborador = filtroEmpresa;
+        }
+      }
+
+      const gruposDispensa = await this.prisma.dispensa.groupBy({
+        by: ['tipoDispensa'],
+        where: condicao,
+        _count: { _all: true },
+      });
+
+      const atestado =
+        gruposDispensa.find((g) => g.tipoDispensa === TipoDispensa.ATESTADO)
+          ?._count._all ?? 0;
+      const bancoDeHoras =
+        gruposDispensa.find(
+          (g) => g.tipoDispensa === TipoDispensa.BANCO_DE_HORAS,
+        )?._count._all ?? 0;
+      const ferias =
+        gruposDispensa.find((g) => g.tipoDispensa === TipoDispensa.FERIAS)
+          ?._count._all ?? 0;
+
+      const gruposSituacao = await this.prisma.dispensa.groupBy({
+        by: ['situacaoDispensa'],
+        where: condicao,
+        _count: { _all: true },
+      });
+
+      const pendente =
+        gruposSituacao.find(
+          (g) => g.situacaoDispensa === SituacaoDispensa.PENDENTE,
+        )?._count._all ?? 0;
+
+      const cancelada =
+        gruposSituacao.find(
+          (g) => g.situacaoDispensa === SituacaoDispensa.CANCELADA,
+        )?._count._all ?? 0;
+      const execucao =
+        gruposSituacao.find(
+          (g) => g.situacaoDispensa === SituacaoDispensa.EXECUCAO,
+        )?._count._all ?? 0;
+      const finalizada =
+        gruposSituacao.find(
+          (g) => g.situacaoDispensa === SituacaoDispensa.FINALIZADA,
+        )?._count._all ?? 0;
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return {
+        total: atestado + bancoDeHoras + ferias,
+        pendente,
+        cancelada,
+        execucao,
+        finalizada,
+        atestado,
+        bancoDeHoras,
+        ferias,
+      };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
+  async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Dispensa> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const buscar = await client.dispensa.findUnique({
+        where: { id: id },
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
+      throw error;
+    }
+  }
+
+  async update(id: string, update: UpdateDispensaDto): Promise<Dispensa> {
+    try {
+      const atualizarDispensa = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const buscar = await this.findOne(id, tx);
+
+          if (
+            buscar.dataInicial !== update.dataInicial ||
+            buscar.dataFinal !== update.dataFinal
+          ) {
+            const verificarColaborador = {
+              usuarioId: buscar.colaboradorId,
+              dataInicial: update.dataInicial!,
+              dataFinal: update.dataFinal!,
+              dispensaId: buscar.id,
+            };
+            await this.checkEmployeeDismissal(verificarColaborador, tx);
+            await this.penalidadeService.checkEmployeePenalty(
+              verificarColaborador,
+              tx,
+            );
+          }
+
+          const atualizar = await tx.dispensa.update({
+            where: { id: id },
+            data: update,
+          });
+
+          return atualizar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.UPDATE);
+      return atualizarDispensa;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
+      throw error;
+    }
+  }
+
+  async updateSituation(id: string): Promise<Dispensa> {
+    try {
+      const atualizarSituacao = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const buscar = await this.findOne(id, tx);
+
+          if (buscar.situacaoDispensa === SituacaoDispensa.EXECUCAO) {
+            this.logger.log(TYPES_NOTICES.UNAUTHORIZED, ' - updateSituation()');
+            throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+          }
+
+          const situacao =
+            buscar.situacaoDispensa === SituacaoDispensa.PENDENTE
+              ? SituacaoDispensa.CANCELADA
+              : SituacaoDispensa.PENDENTE;
+
+          const atualizar = await tx.dispensa.update({
+            where: { id: id },
+            data: { situacaoDispensa: situacao },
+          });
+
+          return atualizar;
+        },
+      );
+      this.logger.log(TYPES_NOTICES.UPDATE_SITUATION);
+      return atualizarSituacao;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - updateSituation()');
+      throw error;
+    }
+  }
+
+  async active(id: string): Promise<Dispensa> {
+    try {
+      const ativarDispensa = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (verificar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_ACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_ACTIVE);
+          }
+
+          const ativar = await tx.dispensa.update({
+            where: { id: id },
+            data: { status: true, _auditAction: Acao.ACTIVE },
+          });
+
+          return ativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
+      return ativarDispensa;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - ACTIVE');
+      throw error;
+    }
+  }
+
+  async deactive(id: string): Promise<Dispensa> {
+    try {
+      const inativarDispensa = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (!verificar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_DEACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_DEACTIVE);
+          }
+
+          const inativar = await tx.dispensa.update({
+            where: { id: id },
+            data: { status: false, _auditAction: Acao.DEACTIVATE },
+          });
+
+          return inativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
+      return inativarDispensa;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE');
+      throw error;
+    }
+  }
+
+  async remove(id: string): Promise<Dispensa> {
+    try {
+      const removerDispensa = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (verificar.status) {
+            this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+            throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+          }
+
+          const remover = await tx.dispensa.delete({
+            where: { id: id },
+          });
+
+          return remover;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return removerDispensa;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
+      throw error;
+    }
+  }
+
+  private readonly allowedDispensaFields = [
+    'id',
+    'codigo',
+    'usuarioId',
+    'gestorId',
+    'tipoDispensa',
+    'situacaoDispensa',
+    'dataInicial',
+    'dataFinal',
+    'status',
+  ];
+
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedDispensaFields.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
+  }
+}
+
+===== src/modules/dispensas/dto/create-dispensa.dto.ts =====
+
+import { TipoDispensa } from '@/generated/prisma/enums';
+import { Type } from 'class-transformer';
+import {
+  IsUUID,
+  IsString,
+  IsNotEmpty,
+  IsDate,
+  IsEnum,
+  ValidateIf,
+  Validate,
+} from 'class-validator';
+
+export class CreateDispensaDto {
+  @IsUUID('all', { message: 'Usuário id inválido.' })
+  @IsNotEmpty({ message: 'O usuário é um campo obrigatório.' })
+  colaboradorId!: string;
+
+  @IsString({ message: 'O tipo de dispensa não é do tipo String.' })
+  @IsNotEmpty({ message: 'O tipo de dispensa é um campo obrigatório.' })
+  @IsEnum(TipoDispensa, {
+    message: 'Tipo dispensa não pertence ao enum TipoDispensa.',
+  })
+  tipoDispensa!: TipoDispensa;
+
+  @Type(() => Date)
+  @IsDate({ message: 'A data inicial não é do tipo Date.' })
+  @IsNotEmpty({ message: 'A data inicial é um campo obrigatório.' })
+  dataInicial!: Date;
+
+  @Type(() => Date)
+  @IsDate({ message: 'A data final não é do tipo Date.' })
+  @IsNotEmpty({ message: 'A data final é um campo obrigatório.' })
+  @ValidateIf(
+    (o) => o.dataInicial instanceof Date && o.dataFinal instanceof Date,
+  )
+  @Validate(
+    (o: { dataFinal: Date; dataInicial: Date }) => o.dataFinal >= o.dataInicial,
+    {
+      message: 'DataFinal não pode ser anterior à DataInicial!',
+    },
+  )
+  dataFinal!: Date;
+}
+
+===== src/modules/dispensas/dto/query-dispensas.dto.ts =====
+
+import { SituacaoDispensa, TipoDispensa } from '@/generated/prisma/enums';
+import {
+  fimDoDiaBrasilia,
+  inicioDoDiaBrasilia,
+} from '@/utils/data-brasilia.util';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsDate,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
+
+export class QueryDispensaFilterDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Código não é do tipo Inteiro!' })
+  @IsNumber({}, { message: 'Código não é do tipo Number!' })
+  codigo?: number;
+
+  @IsOptional()
+  @IsUUID(undefined, { message: 'UsuárioId não é do tipo UUID!' })
+  colaboradorId?: string;
+
+  @IsOptional()
+  @IsUUID(undefined, { message: 'GestorId não é do tipo UUID!' })
+  gestorId?: string;
+
+  @IsOptional()
+  @IsEnum(TipoDispensa, { message: 'TipoDispensa não é um valor válido!' })
+  tipoDispensa?: TipoDispensa;
+
+  @IsOptional()
+  @IsEnum(SituacaoDispensa, {
+    message: 'SituacaoDispensa não é um valor válido!',
+  })
+  situacaoDispensa?: SituacaoDispensa;
+
+  @IsOptional()
+  @Transform(({ value }) => inicioDoDiaBrasilia(value))
+  @IsDate({ message: 'DataInicial não está em formato de data válido!' })
+  dataInicial?: Date;
+
+  @IsOptional()
+  @Transform(({ value }) => fimDoDiaBrasilia(value))
+  @IsDate({ message: 'DataFinal não está em formato de data válido!' })
+  dataFinal?: Date;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
+  status?: boolean;
+
+  @IsOptional()
+  @IsString({ message: 'Campos não é do tipo String!' })
+  campos?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Incluir não é do tipo String!' })
+  incluir?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'Gestor não é do tipo Boolean!' })
+  gestor?: boolean;
+}
+
+export class QueryDispensaCounterDto {
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'Gestor não é do tipo Boolean!' })
+  gestor?: boolean;
+}
+
+export class QueryDispensaDateFilterDto {
+  @IsNotEmpty({ message: 'DataInicial é um campo obrigatório.' })
+  @Transform(({ value }) => inicioDoDiaBrasilia(value))
+  @IsDate({ message: 'DataInicial não está em formato de data válido!' })
+  dataInicial!: Date;
+
+  @IsNotEmpty({ message: 'DataFinal é um campo obrigatório.' })
+  @Transform(({ value }) => fimDoDiaBrasilia(value))
+  @IsDate({ message: 'DataFinal não está em formato de data válido!' })
+  dataFinal!: Date;
+}
+
+===== src/modules/dispensas/dto/response-dispensas.dto.ts =====
+
+import { SituacaoDispensa, TipoDispensa } from '@/generated/prisma/enums';
+import { Expose } from 'class-transformer';
+
+export class ResponseDispensaDto {
+  @Expose() id!: string;
+  @Expose() codigo!: number;
+  @Expose() colaboradorId!: string;
+  @Expose() gestorId!: string;
+  @Expose() tipoDispensa!: TipoDispensa;
+  @Expose() situacaoDispensa!: SituacaoDispensa;
+  @Expose() dataInicial!: Date;
+  @Expose() dataFinal!: Date;
+  @Expose() status!: boolean;
+}
+
+export class ResponseDispensaContadorDto {
+  @Expose() total!: number;
+  @Expose() pendente!: number;
+  @Expose() cancelada!: number;
+  @Expose() execucao!: number;
+  @Expose() finalizada!: number;
+  @Expose() atestado!: number;
+  @Expose() bancoDeHoras!: number;
+  @Expose() ferias!: number;
+}
+
+export class ResponseAlertDispensaDto {
+  @Expose() penalidade!: number;
+  @Expose() dispensa!: number;
+}
+
+===== src/modules/dispensas/dto/update-dispensa.dto.ts =====
+
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateDispensaDto } from './create-dispensa.dto';
+
+export class UpdateDispensaDto extends PartialType(CreateDispensaDto) {}
+
+===== src/modules/dispensas/entities/dispensa.entity.ts =====
+
+import { Dispensa as DispensaModel, Prisma } from '@/generated/prisma/client';
+
+export type Dispensa = DispensaModel;
+
+export type DispensaRelacao = Prisma.DispensaGetPayload<{
+  include: { colaborador: true; gestor: true };
+}>;
+
+export type DispensaRelacaoParcial = Prisma.DispensaGetPayload<{
+  include: {
+    colaborador: { select: { id: true; cracha: true; nome: true } };
+    gestor: { select: { id: true; cracha: true; nome: true } };
+  };
+}>;
+
+export type DispensaColaborados = Prisma.DispensaGetPayload<{
+  include: { colaborador: true };
+}>;
+
+export type DispensaColaboradosParcial = Prisma.DispensaGetPayload<{
+  include: { colaborador: { select: { id: true; cracha: true; nome: true } } };
+}>;
+
+export type DispensaGestor = Prisma.DispensaGetPayload<{
+  include: { gestor: true };
+}>;
+
+export type DispensaGestorParcial = Prisma.DispensaGetPayload<{
+  include: { gestor: { select: { id: true; cracha: true; nome: true } } };
+}>;
+
+export type DispensaListagem =
+  | Dispensa
+  | DispensaRelacao
+  | DispensaRelacaoParcial
+  | DispensaColaborados
+  | DispensaColaboradosParcial
+  | DispensaGestor
+  | DispensaGestorParcial;

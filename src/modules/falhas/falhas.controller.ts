@@ -31,7 +31,7 @@ import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 @Controller('falhas')
 @UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class FalhasController {
-  constructor(private readonly falhasService: FalhasService) {}
+  constructor(private readonly falhasService: FalhasService) {} 
 
   @Post()
   @Roles(ROLES.ASN1, ROLES.ADN1)
@@ -63,7 +63,7 @@ export class FalhasController {
   async findOneFirst(
     @Query() query: QueryFalhaFilterDto,
   ): Promise<ResponseFalhasDto> {
-    const registro = await this.falhasService.findOneFirst(query);
+    const registro = await this.falhasService.findOneFirst(query); 
     return plainToInstance(ResponseFalhasDto, registro);
   }
 

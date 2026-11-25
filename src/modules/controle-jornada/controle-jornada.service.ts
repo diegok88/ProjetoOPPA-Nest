@@ -74,8 +74,6 @@ export class ControleJornadaService {
             );
           }
 
-          /* DUPLICIDADE: impede dois registros do mesmo tipo no mesmo dia 
-          (ex.: segunda ENTRADA_EXPEDIENTE ou segundo RETORNO_INTERVALO) */
           const jaRegistrado = await this.searchDailyJourney(
             usuarioId,
             tipoJornada,
@@ -134,12 +132,6 @@ export class ControleJornadaService {
     }
   }
 
-  /* FUNÇÃO AUXILIAR - BUSCA O REGISTRO DE ENTRADA NO INTERVALO DO DIA CORREÇÃO DE FUSO: 
-   a janela do dia usa o dia civil DE BRASÍLIA (janelaDiaBrasilia) e não o fuso do servidor. 
-   O padrão anterior (setHours(0,0,0,0)) zerava as horas no fuso onde o servidor roda:
-   em UTC, meia-noite UTC equivale a 21:00 do dia anterior em Brasília,
-   deslocando a busca em 3h e podendo perder a SAIDA_INTERVALO gravada
-   perto da virada do dia (turno noturno). */
   private async searchEntryInterval(
     usuarioId: string,
     dataRegistro: Date,
@@ -148,8 +140,6 @@ export class ControleJornadaService {
     try {
       const client = tx ?? this.prisma.client;
 
-      /* Janela do dia civil de Brasília que contém o instante do registro:
-     inicio = 00:00:00.000-03:00 e fim = 23:59:59.999-03:00 desse dia */
       const { inicio: inicioDia, fim: fimDia } =
         janelaDiaBrasilia(dataRegistro);
 
@@ -172,29 +162,15 @@ export class ControleJornadaService {
     }
   }
 
-  /* FUNÇÃO AUXILIAR - VERIFICAÇÃO DE USUÁRIO
-   Valida se o usuário pode registrar a jornada na tag informada.
-   Executa 3 checagens e retorna true apenas se TODAS passarem:
-     1. TURNO: o turno do usuário precisa ser o turno atual do sistema
-        (exceto em SAIDA_EXPEDIENTE, liberado dessa regra);
-     2. PERFIL: o perfil precisa ser "OPERADOR";
-     3. ALOCAÇÃO: precisa existir alocação ATIVA e ALOCADA para a tag
-        no turno atual, e o operador alocado deve ser o próprio usuário.
-   Qualquer reprovação loga o motivo específico e retorna false, o que
-   faz o create() lançar UnauthorizedException e abortar o registro. */
   private async searchOperatorUser(
     usuarioId: string,
     tagAtivoId: string,
     turno: TipoTurno,
     tipoJornada: TipoJornada,
   ): Promise<boolean> {
-    /* Busca o usuário e o perfil vinculado a ele.
-     O "!" (non-null assertion) assume que todo usuário tem perfilId */
     const usuario = await this.usuarioService.findOne(usuarioId);
     const perfil = await this.perfilService.findOne(usuario.perfilId!);
 
-    /* Monta o filtro de alocação: alguém ALOCADO na tag informada,
-     no turno atual, com alocação ativa (status true) */
     const queryA: QueryAlocacaoOperacionalFilterDto = {
       tagAtivoId: tagAtivoId,
       situacao: SituacaoAlocacao.ALOCADO,
@@ -202,32 +178,18 @@ export class ControleJornadaService {
       status: true,
     };
 
-    /* Retorna a alocação ativa da tag no turno (ou undefined se a tag
-     estiver sem operador naquele turno) */
     const alocacao = await this.alocacaoService.findOneAllocation(queryA);
 
-    /* CHECAGEM 1 - TURNO: true quando o turno do usuário DIFERE do turno
-     atual E o registro NÃO é SAIDA_EXPEDIENTE (tipo isento da regra,
-     para permitir a saída no fim do expediente mesmo com o sistema já
-     em outro turno) */
     const isTurno =
       usuario.turno !== turno && tipoJornada !== TipoJornada.SAIDA_EXPEDIENTE;
 
-    /* CHECAGEM 2 - PERFIL: true quando o perfil NÃO é OPERADOR */
     const isOperador = perfil.descricao !== 'OPERADOR';
 
-    /* CHECAGEM 3 - ALOCAÇÃO: true quando não há alocação ativa na tag
-     OU a alocação encontrada pertence a OUTRO operador (a busca não
-     filtra por usuário, por isso a comparação de operadorId confere
-     se o alocado é este usuário) */
     const isAlocado = !alocacao || alocacao.operadorId !== usuarioId;
 
-    /* BASTA UMA reprovação para barrar o registro ( OU ) */
     const isControle = isTurno || isOperador || isAlocado;
 
     if (isControle) {
-      /* Loga cada motivo reprovado individualmente, facilitando
-       diagnóstico e auditoria sem precisar abrir o depurador */
       if (isTurno)
         this.logger.warn(
           `Usuário ${usuarioId} não pertence ao turno da ${turno}!`,
@@ -242,16 +204,9 @@ export class ControleJornadaService {
         );
       return false;
     }
-    /* Todas as checagens passaram: usuário autorizado a registrar */
     return true;
   }
 
-  /* FUNÇÃO AUXILIAR - VALIDA DUPLICIDADE DE JORNADA NO DIA
-   Retorna true se o usuário JÁ possui um registro do mesmo tipoJornada
-   dentro do dia civil consultado; false caso contrário.
-   Janela de busca segue a mesma correção de fuso do searchEntryInterval:
-   dia civil DE BRASÍLIA (janelaDiaBrasilia), imune ao fuso do servidor
-   (o padrão setHours(0,0,0,0) deslocaria a busca em até 3h em UTC). */
   private async searchDailyJourney(
     usuarioId: string,
     tipoJornada: TipoJornada,
@@ -261,13 +216,9 @@ export class ControleJornadaService {
     try {
       const client = tx ?? this.prisma.client;
 
-      /* Janela do dia civil de Brasília que contém o instante do registro:
-       inicio = 00:00:00.000-03:00 e fim = 23:59:59.999-03:00 desse dia */
       const { inicio: inicioDia, fim: fimDia } =
         janelaDiaBrasilia(dataRegistro);
 
-      /* findFirst com select mínimo: basta saber SE existe, não o registro
-       inteiro; consulta mais leve e sem tráfego desnecessário */
       const registro = await client.controleJornada.findFirst({
         where: {
           usuarioId,
@@ -383,13 +334,10 @@ export class ControleJornadaService {
   ): Promise<ControleJornadaListagem | null> {
     try {
       const client = tx ?? this.prisma.client;
-      const dados = this.toAssembleQuery(query);
-      this.logger.debug(dados);
 
       const buscar = await client.controleJornada.findFirst(
         this.toAssembleQuery(query),
       );
-      this.logger.debug(buscar);
       if (!buscar) {
         this.logger.warn(TYPES_NOTICES.NOT_FOUND);
       }

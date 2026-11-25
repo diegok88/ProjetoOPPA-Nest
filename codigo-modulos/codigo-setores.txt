@@ -1,0 +1,547 @@
+
+===== src/modules/setores/dto/create-setores.dto.ts =====
+
+import { Transform } from 'class-transformer';
+import { IsNotEmpty, IsString, Length } from 'class-validator';
+
+export class CreateSetoresDto {
+  @IsString({ message: 'A descrição deve ser do tipo string.' })
+  @IsNotEmpty({ message: 'A descrição não deve estar vazio.' })
+  @Length(5, 50, {
+    message:
+      'A descrição deve conter no minimo 5 caracteres e no maximo 50 caracteres.',
+  })
+  @Transform(({ value }) => value.toUpperCase())
+  descricao!: string;
+}
+
+===== src/modules/setores/dto/query-setores.dto.ts =====
+
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
+
+export class QuerySetoresDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Código não é do tipo Inteiro!' })
+  @IsNumber({}, { message: 'Código não é do tipo Number!' })
+  codigo?: number;
+
+  @IsOptional()
+  @IsString({ message: 'Descrição não é do tipo String.' })
+  descricao?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Empresa id inválido.' })
+  empresaId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  )
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
+  status?: boolean;
+
+  @IsOptional()
+  @IsString({ message: 'Campos não é do tipo String.' })
+  campos?: string;
+}
+
+===== src/modules/setores/dto/response-setores.dto.ts =====
+
+import { Empresa } from '@/modules/empresa/entities/empresa.entity';
+import { OmitType } from '@nestjs/mapped-types';
+import { Expose, Type } from 'class-transformer';
+
+export class ResponseSetoresEmpresaDto {
+  @Expose()
+  razaoSocial!: string;
+}
+
+export class ResponseSetoresDto {
+  @Expose()
+  id!: string;
+
+  @Expose()
+  codigo!: number;
+
+  @Expose()
+  descricao!: string;
+
+  @Expose()
+  empresaId!: string;
+
+  @Expose()
+  status!: boolean;
+  
+  @Expose()
+  @Type(() => ResponseSetoresEmpresaDto)
+  empresa?: ResponseSetoresEmpresaDto;
+}
+
+export class ResponseSetoresListDto extends OmitType(ResponseSetoresDto, [
+  'empresaId',
+  'status',
+] as const) {}
+
+export class ResponseSetoresContadorDto {
+  @Expose()
+  total!: number;
+
+  @Expose()
+  ativos!: number;
+
+  @Expose()
+  inativos!: number;
+}
+
+===== src/modules/setores/dto/update-setores.dto.ts =====
+
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateSetoresDto } from './create-setores.dto';
+
+export class UpdateSetoresDto extends PartialType(CreateSetoresDto) {}
+
+===== src/modules/setores/entities/setores.entity.ts =====
+
+import { Prisma, Setores as SetorModel } from '@/generated/prisma/client';
+
+export type Setores = SetorModel;
+
+/* TYPE USADO NA ENTIDADE COMPETENCIA SETORIAL */
+export type SetoresCompetencia = Prisma.SetoresGetPayload<{
+  select: { id: true; codigo: true; descricao: true };
+}>;
+
+export type SetoresRelacao = Prisma.SetoresGetPayload<{
+  include: { empresa: true };
+}>;
+
+===== src/modules/setores/setores.controller.ts =====
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  ParseUUIDPipe,
+  UseGuards,
+} from '@nestjs/common';
+import { SetoresService } from './setores.service';
+import { CreateSetoresDto } from './dto/create-setores.dto';
+import { UpdateSetoresDto } from './dto/update-setores.dto';
+import {
+  ResponseSetoresContadorDto,
+  ResponseSetoresDto,
+  ResponseSetoresListDto,
+} from './dto/response-setores.dto';
+import { plainToInstance } from 'class-transformer';
+import { Roles } from '@/auth/guards/roles.decorator';
+import { ROLES } from '@/auth/guards/roles.const';
+import { QuerySetoresDto } from './dto/query-setores.dto';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { PerfilService } from '../perfil/perfil.service';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
+
+@Controller('setores')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
+export class SetoresController {
+  constructor(
+    private readonly setoresService: SetoresService,
+    private readonly perfilService: PerfilService,
+    private readonly tennantContext: TenantContextService,
+  ) {}
+
+  @Post()
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async create(
+    @Body() createSetoreDto: CreateSetoresDto,
+  ): Promise<ResponseSetoresDto> {
+    const dado = this.setoresService.create(createSetoreDto);
+    return plainToInstance(ResponseSetoresDto, dado);
+  }
+
+  @Get()
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async findAll(
+    @Query() query: QuerySetoresDto,
+  ): Promise<ResponseSetoresDto[]> {
+    const dados = await this.setoresService.findAll(query);
+    return plainToInstance(ResponseSetoresDto, dados);
+  }
+
+  @Get('list')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async findAllList(): Promise<ResponseSetoresListDto[]> {
+    const query: QuerySetoresDto = { campos: 'id,codigo,descricao' };
+    const ctx = this.tennantContext.getStore()!;
+    const perfil = await this.perfilService.findOne(ctx.perfil);
+    const desPerfil = `${perfil.descricao} - ${perfil.nivel}`;
+    if (desPerfil !== ROLES.ASN1) {
+      query.empresaId = ctx.empresa;
+    }
+
+    const dados = await this.setoresService.findAll(query);
+    return plainToInstance(ResponseSetoresListDto, dados);
+  }
+
+  // CONTADOR DE REGISTROS TOTAIS, ATIVOS E INATIVOS
+  @Get('counter')
+  @Roles(ROLES.ASN1)
+  async counter(): Promise<ResponseSetoresContadorDto> {
+    const contador = await this.setoresService.counter();
+    return plainToInstance(ResponseSetoresContadorDto, contador);
+  }
+
+  @Get(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseSetoresDto> {
+    const dado = await this.setoresService.findOne(id);
+    return plainToInstance(ResponseSetoresDto, dado);
+  }
+
+  @Patch(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateSetoreDto: UpdateSetoresDto,
+  ): Promise<ResponseSetoresDto> {
+    const dado = await this.setoresService.update(id, updateSetoreDto);
+    return plainToInstance(ResponseSetoresDto, dado);
+  }
+
+  @Patch('active/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async active(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseSetoresDto> {
+    const dado = await this.setoresService.active(id);
+    return plainToInstance(ResponseSetoresDto, dado);
+  }
+
+  @Patch('deactive/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async deactive(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseSetoresDto> {
+    const dado = await this.setoresService.deactive(id);
+    return plainToInstance(ResponseSetoresDto, dado);
+  }
+
+  @Delete(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseSetoresDto> {
+    const dado = await this.setoresService.remove(id);
+    return plainToInstance(ResponseSetoresDto, dado);
+  }
+}
+
+===== src/modules/setores/setores.module.ts =====
+
+import { Module } from '@nestjs/common';
+import { SetoresService } from './setores.service';
+import { SetoresController } from './setores.controller';
+import { PerfilModule } from '../perfil/perfil.module';
+
+@Module({
+  imports: [PerfilModule],
+  controllers: [SetoresController],
+  providers: [SetoresService],
+  exports: [SetoresService],
+})
+export class SetoresModule {}
+
+===== src/modules/setores/setores.service.ts =====
+
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { CreateSetoresDto } from './dto/create-setores.dto';
+import { UpdateSetoresDto } from './dto/update-setores.dto';
+import { PrismaService } from '@/prisma/prisma.service';
+import { Setores, SetoresRelacao } from './entities/setores.entity';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+import { Acao, Prisma } from '@/generated/prisma/client';
+import { QuerySetoresDto } from './dto/query-setores.dto';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { Contador } from '@/interfaces/counter.interface';
+
+@Injectable()
+export class SetoresService {
+  private logger = new Logger(SetoresService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
+
+  /*
+  CRIAR SETORES:
+  - serviço apenas permitido para usuaria ADMINISTRADOR E ASSISTENCIA - NIVEL 1
+  */
+  async create(createSetoresDto: CreateSetoresDto): Promise<Setores> {
+    const empresa = this.tenantContext.getStore();
+    try {
+      const criar = await this.prisma.client.setores.create({
+        data: {
+          descricao: createSetoresDto.descricao,
+          empresaId: empresa?.empresa,
+        },
+      });
+
+      this.logger.log(TYPES_NOTICES.CREATE);
+      return criar;
+    } catch (error) {
+      this.logger.log(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
+      throw error;
+    }
+  }
+
+  /*
+  LISTAR SETORES:
+  - serviço apenas permitido para usuaria ADMINISTRADOR E ASSISTENCIA - NIVEL 1
+  */
+  async findAll(query: QuerySetoresDto): Promise<Setores[]> {
+    try {
+      const { campos, ...filtros } = query ?? {}; 
+
+      const condicao: Prisma.SetoresWhereInput = {};
+      if (filtros.codigo) condicao.codigo = filtros.codigo;
+      if (filtros.descricao) condicao.descricao = filtros.descricao;
+      if (filtros.empresaId) condicao.empresaId = filtros.empresaId;
+      if (filtros.status) condicao.status = filtros.status;
+
+      const selecao = await this.buildSelect(campos);
+
+      const listar = await this.prisma.client.setores.findMany({
+        where: condicao,
+        select: selecao,
+        orderBy: { descricao: 'asc' },
+      });
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  } 
+
+  /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS */
+  async counter(): Promise<Contador> {
+    try {
+      const [total, ativos, inativos] = await Promise.all([
+        this.prisma.setores.count(),
+        this.prisma.setores.count({ where: { status: true } }),
+        this.prisma.setores.count({ where: { status: false } }),
+      ]);
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return { total, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
+  /*
+  BUSCAR SETORES:
+  - serviço apenas permitido para usuaria ADMINISTRADOR E ASSISTENCIA - NIVEL 1
+  */
+  async findOne(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<SetoresRelacao> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const buscar = await client.setores.findUnique({
+        where: { id: id },
+        include: { empresa: true },
+      });
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ONE);
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
+      throw error;
+    }
+  }
+
+  /*
+  ATUALIZAR SETORES:
+  - serviço apenas permitido para usuaria ADMINISTRADOR E ASSISTENCIA - NIVEL 1
+  */
+  async update(
+    id: string,
+    updateSetoresDto: UpdateSetoresDto,
+  ): Promise<Setores> {
+    try {
+      const atualizarSetores = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          await this.findOne(id, tx);
+
+          const atualizar = await tx.setores.update({
+            where: { id: id },
+            data: updateSetoresDto,
+          });
+
+          return atualizar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.UPDATE);
+      return atualizarSetores;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
+      throw error;
+    }
+  }
+
+  /*
+  ATIVAR SETORES:
+  - serviço apenas permitido para usuaria ADMINISTRADOR E ASSISTENCIA - NIVEL 1
+  */
+  async active(id: string): Promise<Setores> {
+    try {
+      const ativarSetores = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (verificar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_ACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_ACTIVE);
+          }
+
+          const ativar = await tx.setores.update({
+            where: { id: id },
+            data: { status: true, _auditAction: Acao.ACTIVE },
+          });
+
+          return ativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.ACTIVE);
+      return ativarSetores;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - ACTIVE');
+      throw error;
+    }
+  }
+
+  /*
+  INATIVAR SETORES:
+  - serviço apenas permitido para usuaria ADMINISTRADOR E ASSISTENCIA - NIVEL 1
+  */
+  async deactive(id: string): Promise<Setores> {
+    try {
+      const inativarSetores = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (!verificar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_DEACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_DEACTIVE);
+          }
+
+          const inativar = await tx.setores.update({
+            where: { id: id },
+            data: { status: false, _auditAction: Acao.DEACTIVATE },
+          });
+
+          return inativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
+      return inativarSetores;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE');
+      throw error;
+    }
+  }
+
+  /*
+  REMOVER SETORES:
+  - serviço apenas permitido para usuaria ADMINISTRADOR E ASSISTENCIA - NIVEL 1
+  */
+  async remove(id: string): Promise<Setores> {
+    try {
+      const deletarSetores = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (verificar.status) {
+            this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+            throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+          }
+
+          const deletar = await tx.setores.delete({
+            where: { id: id },
+          });
+
+          return deletar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return deletarSetores;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
+      throw error;
+    }
+  }
+
+  // METODO DE CONSULTA DINAMICA
+  private readonly allowedSetoresFiels = [
+    'id',
+    'codigo',
+    'descricao',
+    'empresaId',
+    'status',
+  ];
+
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedSetoresFiels.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
+  }
+}

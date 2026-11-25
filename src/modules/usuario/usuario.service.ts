@@ -23,7 +23,11 @@ import {
   UpdateUsuarioDto,
   UpdateUsuarioPasswordDto,
 } from './dto/update-usuario.dto';
-import { Usuario, UsuarioListagem } from './entities/usuario.entity';
+import {
+  Usuario,
+  UsuarioListagem,
+  UsuarioRelacoes,
+} from './entities/usuario.entity';
 import {
   QueryBagdeEnterpriceDto,
   QueryUsuarioFilterDto,
@@ -286,7 +290,7 @@ export class UsuarioService {
   async findOne(
     id: string,
     tx?: Prisma.TransactionClient,
-  ): Promise<UsuarioListagem> {
+  ): Promise<UsuarioRelacoes> {
     try {
       const client = tx ?? this.prisma.client;
 
@@ -295,9 +299,7 @@ export class UsuarioService {
         include: {
           perfil: true,
           empresa: true,
-          gestorComoColaborador: {
-            include: { gestor: true },
-          },
+          gestorComoColaborador: { include: { gestor: true } },
         },
       });
 
@@ -307,6 +309,7 @@ export class UsuarioService {
       }
 
       this.logger.log(TYPES_NOTICES.FIND_ONE);
+      //this.logger.debug(buscar);
 
       return buscar;
     } catch (error) {
@@ -322,7 +325,7 @@ export class UsuarioService {
   async findOneBadgeAndEnterprice(
     query: QueryBagdeEnterpriceDto,
     tx?: Prisma.TransactionClient,
-  ): Promise<Usuario> {
+  ): Promise<UsuarioRelacoes> {
     try {
       const client = tx ?? this.prisma.client;
 
@@ -333,6 +336,7 @@ export class UsuarioService {
 
       const buscar = await client.usuario.findFirst({
         where: condicao,
+        include: { perfil: true, empresa: true },
       });
 
       if (!buscar) {

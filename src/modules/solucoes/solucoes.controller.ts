@@ -16,12 +16,16 @@ import { UpdateSolucoeDto } from './dto/update-solucoes.dto';
 import {
   ResponseSolucoesContadorDto,
   ResponseSolucoesDto,
+  ResponseSolucoesPaginadaDto,
   ResponseSolucoesRelacaoDto,
 } from './dto/response-solucoes.dto';
 import { plainToInstance } from 'class-transformer';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
-import { QuerySolucoesFilterDto } from './dto/query-solucoes.dto';
+import {
+  QuerySolucaoFilterDto,
+  QuerySolucoesFilterDto,
+} from './dto/query-solucoes.dto';
 import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
 import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 
@@ -55,6 +59,24 @@ export class SolucoesController {
     return plainToInstance(ResponseSolucoesContadorDto, contador);
   }
 
+  @Get()
+  @Roles(ROLES.ASN1, ROLES.TER1)
+  async findAllPagination(
+    @Query() query: QuerySolucaoFilterDto,
+  ): Promise<ResponseSolucoesPaginadaDto> {
+    const resultado = await this.solucoesService.findAllPagination(query);
+    return plainToInstance(ResponseSolucoesPaginadaDto, resultado);
+  }
+
+  @Get('listar')
+  @Roles(ROLES.ASN1, ROLES.TER1)
+  async findAllList(
+    @Query() query: QuerySolucaoFilterDto,
+  ): Promise<ResponseSolucoesRelacaoDto[]> {
+    const resultado = await this.solucoesService.findAllList(query);
+    return plainToInstance(ResponseSolucoesRelacaoDto, resultado);
+  }
+
   @Get(':id')
   @Roles(ROLES.ASN1, ROLES.ADN1)
   async findOne(
@@ -62,6 +84,15 @@ export class SolucoesController {
   ): Promise<ResponseSolucoesRelacaoDto> {
     const dado = await this.solucoesService.findOne(id);
     return plainToInstance(ResponseSolucoesRelacaoDto, dado);
+  }
+
+  @Get('unico')
+  @Roles(ROLES.ASN1, ROLES.TER1)
+  async findOneFirst(
+    @Query() query: QuerySolucaoFilterDto,
+  ): Promise<ResponseSolucoesDto> {
+    const registro = await this.solucoesService.findOneFirst(query);
+    return plainToInstance(ResponseSolucoesDto, registro);
   }
 
   @Patch(':id')

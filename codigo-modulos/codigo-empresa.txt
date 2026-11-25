@@ -1,0 +1,933 @@
+
+===== src/modules/empresa/dto/create-empresa.dto.ts =====
+
+import { Transform } from 'class-transformer';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  Length,
+  Matches,
+  MaxLength,
+} from 'class-validator';
+
+const toUpperIfString = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? value.toUpperCase() : value;
+
+export class CreateEmpresaDto {
+  @IsString({ message: 'O CNPJ deve ser um texto.' })
+  @IsNotEmpty({ message: 'O CNPJ é um campo obrigatório.' })
+  @Length(14, 14, {
+    message: (args) =>
+      `O CNPJ deve conter exatamente ${args.constraints[0]} caracteres.`,
+  })
+  @Matches(/^\d+$/, { message: 'O CNPJ deve conter apenas números.' })
+  cnpj!: string;
+
+  @IsString({ message: 'A razão social deve ser um texto.' })
+  @IsNotEmpty({ message: 'A razão social é um campo obrigatório.' })
+  @Length(10, 100, {
+    message: (args) =>
+      `A razão social deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
+  })
+  @Transform(toUpperIfString)
+  razaoSocial!: string;
+
+  @IsString({ message: 'O nome fantasia deve ser um texto.' })
+  @IsNotEmpty({ message: 'O nome fantasia é um campo obrigatório.' })
+  @Length(10, 100, {
+    message: (args) =>
+      `O nome fantasia deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
+  })
+  @Transform(toUpperIfString)
+  nomeFantasia!: string;
+
+  @IsString({ message: 'O contato deve ser um texto.' })
+  @IsNotEmpty({ message: 'O contato é um campo obrigatório.' })
+  @Length(11, 11, {
+    message: (args) =>
+      `O contato deve conter exatamente ${args.constraints[0]} caracteres.`,
+  })
+  @Matches(/^\d+$/, { message: 'O contato deve conter apenas números.' })
+  contato!: string;
+
+  @IsString({ message: 'O e-mail deve ser um texto.' })
+  @IsNotEmpty({ message: 'O e-mail é um campo obrigatório.' })
+  @IsEmail(
+    {},
+    {
+      message:
+        'O e-mail informado é inválido. Informe um e-mail no formato nome@dominio.com.',
+    },
+  )
+  email!: string;
+
+  @IsString({ message: 'A rua deve ser um texto.' })
+  @IsNotEmpty({ message: 'A rua é um campo obrigatório.' })
+  @Length(5, 50, {
+    message: (args) =>
+      `A rua deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
+  })
+  @Transform(toUpperIfString)
+  rua!: string;
+
+  @IsString({ message: 'O número deve ser um texto.' })
+  @IsNotEmpty({ message: 'O número é um campo obrigatório.' })
+  @MaxLength(20, {
+    message: (args) =>
+      `O número deve conter no máximo ${args.constraints[0]} caracteres.`,
+  })
+  numero!: string;
+
+  @IsString({ message: 'O bairro deve ser um texto.' })
+  @IsNotEmpty({ message: 'O bairro é um campo obrigatório.' })
+  @Length(5, 50, {
+    message: (args) =>
+      `O bairro deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
+  })
+  @Transform(toUpperIfString)
+  bairro!: string;
+
+  @IsString({ message: 'A cidade deve ser um texto.' })
+  @IsNotEmpty({ message: 'A cidade é um campo obrigatório.' })
+  @Length(5, 50, {
+    message: (args) =>
+      `A cidade deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
+  })
+  @Transform(toUpperIfString)
+  cidade!: string;
+
+  @IsString({ message: 'O estado deve ser um texto.' })
+  @IsNotEmpty({ message: 'O estado é um campo obrigatório.' })
+  @Length(2, 2, {
+    message: (args) =>
+      `O estado deve conter exatamente ${args.constraints[0]} caracteres (sigla UF).`,
+  })
+  @Transform(toUpperIfString)
+  estado!: string;
+
+  @IsString({ message: 'O CEP deve ser um texto.' })
+  @IsNotEmpty({ message: 'O CEP é um campo obrigatório.' })
+  @Length(8, 8, {
+    message: (args) =>
+      `O CEP deve conter exatamente ${args.constraints[0]} caracteres.`,
+  })
+  @Matches(/^\d+$/, { message: 'O CEP deve conter apenas números.' })
+  cep!: string;
+}
+
+===== src/modules/empresa/dto/query-empresa.dto.ts =====
+
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEmail,
+  IsInt,
+  IsOptional,
+  IsString,
+  Length,
+  Matches,
+} from 'class-validator';
+
+const toUpperIfString = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? value.toUpperCase() : value;
+
+export class QueryEmpresaFilterDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({
+    message: (args) => `O código "${args.value}" não é do tipo Inteiro!`,
+  })
+  codigo?: number;
+
+  @IsOptional()
+  @IsString({ message: 'O CNPJ não é do tipo String.' })
+  @Length(1, 14, {
+    message: (args) =>
+      `O CNPJ deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
+  })
+  @Matches(/^\d+$/, { message: 'O CNPJ deve conter apenas números.' })
+  cnpj?: string;
+
+  @IsOptional()
+  @IsString({ message: 'A razão social não é do tipo String.' })
+  @Length(1, 100, {
+    message: (args) =>
+      `A razão social deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
+  })
+  @Transform(toUpperIfString)
+  razaoSocial?: string;
+
+  @IsOptional()
+  @IsString({ message: 'O nome fantasia não é do tipo String.' })
+  @Length(1, 100, {
+    message: (args) =>
+      `O nome fantasia deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
+  })
+  @Transform(toUpperIfString)
+  nomeFantasia?: string;
+
+  @IsOptional()
+  @IsString({ message: 'O contato não é do tipo String.' })
+  @Length(1, 11, {
+    message: (args) =>
+      `O contato deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
+  })
+  @Matches(/^\d+$/, { message: 'O contato deve conter apenas números.' })
+  contato?: string;
+
+  @IsOptional()
+  @IsString({ message: 'O e-mail não é do tipo String.' })
+  @IsEmail(
+    {},
+    {
+      message:
+        'O e-mail informado é inválido. Informe um e-mail no formato nome@dominio.com.',
+    },
+  )
+  email?: string;
+
+  @IsOptional()
+  @IsString({ message: 'A rua não é do tipo String.' })
+  @Length(1, 50, {
+    message: (args) =>
+      `A rua deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
+  })
+  @Transform(toUpperIfString)
+  rua?: string;
+
+  @IsOptional()
+  @IsString({ message: 'O número não é do tipo String.' })
+  @Length(1, 20, {
+    message: (args) =>
+      `O número deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
+  })
+  numero?: string;
+
+  @IsOptional()
+  @IsString({ message: 'O bairro não é do tipo String.' })
+  @Length(1, 50, {
+    message: (args) =>
+      `O bairro deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
+  })
+  @Transform(toUpperIfString)
+  bairro?: string;
+
+  @IsOptional()
+  @IsString({ message: 'A cidade não é do tipo String.' })
+  @Length(1, 50, {
+    message: (args) =>
+      `A cidade deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
+  })
+  @Transform(toUpperIfString)
+  cidade?: string;
+
+  @IsOptional()
+  @IsString({ message: 'O estado não é do tipo String.' })
+  @Length(1, 2, {
+    message: (args) =>
+      `O estado deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres (UF).`,
+  })
+  @Transform(toUpperIfString)
+  estado?: string;
+
+  @IsOptional()
+  @IsString({ message: 'O CEP não é do tipo String.' })
+  @Length(1, 8, {
+    message: (args) =>
+      `O CEP deve conter entre ${args.constraints[0]} e ${args.constraints[1]} caracteres.`,
+  })
+  @Matches(/^\d+$/, { message: 'O CEP deve conter apenas números.' })
+  cep?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  )
+  @IsBoolean({
+    message: (args) => `O status "${args.value}" não é do tipo Boolean!`,
+  })
+  status?: boolean;
+}
+
+===== src/modules/empresa/dto/response-empresa.dto.ts =====
+
+import { ResponseUsuarioDto } from '@/modules/usuario/dto/response-usuario.dto';
+import { Usuario } from '@/modules/usuario/entities/usuario.entity';
+import { FormatCep } from '@/utils/format-cep.util';
+import { FormatCNPJ } from '@/utils/format-cnpj.util';
+import { FormatFone } from '@/utils/format-fone.util';
+import { OmitType, PickType } from '@nestjs/mapped-types';
+import { Expose, Type } from 'class-transformer';
+
+export class ResponseEmpresaContadorCrachaDto {
+  @Expose()
+  id!: string;
+
+  @Expose()
+  contador!: number;
+}
+
+export class ResponseEmpresaDto {
+  @Expose()
+  id!: string;
+
+  @Expose()
+  codigo!: number;
+
+  @Expose()
+  cnpj!: string;
+
+  @Expose()
+  razaoSocial!: string;
+
+  @Expose()
+  nomeFantasia!: string;
+
+  @Expose()
+  contato!: string;
+
+  @Expose()
+  email!: string;
+
+  @Expose()
+  rua!: string;
+
+  @Expose()
+  numero!: string;
+
+  @Expose()
+  bairro!: string;
+
+  @Expose()
+  cidade!: string;
+
+  @Expose()
+  estado!: string;
+
+  @Expose()
+  cep!: string;
+
+  @Expose()
+  status!: boolean;
+
+  @Type(() => ResponseUsuarioDto)
+  usuario?: Usuario[];
+
+  @Expose()
+  get desNome(): string[] {
+    return (
+      this.usuario?.map((u) => u.nome).filter((n): n is string => n !== null) ??
+      []
+    );
+  }
+
+  @Expose()
+  @Type(() => ResponseEmpresaContadorCrachaDto)
+  contadorCracha?: ResponseEmpresaContadorCrachaDto;
+}
+
+export class ResponseEmpresaListDto extends PickType(ResponseEmpresaDto, [
+  'id',
+  'codigo',
+  'razaoSocial',
+]) {}
+
+export class ResponseEmpresaContadorDto {
+  @Expose()
+  total!: number;
+
+  @Expose()
+  ativos!: number;
+
+  @Expose()
+  inativos!: number;
+}
+
+export class ResponseEmpresaAdminDto extends OmitType(ResponseEmpresaDto, [
+  'cnpj',
+  'contato',
+  'cep',
+]) {
+  @Expose()
+  @FormatCNPJ()
+  cnpj!: string;
+
+  @Expose()
+  @FormatFone()
+  contato!: string;
+
+  @Expose()
+  @FormatCep()
+  cep!: string;
+}
+
+export class ResponseEmpresaMessageDto {
+  @Expose()
+  message!: string;
+}
+
+===== src/modules/empresa/dto/update-empresa.dto.ts =====
+
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateEmpresaDto } from './create-empresa.dto';
+
+export class UpdateEmpresaDto extends PartialType(CreateEmpresaDto) {}
+
+===== src/modules/empresa/empresa.controller.ts =====
+
+
+import { ROLES } from '@/auth/guards/roles.const';
+import { Roles } from '@/auth/guards/roles.decorator';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { CreateEmpresaDto } from './dto/create-empresa.dto';
+import { QueryEmpresaFilterDto } from './dto/query-empresa.dto';
+import {
+  ResponseEmpresaContadorDto,
+  ResponseEmpresaDto,
+  ResponseEmpresaListDto,
+} from './dto/response-empresa.dto';
+import { UpdateEmpresaDto } from './dto/update-empresa.dto';
+import { EmpresaService } from './empresa.service';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { PerfilService } from '../perfil/perfil.service';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
+
+@Controller('empresa')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
+export class EmpresaController {
+  constructor(
+    private readonly empresaService: EmpresaService,
+    private readonly perfilService: PerfilService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
+
+  // CONTROLLER CRIAR EMPRESA
+  @Post()
+  @Roles(ROLES.ASN1)
+  async create(
+    @Body() createEmpresaDto: CreateEmpresaDto,
+  ): Promise<ResponseEmpresaDto> {
+    const dados = await this.empresaService.create(createEmpresaDto);
+    return plainToInstance(ResponseEmpresaDto, dados);
+  }
+
+  // CONTROLLER LISTAR EMPRESAS
+  @Get()
+  @Roles(ROLES.ASN1)
+  async findAll(
+    @Query() query: QueryEmpresaFilterDto,
+  ): Promise<ResponseEmpresaDto[]> {
+    const dados = await this.empresaService.findAll(query);
+    return plainToInstance(ResponseEmpresaDto, dados);
+  }
+
+  // LISTAR TODOS OS DADOS PARA TABELA LIST - RETORNA APENAS id, descrição e nivel
+  @Get('list')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async findAllList(): Promise<ResponseEmpresaListDto[]> {
+    const ctx = this.tenantContext.getStore()!;
+    const codigo = await this.empresaService.findOne(ctx.empresa);
+    const perfil = await this.perfilService.findOne(ctx.perfil);
+    const desPerfil = `${perfil.descricao} - ${perfil.nivel}`;
+    let query: QueryEmpresaFilterDto = {};
+    if (desPerfil !== ROLES.ASN1) {
+      query = { codigo: codigo.codigo };
+    }
+    const dados = await this.empresaService.findAll(query);
+    return plainToInstance(ResponseEmpresaListDto, dados);
+  }
+
+  /*
+  CONTADOR DE REGISTROS:
+  - Retorna dados totais, ativos e inativos.
+  - Apenas para Assistência.
+  */
+  @Get('counter')
+  @Roles(ROLES.ASN1)
+  async counter(): Promise<ResponseEmpresaContadorDto> {
+    const contador = await this.empresaService.counter();
+    return plainToInstance(ResponseEmpresaContadorDto, contador);
+  }
+
+  /*
+  CONTADOR DE REGISTROS:
+  - Retorna dados totais, ativos e inativos.
+  - Apenas para Administradores e gestores.
+  */
+  @Get('counter_collaborators')
+  @Roles(ROLES.ADN1)
+  async counterCollaborators(): Promise<ResponseEmpresaContadorDto> {
+    const contador = await this.empresaService.counterCollaborators();
+    return plainToInstance(ResponseEmpresaContadorDto, contador);
+  }
+
+  // CONTROLLER BUSCAR EMPRESA PELO ID
+  @Get(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseEmpresaDto> {
+    const dado = await this.empresaService.findOne(id);
+    return plainToInstance(ResponseEmpresaDto, dado);
+  }
+
+  // CONTROLLER ATUALIZAR EMPRESA PELO ID
+  @Patch(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateEmpresaDto: UpdateEmpresaDto,
+  ): Promise<ResponseEmpresaDto> {
+    const dado = await this.empresaService.update(id, updateEmpresaDto);
+    return plainToInstance(ResponseEmpresaDto, dado);
+  }
+
+  // CONTROLLER ATIVAR EMPRESA PELO ID
+  @Patch('active/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async active(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseEmpresaDto> {
+    const dado = await this.empresaService.active(id);
+    return plainToInstance(ResponseEmpresaDto, dado);
+  }
+
+  // CONTROLLER INATIVAR EMPRESA PELO ID
+  @Patch('deactive/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async deactive(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseEmpresaDto> {
+    const dado = await this.empresaService.deactive(id);
+    return plainToInstance(ResponseEmpresaDto, dado);
+  }
+
+  // CONTROLLER DELETAR EMPRESA PELO ID
+  @Delete(':id')
+  @Roles(ROLES.ASN1)
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseEmpresaDto> {
+    const dado = await this.empresaService.remove(id);
+    return plainToInstance(ResponseEmpresaDto, dado);
+  }
+}
+
+===== src/modules/empresa/empresa.module.ts =====
+
+import { Module } from '@nestjs/common';
+import { AuditoriaModule } from '../auditoria/auditoria.module';
+import { ContadorCrachaModule } from '../contador-cracha/contador-cracha.module';
+import { PerfilModule } from '../perfil/perfil.module';
+import { UsuarioModule } from '../usuario/usuario.module';
+import { EmpresaController } from './empresa.controller';
+import { EmpresaService } from './empresa.service';
+import { GestorModule } from '../gestor/gestor.module';
+
+@Module({
+  imports: [UsuarioModule, GestorModule, ContadorCrachaModule, PerfilModule],
+  controllers: [EmpresaController],
+  providers: [EmpresaService],
+  exports: [EmpresaService],
+})
+export class EmpresaModule {}
+
+===== src/modules/empresa/empresa.service.ts =====
+
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { Prisma } from '@/generated/prisma/client';
+import { Acao } from '@/generated/prisma/enums';
+import { PrismaService } from '@/prisma/prisma.service';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ContadorCrachaService } from '../contador-cracha/contador-cracha.service';
+import { GestorService } from '../gestor/gestor.service';
+import { UsuarioService } from '../usuario/usuario.service';
+import { CreateEmpresaDto } from './dto/create-empresa.dto';
+import { QueryEmpresaFilterDto } from './dto/query-empresa.dto';
+import { UpdateEmpresaDto } from './dto/update-empresa.dto';
+import { Empresa } from './entities/empresa.entity';
+import { Contador } from '@/interfaces/counter.interface';
+import { QueryUsuarioFilterDto } from '../usuario/dto/query-usuario.dto';
+
+@Injectable()
+export class EmpresaService {
+  private logger = new Logger(EmpresaService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly usuario: UsuarioService,
+    private readonly gestor: GestorService,
+    private readonly contadorCracha: ContadorCrachaService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
+
+  /*
+  SERVIÇO CRIAR EMPRESA:
+  - serviço de cadastro de empresa.
+  - vinculado a criação de contador de cracha.
+  */
+  async create(create: CreateEmpresaDto): Promise<Empresa> {
+    try {
+      const criarEmpresa = await this.prisma.client.$transaction(async (tx) => {
+        const criar = await tx.empresa.create({
+          data: create,
+        });
+        const dadosCriarContador = {
+          empresaId: criar.id,
+          contador: 0,
+        };
+        await this.contadorCracha.create(dadosCriarContador, tx);
+
+        return criar;
+      });
+      this.logger.log(TYPES_NOTICES.CREATE);
+      return criarEmpresa;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
+      throw error;
+    }
+  }
+
+  /*
+  SERVIÇO LISTAR EMPRESAS
+  */
+  async findAll(query: QueryEmpresaFilterDto): Promise<Empresa[]> { 
+    try {
+      const condicao: Prisma.EmpresaWhereInput = {};
+      if (query.codigo) condicao.codigo = query.codigo;
+      if (query.bairro) condicao.bairro = query.bairro;
+      if (query.cep) condicao.cep = query.cep;
+      if (query.cidade) condicao.cidade = query.cidade;
+      if (query.cnpj) condicao.cnpj = query.cnpj;
+      if (query.contato) condicao.contato = query.contato;
+      if (query.email) condicao.email = query.email;
+      if (query.estado) condicao.estado = query.estado;
+      if (query.nomeFantasia) condicao.nomeFantasia = query.nomeFantasia;
+      if (query.numero) condicao.numero = query.numero;
+      if (query.razaoSocial) condicao.razaoSocial = query.razaoSocial;
+      if (query.rua) condicao.rua = query.rua;
+
+      const listarEmpresas = await this.prisma.empresa.findMany({
+        where: condicao,
+        orderBy: { razaoSocial: 'asc' },
+      });
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listarEmpresas;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  /* 
+  FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS 
+  */
+  async counter(): Promise<Contador> {
+    try {
+      const [total, ativos, inativos] = await Promise.all([
+        this.prisma.empresa.count(),
+        this.prisma.empresa.count({ where: { status: true } }),
+        this.prisma.empresa.count({ where: { status: false } }),
+      ]);
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return { total, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
+  /* 
+  FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS 
+  */
+  async counterCollaborators(): Promise<Contador> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+
+      this.logger.debug(ctx.empresa);
+
+      const usuarioTotal = await this.prisma.empresa.findUnique({
+        where: { id: ctx.empresa },
+        include: {
+          _count: { select: { usuario: true } },
+        },
+      });
+      const usuarioAtivos = await this.prisma.empresa.findUnique({
+        where: { id: ctx.empresa },
+        include: {
+          _count: { select: { usuario: { where: { status: true } } } },
+        },
+      });
+      const usuarioInativos = await this.prisma.empresa.findUnique({
+        where: { id: ctx.empresa },
+        include: {
+          _count: { select: { usuario: { where: { status: false } } } },
+        },
+      });
+
+      const total = usuarioTotal?._count.usuario ?? 0;
+      const ativos = usuarioAtivos?._count.usuario ?? 0;
+      const inativos = usuarioInativos?._count.usuario ?? 0;
+
+      this.logger.debug(total, ativos, inativos);
+
+      return { total, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
+  /*
+  SERVIÇO DE BUSCA DE EMPRESA POR ID
+  */
+  async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Empresa> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const buscar = await client.empresa.findUnique({
+        where: { id: id },
+        include: { contadorCracha: true },
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ONE);
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
+      throw error;
+    }
+  }
+  /*
+  SERVIÇO DE BUSCA DE EMPRESA:
+  - busca da empresa de acordo com os paramentros de filtro.
+  - serviço interno
+  */
+  async findEnterpriceOne(
+    query: QueryEmpresaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Empresa> {
+    try {
+      const client = tx ?? this.prisma;
+
+      const condicao: Prisma.EmpresaWhereInput = {};
+      if (query.codigo) condicao.codigo = query.codigo;
+      if (query.bairro) condicao.bairro = query.bairro;
+      if (query.cep) condicao.cep = query.cep;
+      if (query.cidade) condicao.cidade = query.cidade;
+      if (query.cnpj) condicao.cnpj = query.cnpj;
+      if (query.contato) condicao.contato = query.contato;
+      if (query.email) condicao.email = query.email;
+      if (query.estado) condicao.estado = query.estado;
+      if (query.nomeFantasia) condicao.nomeFantasia = query.nomeFantasia;
+      if (query.numero) condicao.numero = query.numero;
+      if (query.razaoSocial) condicao.razaoSocial = query.razaoSocial;
+      if (query.rua) condicao.rua = query.rua;
+
+      const buscar = await client.empresa.findFirst({
+        where: condicao,
+        take: 1,
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ONE);
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findEnterpriceOne');
+      throw error;
+    }
+  }
+  /*
+  ATUALIZAÇÃO DA EMPRESA PELO ID:
+  - atualiza os dados da empresa.
+  - bloqueia o registro ate a finalização da transação.
+  */
+  async update(
+    id: string,
+    updateEmpresaDto: UpdateEmpresaDto,
+  ): Promise<Empresa> {
+    try {
+      const atualizarEmpresa = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const ctx = this.tenantContext.getStore()!;
+          const buscarUsuario = await tx.usuario.findUnique({
+            where: { id: ctx.user },
+            select: { empresaId: true },
+          });
+          if (id !== buscarUsuario.empresaId) {
+            this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+            throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+          }
+
+          await this.findOne(id, tx);
+
+          const atualizar = await tx.empresa.update({
+            where: { id: id },
+            data: updateEmpresaDto,
+          });
+
+          return atualizar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.UPDATE);
+      return atualizarEmpresa;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
+      throw error;
+    }
+  }
+  /*
+  ATIVAR EMPRESA PELO ID:
+  - serviço de ativação.
+  - vinculado com contador de cracha, gestor e usuario.
+  - falta apenas conectar as outras classes
+  */
+  async active(id: string): Promise<Empresa> {
+    try {
+      const ativarEmpresa = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          await this.findOne(id, tx);
+
+          const consultarUsuario: QueryUsuarioFilterDto = { empresaId: id };
+          const listarUsuario = await this.usuario.findAll(
+            consultarUsuario,
+            tx,
+          );
+          const ids = listarUsuario.map((usuario) => usuario.id);
+
+          await this.contadorCracha.active(id, tx);
+
+          if (listarUsuario.length > 0) {
+            await this.gestor.activeAll(ids, tx);
+            await this.usuario.activeAll(ids, tx);
+          }
+
+          const ativar = await tx.empresa.update({
+            where: { id: id },
+            data: { status: true, _auditAction: Acao.ACTIVE },
+          });
+
+          return ativar;
+        },
+      );
+      this.logger.log(TYPES_NOTICES.ACTIVE);
+      return ativarEmpresa;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - ACTIVE');
+      throw error;
+    }
+  }
+  /*
+  INATIVAR EMPRESA PELO ID:
+  - serviço de inativação.
+  - vinculado com contador de cracha, gestor e usuario.
+  */
+  async deactive(id: string): Promise<Empresa> {
+    try {
+      const inativarEmpresa = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          await this.findOne(id, tx);
+
+          const consultarUsuario: QueryUsuarioFilterDto = { empresaId: id };
+          const listarUsuario = await this.usuario.findAll(
+            consultarUsuario,
+            tx,
+          );
+          const ids = listarUsuario.map((usuario) => usuario.id);
+
+          await this.contadorCracha.deactive(id, tx);
+
+          if (listarUsuario.length > 0) {
+            await this.gestor.deactiveAll(ids, tx);
+            await this.usuario.deactiveAll(ids, tx);
+          }
+
+          const inativar = await tx.empresa.update({
+            where: { id: id },
+            data: { status: false, _auditAction: Acao.DEACTIVATE },
+          });
+
+          return inativar;
+        },
+      );
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
+      return inativarEmpresa;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE');
+      throw error;
+    }
+  }
+  // DELETAR EMPRESA PELO ID
+  async remove(id: string): Promise<Empresa> {
+    try {
+      const deletarEmpresa = this.prisma.client.$transaction(async (tx) => {
+        const consultarUsuario: QueryUsuarioFilterDto = { empresaId: id };
+        const listarUsuario = await this.usuario.findAll(consultarUsuario, tx);
+        const ids = listarUsuario.map((usuario) => usuario.id);
+
+        await this.contadorCracha.remove(id, tx);
+
+        if (listarUsuario.length > 0) {
+          await this.gestor.removeAll(ids, tx);
+          await this.usuario.removeAll(ids, tx);
+        }
+
+        await this.findOne(id, tx);
+
+        const deletar = await tx.empresa.delete({
+          where: { id: id },
+        });
+
+        return deletar;
+      });
+
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return deletarEmpresa;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
+      throw error;
+    }
+  }
+}
+
+===== src/modules/empresa/entities/empresa.entity.ts =====
+
+import { Empresa as EmpresaModel, Prisma } from '@/generated/prisma/client';
+
+export type Empresa = EmpresaModel;
+
+export type EmpresaRelacao = Prisma.EmpresaGetPayload<{
+  include: {
+    contadorCracha: true;
+  };
+}>;
+

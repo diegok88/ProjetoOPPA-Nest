@@ -13,7 +13,10 @@ import {
 import { OcorrenciaService } from './ocorrencia.service';
 import { CreateOcorrenciaDto } from './dto/create-ocorrencia.dto';
 import { UpdateOcorrenciaDto } from './dto/update-ocorrencia.dto';
-import { ResponseOcorrenciaDto } from './dto/response-ocorrencia.dto';
+import {
+  ResponseOcorrenciaDto,
+  ResponseOcorrenciaRelacaoDto,
+} from './dto/response-ocorrencia.dto';
 import { plainToInstance } from 'class-transformer';
 import { ROLES } from '@/auth/guards/roles.const';
 import { Roles } from '@/auth/guards/roles.decorator';
@@ -50,9 +53,9 @@ export class OcorrenciaController {
   @Roles(ROLES.ASN1, ROLES.TER1)
   async findOneFirst(
     @Query() query: QueryOcorrenciaFilterDto,
-  ): Promise<ResponseOcorrenciaDto> {
+  ): Promise<ResponseOcorrenciaRelacaoDto> {
     const registro = await this.ocorrenciaService.findOneFirst(query);
-    return plainToInstance(ResponseOcorrenciaDto, registro);
+    return plainToInstance(ResponseOcorrenciaRelacaoDto, registro);
   }
 
   @Get(':id')

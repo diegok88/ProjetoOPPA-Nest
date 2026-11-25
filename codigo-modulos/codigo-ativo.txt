@@ -1,0 +1,662 @@
+
+===== src/modules/ativo/ativo.controller.ts =====
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import { AtivoService } from './ativo.service';
+import { CreateAtivoDto } from './dto/create-ativo.dto';
+import { UpdateAtivoDto } from './dto/update-ativo.dto';
+
+import {
+  ResponseAtivoContadorDto,
+  ResponseAtivoDto,
+  ResponseAtivoRelacaoDto,
+} from './dto/response-ativo.dto';
+import { plainToInstance } from 'class-transformer';
+import { ROLES } from '@/auth/guards/roles.const';
+import { Roles } from '@/auth/guards/roles.decorator';
+import { QueryAtivoFilterDto } from './dto/query-ativo.dto';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
+
+@Controller('ativo')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
+export class AtivoController {
+  constructor(
+    private readonly ativoService: AtivoService,
+    private readonly tennantContext: TenantContextService,
+  ) {}
+
+  @Post()
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async create(
+    @Body() createAtivoDto: CreateAtivoDto,
+  ): Promise<ResponseAtivoDto> {
+    const ctx = this.tennantContext.getStore()?.empresa!;
+    const dado = await this.ativoService.create(createAtivoDto, ctx);
+    return plainToInstance(ResponseAtivoDto, dado);
+  }
+
+  @Get()
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.SUP1)
+  async findAll(
+    @Query() query: QueryAtivoFilterDto,
+  ): Promise<ResponseAtivoDto[]> {
+    const dados = await this.ativoService.findAll(query);
+    return plainToInstance(ResponseAtivoDto, dados);
+  }
+
+  @Get('counter')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async counter(): Promise<ResponseAtivoContadorDto> {
+    const contador = await this.ativoService.counter();
+    return plainToInstance(ResponseAtivoContadorDto, contador);
+  }
+
+  @Get(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseAtivoRelacaoDto> {
+    const dado = await this.ativoService.findOne(id);
+    return plainToInstance(ResponseAtivoRelacaoDto, dado);
+  }
+
+  @Patch(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateAtivoDto: UpdateAtivoDto,
+  ): Promise<ResponseAtivoDto> {
+    const dado = await this.ativoService.update(id, updateAtivoDto);
+    return plainToInstance(ResponseAtivoDto, dado);
+  }
+
+  @Patch('active/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async active(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseAtivoDto> {
+    const dado = await this.ativoService.active(id);
+    return plainToInstance(ResponseAtivoDto, dado);
+  }
+
+  @Patch('deactive/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async deactive(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseAtivoDto> {
+    const dado = await this.ativoService.deactive(id);
+    return plainToInstance(ResponseAtivoDto, dado);
+  }
+
+  @Delete(':id')
+  @Roles(ROLES.ASN1)
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseAtivoDto> {
+    const dado = await this.ativoService.remove(id);
+    return plainToInstance(ResponseAtivoDto, dado);
+  }
+}
+
+===== src/modules/ativo/ativo.module.ts =====
+
+import { forwardRef, Module } from '@nestjs/common';
+import { AtivoService } from './ativo.service';
+import { AtivoController } from './ativo.controller';
+import { PerfilModule } from '../perfil/perfil.module';
+
+@Module({
+  imports: [forwardRef(() => PerfilModule)],
+  controllers: [AtivoController],
+  providers: [AtivoService],
+  exports: [AtivoService],
+})
+export class AtivoModule {}
+
+===== src/modules/ativo/ativo.service.ts =====
+
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { CreateAtivoDto } from './dto/create-ativo.dto';
+import { UpdateAtivoDto } from './dto/update-ativo.dto';
+import { PrismaService } from '@/prisma/prisma.service';
+import {
+  Ativo,
+  AtivoRelacoes,
+  AtivoRelacoesParcial,
+} from './entities/ativo.entity';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+import { QueryAtivoFilterDto } from './dto/query-ativo.dto';
+import { Acao, Prisma } from '@/generated/prisma/client';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { Contador } from '@/interfaces/counter.interface';
+
+@Injectable()
+export class AtivoService {
+  private logger = new Logger(AtivoService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
+
+  async create(
+    createAtivoDto: CreateAtivoDto,
+    empresa: string,
+  ): Promise<Ativo> {
+    try {
+      const criar = await this.prisma.client.ativo.create({
+        data: { ...createAtivoDto, empresaId: empresa },
+      });
+      this.logger.log(TYPES_NOTICES.CREATE);
+      return criar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
+      throw error;
+    }
+  }
+
+  async findAll(
+    query: QueryAtivoFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<AtivoRelacoes[]> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+      this.logger.debug(query);
+
+      const client = tx ?? this.prisma.client;
+
+      const { campos, ...filtros } = query ?? {};
+
+      const condicao: Prisma.AtivoWhereInput = {};
+      if (query.codigo) condicao.codigo = query.codigo;
+      if (query.descricao) condicao.descricao = query.descricao;
+      if (query.modelo) condicao.modelo = query.modelo;
+      if (query.fabricante) condicao.fabricante = query.fabricante;
+      if (query.ano) condicao.ano = query.ano;
+      if (query.setorId) condicao.setorId = query.setorId;
+      if (query.empresaId) condicao.empresaId = query.empresaId;
+      if (query.status) condicao.status = query.status;
+
+      if (query.gestor === true) condicao.empresaId = ctx.empresa;
+
+      const selecao = await this.buildSelect(campos);
+
+      const opcoes: Prisma.AtivoFindManyArgs = {
+        where: condicao,
+        orderBy: { codigo: 'asc' },
+      };
+
+      if (campos?.length) {
+        opcoes.select = selecao;
+      } else {
+        opcoes.include =
+          filtros.incluir === 'todos_relacoes'
+            ? {
+                setor: true,
+                empresa: true,
+                competenciaAtivo: true,
+                tagAtivo: true,
+                falhaAtivo: true,
+              }
+            : filtros.incluir === 'empresa'
+              ? { empresa: true }
+              : filtros.incluir === 'competenciaAtivo'
+                ? { competenciaAtivo: true }
+                : filtros.incluir === 'falhaAtivo'
+                  ? { falhaAtivo: true }
+                  : { tagAtivo: true };
+      }
+
+      const listar: AtivoRelacoes[] = await client.ativo.findMany(opcoes);
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.debug(listar);
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO QUE RETORNA OS ATIVOS 
+  - apenas o que não foi atibuido ao colaborador.
+  - requerida na competência operacional.
+  */
+  async findAssetsAvailable(
+    ids: Array<string>,
+  ): Promise<AtivoRelacoesParcial[]> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+
+      const condicao: Prisma.AtivoWhereInput = {
+        ...(ids.length ? { id: { notIn: ids } } : {}),
+        empresaId: ctx.empresa,
+      };
+
+      const ativos = await this.prisma.client.ativo.findMany({
+        where: condicao,
+        select: { id: true, codigo: true, descricao: true, modelo: true },
+      });
+
+      return ativos;
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - findAssetsAvailable()',
+      );
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO CONTADOR DE REGISTROS: TOTAL, ATIVOS E INATIVOS EM UMA ÚNICA QUERY */
+  async counter(): Promise<Contador> {
+    try {
+      const ctx = this.tenantContext.getStore()?.empresa;
+
+      const grupos = await this.prisma.ativo.groupBy({
+        by: ['status'],
+        where: { empresaId: ctx },
+        _count: { _all: true },
+      });
+
+      const ativos = grupos.find((g) => g.status === true)?._count._all ?? 0;
+      const inativos = grupos.find((g) => g.status === false)?._count._all ?? 0;
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return { total: ativos + inativos, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
+  async findOne(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<AtivoRelacoes> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const buscar = await client.ativo.findUnique({
+        where: { id: id },
+        include: {
+          falhaAtivo: true,
+          tagAtivo: true,
+          competenciaAtivo: true,
+          empresa: true,
+          setor: true,
+        },
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
+      throw error;
+    }
+  }
+
+  async update(id: string, updateAtivoDto: UpdateAtivoDto): Promise<Ativo> {
+    try {
+      const atualizarAtivo = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          await this.findOne(id, tx);
+
+          const atualizar = await tx.ativo.update({
+            where: { id: id },
+            data: updateAtivoDto,
+          });
+
+          return atualizar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.UPDATE);
+      return atualizarAtivo;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
+      throw error;
+    }
+  }
+
+  async active(id: string): Promise<Ativo> {
+    try {
+      const ativarAtivo = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (verificar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_ACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_ACTIVE);
+          }
+
+          const ativar = await tx.ativo.update({
+            where: { id: id },
+            data: { status: true, _auditAction: Acao.ACTIVE },
+          });
+
+          return ativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.ACTIVE);
+      return ativarAtivo;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - ACTIVE');
+      throw error;
+    }
+  }
+
+  async deactive(id: string): Promise<Ativo> {
+    try {
+      const inativarAtivo = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (!verificar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_DEACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_DEACTIVE);
+          }
+
+          const inativar = await tx.ativo.update({
+            where: { id: id },
+            data: { status: false, _auditAction: Acao.DEACTIVATE },
+          });
+
+          return inativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
+      return inativarAtivo;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE');
+      throw error;
+    }
+  }
+
+  async remove(id: string): Promise<Ativo> {
+    try {
+      const removerAtivo = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (verificar.status) {
+            this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+            throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+          }
+
+          const remover = await tx.ativo.delete({
+            where: { id: id },
+          });
+
+          return remover;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return removerAtivo;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
+      throw error;
+    }
+  }
+
+  // METODO DE CONSULTA DINAMICA
+  private readonly allowedAtivoFiels = [
+    'id',
+    'codigo',
+    'descricao',
+    'modelo',
+    'fabricante',
+    'ano',
+    'empresaId',
+    'status',
+  ];
+
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedAtivoFiels.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
+  }
+}
+
+===== src/modules/ativo/dto/create-ativo.dto.ts =====
+
+import { Transform } from 'class-transformer';
+import {
+  IsString,
+  IsNotEmpty,
+  IsNumber,
+  IsInt,
+  IsUUID,
+  Min,
+  Length,
+  Matches,
+} from 'class-validator';
+
+export class CreateAtivoDto {
+  @IsString({ message: 'A descrição não é do tipo String.' })
+  @IsNotEmpty({ message: 'A descrição é um campo obrigatório.' })
+  @Length(5, 100, {
+    message:
+      'A descrição deve conter no minimo 10 caracteres e no maximo 100 caracteres.',
+  })
+  @Matches(/^[a-zA-ZÀ-ÿ\s]+$/, {
+    message:
+      'A descrição deve conter letras maisculas e minusculas, sem numeros e caracteres especiais.',
+  })
+  @Transform(({ value }) => value.toUpperCase())
+  descricao!: string;
+
+  @IsString({ message: 'O modelo não é do tipo String.' })
+  @IsNotEmpty({ message: 'O modelo é um campo obrigatório.' })
+  @Length(5, 100, {
+    message:
+      'O modelo deve conter no minimo 10 caracteres e no maximo 100 caracteres.',
+  })
+  @Matches(/^[a-zA-Z0-9]+$/, {
+    message: 'O modelo deve conter apenas letras e números',
+  })
+  @Transform(({ value }) => value.toUpperCase())
+  modelo!: string;
+
+  @IsString({ message: 'O fabricante não é do tipo String.' })
+  @IsNotEmpty({ message: 'O fabricante é um campo obrigatório.' })
+  @Length(3, 100, {
+    message:
+      'O fabricante deve conter no minimo 10 caracteres e no maximo 100 caracteres.',
+  })
+  @Matches(/^[a-zA-Z0-9]+$/, {
+    message: 'O fabricante deve conter apenas letras e números',
+  })
+  @Transform(({ value }) => value.toUpperCase())
+  fabricante!: string;
+
+  @IsNumber({}, { message: 'O ano não é do tipo Number.' })
+  @IsInt({ message: 'O ano deve ser um número inteiro.' })
+  @Min(1950, { message: 'O ano não pode ser anterior a 1950.' })
+  @IsNotEmpty({ message: 'O ano é um campo obrigatório.' })
+  ano!: number;
+
+  @IsUUID('all', { message: 'Setor id inválido.' })
+  @IsNotEmpty({ message: 'O setor é um campo obrigatório.' })
+  setorId!: string;
+}
+
+===== src/modules/ativo/dto/query-ativo.dto.ts =====
+
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
+
+export class QueryAtivoFilterDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Código não é do tipo Inteiro!' })
+  @IsNumber({}, { message: 'Código não é do tipo Number!' })
+  codigo?: number;
+
+  @IsOptional()
+  @IsString({ message: 'A descrição não é do tipo String.' })
+  descricao?: string;
+
+  @IsOptional()
+  @IsString({ message: 'O modelo não é do tipo String.' })
+  modelo?: string;
+
+  @IsOptional()
+  @IsString({ message: 'O fabricante não é do tipo String.' })
+  fabricante?: string;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'O ano não é do tipo Number.' })
+  @IsInt({ message: 'O ano deve ser um número inteiro.' })
+  @Min(1950, { message: 'O ano não pode ser anterior a 1950.' })
+  ano?: number;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'O setor id informado não é um UUID válido!' })
+  setorId?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'O empresa id informado não é um UUID válido!' })
+  empresaId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
+  status?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'Gestor não é do tipo Boolean!' })
+  gestor?: boolean;
+
+  @IsOptional()
+  @IsString({ message: 'Campos não é do tipo String.' })
+  campos?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Include não é do tipo String.' })
+  incluir?: string;
+}
+
+===== src/modules/ativo/dto/response-ativo.dto.ts =====
+
+import { Expose, Type } from 'class-transformer';
+
+export class ResponseAtivoEmpresaDto {
+  @Expose() razaoSocial!: string;
+}
+
+export class ResponseAtivoSetoresDto {
+  @Expose() descricao!: string;
+}
+
+export class ResponseAtivoDto {
+  @Expose() id!: string;
+  @Expose() codigo!: number;
+  @Expose() descricao!: string;
+  @Expose() modelo!: string;
+  @Expose() fabricante!: string;
+  @Expose() ano!: number;
+  @Expose() setorId!: string;
+  @Expose() empresaId!: string;
+  @Expose() status!: boolean;
+}
+
+export class ResponseAtivoRelacaoDto extends ResponseAtivoDto {
+  @Expose()
+  @Type(() => ResponseAtivoSetoresDto)
+  setor!: ResponseAtivoSetoresDto;
+
+  @Expose()
+  @Type(() => ResponseAtivoEmpresaDto)
+  empresa!: ResponseAtivoEmpresaDto;
+}
+
+export class ResponseAtivoContadorDto {
+  @Expose()
+  total!: number;
+
+  @Expose()
+  ativos!: number;
+
+  @Expose()
+  inativos!: number;
+}
+
+===== src/modules/ativo/dto/update-ativo.dto.ts =====
+
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateAtivoDto } from './create-ativo.dto';
+
+export class UpdateAtivoDto extends PartialType(CreateAtivoDto) {}
+
+===== src/modules/ativo/entities/ativo.entity.ts =====
+
+import { Ativo as AtivoModel, Prisma } from '@/generated/prisma/client';
+
+export type Ativo = AtivoModel;
+
+export type AtivoRelacoes = Prisma.AtivoGetPayload<{
+  include: {
+    falhaAtivo: true;
+    tagAtivo: true;
+    competenciaAtivo: true;
+    empresa: true;
+    setor: true;
+  };
+}>;
+
+export type AtivoRelacoesParcial = Prisma.AtivoGetPayload<{
+  select: { id: true; codigo: true; descricao: true; modelo: true };
+}>;

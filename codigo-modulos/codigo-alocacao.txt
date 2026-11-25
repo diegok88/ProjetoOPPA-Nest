@@ -1,0 +1,989 @@
+
+===== src/modules/alocacao/alocacao.controller.ts =====
+
+import {
+  Controller,
+  Get,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import { AlocacaoService } from './alocacao.service';
+import { UpdateAlocacaoDto } from './dto/update-alocacao.dto';
+import {
+  ResponseAlertAlocacaoDto,
+  ResponseAlocacaoContadorDto,
+  ResponseAlocacaoDto,
+  ResponseAlocacaoPaginadaDto,
+  ResponseAlocacaoRelacaoDto,
+} from './dto/response-alocacao.dto';
+import { plainToInstance } from 'class-transformer';
+import { ROLES } from '@/auth/guards/roles.const';
+import { Roles } from '@/auth/guards/roles.decorator';
+import {
+  QueryAlocacaoOperacionalCounterDto,
+  QueryAlocacaoOperacionalFilterDto,
+  QueryQuantidadeAlocacaoOperadorDto,
+} from './dto/query-alocacao.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
+
+@Controller('alocacao')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
+export class AlocacaoController {
+  constructor(private readonly alocacaoService: AlocacaoService) {}
+
+  @Get()
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async findAll(
+    @Query() query: QueryAlocacaoOperacionalFilterDto,
+  ): Promise<ResponseAlocacaoPaginadaDto> {
+    const resultado = await this.alocacaoService.findAll(query);
+    return plainToInstance(ResponseAlocacaoPaginadaDto, resultado);
+  }
+
+  @Get('allocation')
+  @Roles(ROLES.ASN1, ROLES.SUP1, ROLES.TER1)
+  async findOneAllocation(
+    @Query() query: QueryAlocacaoOperacionalFilterDto,
+  ): Promise<ResponseAlocacaoRelacaoDto> {
+    const resultado = await this.alocacaoService.findOneAllocation(query);
+    return plainToInstance(ResponseAlocacaoRelacaoDto, resultado);
+  }
+
+  @Get('check-allocation')
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async checkManagerAllocation(
+    @Query() query: QueryQuantidadeAlocacaoOperadorDto,
+  ): Promise<ResponseAlertAlocacaoDto> {
+    const dados = await this.alocacaoService.checkManagerAllocation(query);
+    return plainToInstance(ResponseAlertAlocacaoDto, dados);
+  }
+
+  @Get('counter')
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async counter(
+    @Query() query: QueryAlocacaoOperacionalCounterDto,
+  ): Promise<ResponseAlocacaoContadorDto> {
+    const contador = await this.alocacaoService.counter(query);
+    return plainToInstance(ResponseAlocacaoContadorDto, contador);
+  }
+
+  @Get(':id')
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseAlocacaoRelacaoDto> {
+    const dado = await this.alocacaoService.findOne(id);
+    return plainToInstance(ResponseAlocacaoRelacaoDto, dado);
+  }
+
+  @Patch(':id')
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateAlocacaoDto: UpdateAlocacaoDto,
+  ): Promise<ResponseAlocacaoDto> {
+    const dado = await this.alocacaoService.update(id, updateAlocacaoDto);
+    return plainToInstance(ResponseAlocacaoDto, dado);
+  }
+
+  @Patch('deactive/:id')
+  @Roles(ROLES.ASN1)
+  async deactive(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseAlocacaoDto> {
+    const dado = await this.alocacaoService.deactive(id);
+    return plainToInstance(ResponseAlocacaoDto, dado);
+  }
+
+  @Delete(':id')
+  @Roles(ROLES.ASN1)
+  async remove(@Param('id') id: string): Promise<ResponseAlocacaoDto> {
+    const dado = await this.alocacaoService.remove(id);
+    return plainToInstance(ResponseAlocacaoDto, dado);
+  }
+}
+
+===== src/modules/alocacao/alocacao.module.ts =====
+
+import { forwardRef, Module } from '@nestjs/common';
+import { AlocacaoService } from './alocacao.service';
+import { AlocacaoController } from './alocacao.controller';
+import { PerfilModule } from '../perfil/perfil.module';
+import { TagAtivoModule } from '../tag-ativo/tag-ativo.module';
+
+@Module({
+  imports: [forwardRef(() => PerfilModule), TagAtivoModule],
+  controllers: [AlocacaoController],
+  providers: [AlocacaoService],
+  exports: [AlocacaoService],
+})
+export class AlocacaoModule {}
+
+===== src/modules/alocacao/alocacao.service.ts =====
+
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { UpdateAlocacaoDto } from './dto/update-alocacao.dto';
+import { PrismaService } from '@/prisma/prisma.service';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+import {
+  Acao,
+  CondicaoAlocacao,
+  Prisma,
+  SituacaoAlocacao,
+  TipoTurno,
+} from '@/generated/prisma/client';
+import {
+  AlocacaoListagem,
+  AlocacaoOperacional,
+} from './entities/alocacao.entity';
+import {
+  QueryAlocacaoOperacionalCounterDto,
+  QueryAlocacaoOperacionalFilterDto,
+  QueryQuantidadeAlocacaoOperadorDto,
+} from './dto/query-alocacao.dto';
+import { QueryTagAtivoSetoresDto } from '../tag-ativo/dto/query-tag-ativo.dto';
+import { TagAtivoService } from '../tag-ativo/tag-ativo.service';
+import {
+  ResponseAlertAlocacaoDto,
+  ResponseAlocacaoContadorDto,
+} from './dto/response-alocacao.dto';
+import { PerfilService } from '../perfil/perfil.service';
+import { ROLES } from '@/auth/guards/roles.const';
+import { PaginatedResponse } from '@/interfaces/paginator.interface';
+
+@Injectable()
+export class AlocacaoService {
+  private logger = new Logger(AlocacaoService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly perfilService: PerfilService,
+    private readonly tagAtivoService: TagAtivoService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
+
+  async create(
+    tagAtivoId: string,
+    turno: TipoTurno,
+    gestorId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<AlocacaoListagem> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const criar = await client.alocacaoOperacional.create({
+        data: { tagAtivoId: tagAtivoId, turno: turno, gestorId: gestorId },
+      });
+
+      this.logger.log(TYPES_NOTICES.CREATE);
+      return criar;
+    } catch (error) {
+      this.logger.log(TYPES_NOTICES.SERVICE_FAILURE, ' - create()');
+      throw error;
+    }
+  }
+
+  async createAll(
+    setorId: string,
+    turno: TipoTurno,
+    gestorId: string,
+  ): Promise<Prisma.BatchPayload> {
+    try {
+      let criarAlocacao: Prisma.BatchPayload = { count: 0 };
+
+      const condicao: Prisma.AlocacaoOperacionalWhereInput = {
+        turno: turno,
+        situacao: { not: SituacaoAlocacao.FINALIZADO },
+        condicao: { not: CondicaoAlocacao.RECUSADO },
+        tagAtivo: { ativo: { setorId: setorId } },
+      };
+
+      const listarAlocacao =
+        await this.prisma.client.alocacaoOperacional.findMany({
+          where: condicao,
+        });
+
+      const queryT: QueryTagAtivoSetoresDto = { setorId: setorId };
+      const listarTags = await this.tagAtivoService.findAllSection(queryT);
+
+      if (listarAlocacao.length !== listarTags.length) {
+        const tagsAlocados = new Set(
+          listarAlocacao.map((a: AlocacaoOperacional) => a.tagAtivoId),
+        );
+        const tagsSemAlocados = listarTags
+          .filter((tag) => !tagsAlocados.has(tag.id))
+          .map((tag) => tag.id);
+        if (tagsSemAlocados.length > 0) {
+          criarAlocacao =
+            await this.prisma.client.alocacaoOperacional.createMany({
+              data: tagsSemAlocados.map((tagAtivoId) => ({
+                tagAtivoId: tagAtivoId,
+                turno: turno,
+                gestorId: gestorId,
+              })),
+            });
+        }
+      }
+
+      return criarAlocacao;
+    } catch (error) {
+      this.logger.log(TYPES_NOTICES.SERVICE_FAILURE, ' - createAll()');
+      throw error;
+    }
+  }
+
+  async checkManagerAllocation(
+    query: QueryQuantidadeAlocacaoOperadorDto,
+  ): Promise<ResponseAlertAlocacaoDto> {
+    try {
+      const qtdAlocacao = await this.prisma.client.alocacaoOperacional.count({
+        where: query,
+      });
+
+      if (qtdAlocacao === 0) {
+        this.logger.warn(`Operador id possui ${qtdAlocacao} alocações.`);
+      } else {
+        this.logger.log(`Operador id possui ${qtdAlocacao} alocações.`);
+      }
+
+      return { alocacao: qtdAlocacao };
+    } catch (error) {
+      this.logger.log(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - checkManagerAllocation()',
+      );
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO MONTAGEM DE CONDIÇÃO */
+  private async toAssembleCondicao(
+    filtros: Omit<
+      QueryAlocacaoOperacionalFilterDto,
+      'page' | 'size' | 'campos' | 'incluir' | 'ordenacao'
+    >,
+    usuarioId?: string,
+  ): Promise<Prisma.AlocacaoOperacionalWhereInput> {
+    const condicao: Prisma.AlocacaoOperacionalWhereInput = {};
+
+    if (filtros.codigo) condicao.codigo = filtros.codigo;
+    if (filtros.operadorId) condicao.operadorId = filtros.operadorId;
+    if (filtros.gestorId) condicao.gestorId = filtros.gestorId;
+    if (filtros.tagAtivoId) condicao.tagAtivoId = filtros.tagAtivoId;
+    if (filtros.setorId)
+      condicao.tagAtivo = { ativo: { setorId: filtros.setorId } };
+    if (filtros.turno) condicao.turno = filtros.turno;
+    if (filtros.condicao) condicao.condicao = filtros.condicao;
+    if (filtros.situacao) condicao.situacao = filtros.situacao;
+    if (filtros.status !== undefined) condicao.status = filtros.status;
+
+    if (filtros.decisao === 'finalizado') {
+      condicao.AND = { situacao: { not: SituacaoAlocacao.FINALIZADO } };
+    }
+
+    if (filtros.gestor) condicao.gestorId = usuarioId;
+
+    return condicao;
+  }
+
+  /* FUNÇÃO MONTAGEM DE ORDENAÇÃO */
+  private async toAssembleOrderBy(
+    ordenacao?: string,
+  ): Promise<Prisma.AlocacaoOperacionalOrderByWithRelationInput[]> {
+    switch (ordenacao) {
+      case 'filtrar':
+        return [{ codigo: 'desc' }, { situacao: 'asc' }];
+      default:
+        return [{ tagAtivo: { descricao: 'asc' } }];
+    }
+  }
+
+  /* FUNÇÃO MONTAGEM DE INCLUDE */
+  private async toAssembleInclude(
+    incluir?: string,
+  ): Promise<Prisma.AlocacaoOperacionalInclude> {
+    switch (incluir) {
+      case 'todos_relacoes':
+        return { operador: true, gestor: true, tagAtivo: true };
+      default:
+        return {
+          operador: {
+            select: { id: true, cracha: true, nome: true, turno: true },
+          },
+          gestor: { select: { id: true, cracha: true, nome: true } },
+          tagAtivo: {
+            select: {
+              id: true,
+              codigo: true,
+              descricao: true,
+              ativo: {
+                select: {
+                  id: true,
+                  descricao: true,
+                  modelo: true,
+                  setorId: true,
+                  setor: { select: { id: true, descricao: true } },
+                },
+              },
+            },
+          },
+        };
+    }
+  }
+
+  /* METODO DE CONSULTA DINAMICA */
+  private readonly allowedAlocacaoOperacionalFields = [
+    'id',
+    'codigo',
+    'operadorId',
+    'gestorId',
+    'tagAtivoId',
+    'turno',
+    'condicao',
+    'situacao',
+    'status',
+  ];
+
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj: Record<string, true> = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedAlocacaoOperacionalFields.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
+  }
+
+  /* FUNÇÃO DE LISTAGEM COM PAGINAÇÃO */
+  async findAll(
+    query: QueryAlocacaoOperacionalFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<PaginatedResponse<any>> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+      const client = tx ?? this.prisma.client;
+
+      const {
+        page = 1,
+        size = 10,
+        campos,
+        incluir,
+        ordenacao,
+        ...filtros
+      } = query;
+
+      if (filtros.setorId && filtros.turno) {
+        await this.createAll(filtros.setorId, filtros.turno, ctx.user);
+      }
+
+      const condicao = await this.toAssembleCondicao(filtros, ctx.user);
+
+      const selecao = await this.buildSelect(campos);
+
+      const opcoes: Prisma.AlocacaoOperacionalFindManyArgs = {
+        where: condicao,
+        orderBy: await this.toAssembleOrderBy(ordenacao),
+        skip: (page - 1) * size,
+        take: size,
+      };
+
+      if (campos?.length) {
+        opcoes.select = selecao;
+      } else {
+        opcoes.include = await this.toAssembleInclude(incluir);
+      }
+
+      const listar: AlocacaoListagem[] =
+        await client.alocacaoOperacional.findMany(opcoes);
+
+      const total = await client.alocacaoOperacional.count({ where: condicao });
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return { dados: listar, total, pagina: page, tamanho: size };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ACEITO, RECUSADO, AGUARDANDO, ALOCADO, DISPONIVEL, INDISPONIVEL E FINALIZADO */
+  async counter(
+    query?: QueryAlocacaoOperacionalCounterDto,
+  ): Promise<ResponseAlocacaoContadorDto> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+
+      const buscarPerfil = await this.perfilService.findOne(ctx.perfil);
+      const perfil = `${buscarPerfil.descricao} - ${buscarPerfil.nivel}`;
+
+      const condicao: Prisma.AlocacaoOperacionalWhereInput = {};
+
+      if (query?.gestor && perfil === ROLES.SUP1) {
+        condicao.gestorId = ctx.user;
+      } else if (!query?.gestor && perfil !== ROLES.ASN1) {
+        this.logger.warn(
+          `Perfil ${perfil} não autorizado. `,
+          TYPES_NOTICES.UNAUTHORIZED,
+        );
+        throw new UnauthorizedException(
+          `Perfil ${perfil} não autorizado. `,
+          TYPES_NOTICES.UNAUTHORIZED,
+        );
+      }
+
+      const totalAlocacao = await this.prisma.client.alocacaoOperacional.count({
+        where: condicao,
+      });
+
+      const gruposCondicao = await this.prisma.alocacaoOperacional.groupBy({
+        by: ['condicao'],
+        where: condicao,
+        _count: { _all: true },
+      });
+
+      const aceito =
+        gruposCondicao.find((g) => g.condicao === CondicaoAlocacao.ACEITO)
+          ?._count._all ?? 0;
+      const recusado =
+        gruposCondicao.find((g) => g.condicao === CondicaoAlocacao.RECUSADO)
+          ?._count._all ?? 0;
+      const aguardando =
+        gruposCondicao.find((g) => g.condicao === CondicaoAlocacao.AGUARDANDO)
+          ?._count._all ?? 0;
+
+      const gruposSituacao = await this.prisma.alocacaoOperacional.groupBy({
+        by: ['situacao'],
+        where: condicao,
+        _count: { _all: true },
+      });
+
+      const alocado =
+        gruposSituacao.find((g) => g.situacao === SituacaoAlocacao.ALOCADO)
+          ?._count._all ?? 0;
+      const disponivel =
+        gruposSituacao.find((g) => g.situacao === SituacaoAlocacao.DISPONIVEL)
+          ?._count._all ?? 0;
+      const indisponivel =
+        gruposSituacao.find((g) => g.situacao === SituacaoAlocacao.INDISPONIVEL)
+          ?._count._all ?? 0;
+      const finalizado =
+        gruposSituacao.find((g) => g.situacao === SituacaoAlocacao.FINALIZADO)
+          ?._count._all ?? 0;
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return {
+        total: totalAlocacao,
+        aceito: aceito,
+        recusado: recusado,
+        aguardando: aguardando,
+        alocado: alocado,
+        disponivel: disponivel,
+        indisponivel: indisponivel,
+        finalizado: finalizado,
+      };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
+  async findOne(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<AlocacaoListagem> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const buscar = await client.alocacaoOperacional.findUnique({
+        where: { id: id },
+        include: {
+          tagAtivo: { include: { ativo: true } },
+          operador: true,
+          gestor: true,
+        },
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
+      throw error;
+    }
+  }
+
+  async findOneAllocation(
+    query: QueryAlocacaoOperacionalFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<AlocacaoListagem> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const {
+        page = 1,
+        size = 10,
+        campos,
+        incluir,
+        ordenacao,
+        ...filtros
+      } = query;
+
+      const condicao = await this.toAssembleCondicao(filtros);
+      const selecao = await this.buildSelect(campos);
+      const opcoes: Prisma.AlocacaoOperacionalFindManyArgs = {
+        where: condicao,
+      };
+
+      if (campos?.length) {
+        opcoes.select = selecao;
+      } else {
+        opcoes.include = await this.toAssembleInclude(incluir);
+      }
+
+      const buscar: AlocacaoListagem =
+        await client.alocacaoOperacional.findFirst(opcoes);
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - findOneAllocation()',
+      );
+      throw error;
+    }
+  }
+
+  async update(
+    id: string,
+    update: UpdateAlocacaoDto,
+  ): Promise<AlocacaoListagem> {
+    try {
+      const atualizarAlocacao = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const alocacao = await this.findOne(id, tx);
+          const { tagAtivoId, turno, gestorId } = alocacao;
+
+          const atualizar = await tx.alocacaoOperacional.update({
+            where: { id: id },
+            data: update,
+          });
+
+          if (update.situacao === SituacaoAlocacao.FINALIZADO) {
+            await this.create(tagAtivoId, turno, gestorId!, tx);
+          }
+
+          return atualizar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.UPDATE);
+      return atualizarAlocacao;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
+      throw error;
+    }
+  }
+
+  async deactive(id: string): Promise<AlocacaoListagem> {
+    try {
+      const inativarPerfil = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (!verificar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_DEACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_DEACTIVE);
+          }
+
+          const inativar = await tx.alocacaoOperacional.update({
+            where: { id: id },
+            data: { status: false, _auditAction: Acao.DEACTIVATE },
+          });
+
+          return inativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
+      return inativarPerfil;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE');
+      throw error;
+    }
+  }
+
+  async remove(id: string): Promise<AlocacaoListagem> {
+    try {
+      const removerAlocacao = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (verificar.status) {
+            this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+            throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+          }
+
+          const remover = await tx.alocacaoOperacional.delete({
+            where: { id: id },
+          });
+
+          return remover;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return removerAlocacao;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
+      throw error;
+    }
+  }
+}
+
+===== src/modules/alocacao/dto/create-alocacao.dto.ts =====
+
+import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
+
+export class CreateAlocacaoDto {
+  @IsString({ message: 'Tag Ativo id não é do tipo String.' })
+  @IsUUID('all', { message: 'Tag Ativo id inválido.' })
+  @IsNotEmpty({ message: 'Tag Ativo é um campo obrigatório.' })
+  tagAtivoId!: string;
+}
+
+===== src/modules/alocacao/dto/query-alocacao.dto.ts =====
+
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
+import {
+  CondicaoAlocacao,
+  SituacaoAlocacao,
+  TipoTurno,
+} from '@/generated/prisma/enums'; 
+
+export class QueryAlocacaoOperacionalFilterDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Código deve ser um número inteiro.' })
+  @Min(1, { message: 'Código deve ser maior que zero.' })
+  codigo?: number;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Operador id inválido.' })
+  operadorId?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Gestor id inválido.' })
+  gestorId?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Tag ativo id inválido.' })
+  tagAtivoId?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Setor id inválido.' })
+  setorId?: string;
+
+  @IsOptional()
+  @IsEnum(TipoTurno, {
+    message: 'Turno não pertence ao enum TipoTurno.',
+  })
+  turno?: TipoTurno;
+
+  @IsOptional()
+  @IsEnum(CondicaoAlocacao, {
+    message: 'Condição não pertence ao enum CondicaoAlocacao.',
+  })
+  condicao?: CondicaoAlocacao;
+
+  @IsOptional()
+  @IsEnum(SituacaoAlocacao, {
+    message: 'Situação não pertence ao enum SituacaoAlocacao.',
+  })
+  situacao?: SituacaoAlocacao;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return value;
+  })
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
+  status?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'Gestor não é do tipo Boolean!' })
+  gestor?: boolean;
+
+  /* Parametro que garante o retorno dos campos selecionados */
+  @IsOptional()
+  @IsString({ message: 'Campos não é do tipo String.' })
+  campos?: string;
+
+  /* Parametro que garante o retorno do dados escolhidos */
+  @IsOptional()
+  @IsString({ message: 'Incluir não é do tipo String.' })
+  incluir?: string;
+
+  /* Parametro que garante a retirada, oerdenação de dados */
+  @IsOptional()
+  @IsString({ message: 'Eliminar não é do tipo String.' })
+  decisao?: string;
+
+  /* Parametro que garante a ordenação dinâmica */
+  @IsOptional()
+  @IsString({ message: 'Ordenação não é do tipo String.' })
+  ordenacao?: string;
+
+  /* Paginação da lista do filtro */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Página deve ser um número inteiro.' })
+  @Min(1, { message: 'Página deve ser maior que zero.' })
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Tamanho deve ser um número inteiro.' })
+  @Min(1)
+  @Max(100, { message: 'Tamanho máximo é 100.' })
+  size?: number = 10;
+}
+
+export class QueryQuantidadeAlocacaoOperadorDto {
+  @IsOptional()
+  @IsUUID('all', { message: 'Operador id inválido.' })
+  operadorId?: string;
+
+  @IsOptional()
+  @IsEnum(SituacaoAlocacao, {
+    message: 'Situação não pertence ao enum SituacaoAlocacao.',
+  })
+  situacao?: SituacaoAlocacao;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return value;
+  })
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
+  status?: boolean;
+}
+
+export class QueryAlocacaoOperacionalCounterDto {
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'Gestor não é do tipo Boolean!' })
+  gestor?: boolean;
+}
+
+===== src/modules/alocacao/dto/response-alocacao.dto.ts =====
+
+import { Expose, Type } from 'class-transformer';
+import {
+  CondicaoAlocacao,
+  SituacaoAlocacao,
+  TipoTurno,
+} from '@/generated/prisma/enums';
+
+export class ResponseAlocacaoSetorDto {
+  @Expose() id!: string;
+  @Expose() descricao!: string;
+}
+
+export class ResponseAlocacaoAtivoDto {
+  @Expose() id!: string;
+  @Expose() descricao!: string;
+  @Expose() modelo!: string;
+  @Expose() setorId!: string;
+  @Expose()
+  @Type(() => ResponseAlocacaoSetorDto)
+  setor!: ResponseAlocacaoSetorDto;
+}
+
+export class ResponseAlocacaoTagAtivoDto { 
+  @Expose() id!: string;
+  @Expose() descricao!: string;
+  @Expose()
+  @Type(() => ResponseAlocacaoAtivoDto)
+  ativo!: ResponseAlocacaoAtivoDto;
+}
+
+export class ResponseAlocacaoOperadorDto {
+  @Expose() id!: string;
+  @Expose() cracha!: number;
+  @Expose() nome!: string;
+  @Expose() turno!: TipoTurno;
+}
+
+export class ResponseAlocacaoDto {
+  @Expose() id!: string;
+  @Expose() codigo!: number;
+  @Expose() operadorId!: string;
+  @Expose() gestorId!: string;
+  @Expose() tagAtivoId!: string;
+  @Expose() turno!: TipoTurno;
+  @Expose() alocadoEm!: Date;
+  @Expose() finalizadoEm!: Date;
+  @Expose() condicao!: CondicaoAlocacao;
+  @Expose() situacao!: SituacaoAlocacao;
+  @Expose() status!: boolean;
+}
+
+export class ResponseAlocacaoRelacaoDto extends ResponseAlocacaoDto {
+  @Expose()
+  @Type(() => ResponseAlocacaoTagAtivoDto)
+  tagAtivo!: ResponseAlocacaoTagAtivoDto;
+
+  @Expose()
+  @Type(() => ResponseAlocacaoOperadorDto)
+  operador!: ResponseAlocacaoOperadorDto;
+}
+
+export class ResponseAlocacaoPaginadaDto {
+  @Expose()
+  @Type(() => ResponseAlocacaoRelacaoDto)
+  dados!: ResponseAlocacaoRelacaoDto[];
+
+  @Expose() total!: number;
+  @Expose() pagina!: number;
+  @Expose() tamanho!: number;
+}
+
+export class ResponseAlocacaoContadorDto {
+  @Expose() total!: number;
+  @Expose() aceito!: number;
+  @Expose() recusado!: number;
+  @Expose() aguardando!: number;
+  @Expose() alocado!: number;
+  @Expose() disponivel!: number;
+  @Expose() indisponivel!: number;
+  @Expose() finalizado!: number;
+}
+
+export class ResponseAlertAlocacaoDto {
+  @Expose() alocacao!: number;
+}
+
+===== src/modules/alocacao/dto/update-alocacao.dto.ts =====
+
+import { CondicaoAlocacao, SituacaoAlocacao } from '@/generated/prisma/enums';
+import { Type } from 'class-transformer';
+import { IsDate, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+
+export class UpdateAlocacaoDto {
+  @IsOptional()
+  @IsString({ message: 'Usuário id não é do tipo String.' })
+  @IsUUID('all', { message: 'Usuário id inválido.' })
+  operadorId?: string;
+
+  @IsOptional()
+  @IsEnum(SituacaoAlocacao, {
+    message: 'Situação não pertence ao enum SituacaoAlocacao.',
+  })
+  situacao?: SituacaoAlocacao;
+
+  @IsOptional()
+  @IsEnum(CondicaoAlocacao, {
+    message: 'Condição não pertence ao enum SituacaoAlocacao.',
+  })
+  condicao?: CondicaoAlocacao;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate({ message: 'Alocado não é do tipo Date.' })
+  alocadoEm?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate({ message: 'Finalizado não é do tipo Date.' })
+  finalizadoEm?: Date;
+}
+
+===== src/modules/alocacao/entities/alocacao.entity.ts =====
+
+import {
+  AlocacaoOperacional as AlocacaoOperacionalModel,
+  Prisma,
+} from '@/generated/prisma/client';
+
+export type AlocacaoOperacional = AlocacaoOperacionalModel;
+
+export type AlocacaoOperacionalRelacao = Prisma.AlocacaoOperacionalGetPayload<{
+  include: {
+    operador: true;
+    gestor: true;
+    tagAtivo: { include: { ativo: true } };
+  };
+}>;
+
+export type AlocacaoOperacionalRelacaoParcial =
+  Prisma.AlocacaoOperacionalGetPayload<{
+    include: {
+      operador: { select: { id: true; cracha: true; nome: true } };
+      gestor: { select: { id: true; cracha: true; nome: true } };
+      tagAtivo: {
+        select: {
+          id: true;
+          codigo: true;
+          descricao: true;
+          ativo: {
+            include: {
+              tagAtivo: {
+                select: {
+                  id: true;
+                  descricao: true;
+                  modelo: true;
+                  setorId: true;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+  }>;
+
+export type AlocacaoListagem =
+  | AlocacaoOperacional
+  | AlocacaoOperacionalRelacao
+  | AlocacaoOperacionalRelacaoParcial;

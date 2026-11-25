@@ -1,0 +1,80 @@
+
+===== src/modules/gerador-turno/dto/response-gerador-turno.dto.ts =====
+
+import { Expose } from 'class-transformer';
+import type { TurnoVigente } from '@/utils/turno.util';
+
+export class ResponseTurnoDto {
+  @Expose() turno!: TurnoVigente;
+  @Expose() inicio!: string; // ex.: "14:00"
+  @Expose() fim!: string; // ex.: "22:00"
+  @Expose() timezone!: string; // ex.: "America/Sao_Paulo"
+  @Expose() consultadoEm!: string; // ISO 8601 (UTC)
+}
+
+===== src/modules/gerador-turno/entities/gerador-turno.entity.ts =====
+
+export class GeradorTurno {}
+
+===== src/modules/gerador-turno/gerador-turno.controller.ts =====
+
+import { Controller, Get } from '@nestjs/common';
+import { ResponseTurnoDto } from './dto/response-gerador-turno.dto';
+import { GeradorTurnoService } from './gerador-turno.service';
+import { plainToInstance } from 'class-transformer';
+
+@Controller('gerador-turno')
+export class GeradorTurnoController {
+  constructor(private readonly turnoService: GeradorTurnoService) {}
+
+  @Get('atual')
+  async getAtual(): Promise<ResponseTurnoDto> {
+    const turnoAtual = await this.turnoService.getTurnoAtual();
+    return plainToInstance(ResponseTurnoDto, turnoAtual);
+  }
+}
+
+===== src/modules/gerador-turno/gerador-turno.module.ts =====
+
+import { Module } from '@nestjs/common';
+import { GeradorTurnoService } from './gerador-turno.service';
+import { GeradorTurnoController } from './gerador-turno.controller';
+
+@Module({
+  controllers: [GeradorTurnoController],
+  providers: [GeradorTurnoService],
+  exports: [GeradorTurnoService],
+})
+export class GeradorTurnoModule {}
+
+===== src/modules/gerador-turno/gerador-turno.service.ts =====
+
+import {
+  FUSO_REFERENCIA,
+  obterFaixaTurno,
+  obterTurnoVigente,
+} from '@/utils/turno.util';
+import { Injectable } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { ResponseTurnoDto } from './dto/response-gerador-turno.dto';
+
+@Injectable()
+export class GeradorTurnoService {
+  async getTurnoAtual(): Promise<ResponseTurnoDto> {
+    const agora = new Date();
+    const turno = obterTurnoVigente(agora);
+    const faixa = obterFaixaTurno(turno);
+
+    return plainToInstance(ResponseTurnoDto, {
+      turno,
+      inicio: formatarHora(faixa.inicio),
+      fim: formatarHora(faixa.fim),
+      timezone: FUSO_REFERENCIA,
+      consultadoEm: agora.toISOString(),
+    });
+  }
+}
+
+function formatarHora(hora: number): string {
+  return `${String(hora).padStart(2, '0')}:00`;
+}

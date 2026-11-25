@@ -29,6 +29,16 @@ export class ResponseSolucoesRelacaoDto extends ResponseSolucoesDto {
   perfil!: ResponseSolucoesPerfilDto;
 }
 
+export class ResponseSolucoesPaginadaDto {
+  @Expose()
+  @Type(() => ResponseSolucoesRelacaoDto)
+  dados!: ResponseSolucoesRelacaoDto[];
+
+  @Expose() total!: number;
+  @Expose() pagina!: number;
+  @Expose() tamanho!: number;
+}
+
 export class ResponseSolucoesContadorDto {
   @Expose()
   total!: number;

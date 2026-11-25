@@ -36,6 +36,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { HttpRolesGuard } from './auth/guards/http-roles.guard';
 import { GeradorTurnoModule } from './modules/gerador-turno/gerador-turno.module';
 import { EficienciaOperacionalModule } from './modules/eficiencia-operacional/eficiencia-operacional.module';
+import { SolicitacoesModule } from './web-socket/solicitacoes/solicitacoes.module';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { EficienciaOperacionalModule } from './modules/eficiencia-operacional/ef
     EstadoAtivoModule,
     GeradorTurnoModule,
     EficienciaOperacionalModule,
+    SolicitacoesModule,
   ],
   controllers: [AppController],
   providers: [

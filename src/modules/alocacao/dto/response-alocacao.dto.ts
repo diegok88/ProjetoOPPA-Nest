@@ -20,7 +20,7 @@ export class ResponseAlocacaoAtivoDto {
   setor!: ResponseAlocacaoSetorDto;
 }
 
-export class ResponseAlocacaoTagAtivoDto { 
+export class ResponseAlocacaoTagAtivoDto {
   @Expose() id!: string;
   @Expose() descricao!: string;
   @Expose()
@@ -33,6 +33,12 @@ export class ResponseAlocacaoOperadorDto {
   @Expose() cracha!: number;
   @Expose() nome!: string;
   @Expose() turno!: TipoTurno;
+}
+
+export class ResponseAlocacaoGestorDto {
+  @Expose() id!: string;
+  @Expose() cracha!: number;
+  @Expose() nome!: string;
 }
 
 export class ResponseAlocacaoDto {
@@ -57,6 +63,10 @@ export class ResponseAlocacaoRelacaoDto extends ResponseAlocacaoDto {
   @Expose()
   @Type(() => ResponseAlocacaoOperadorDto)
   operador!: ResponseAlocacaoOperadorDto;
+
+  @Expose()
+  @Type(() => ResponseAlocacaoGestorDto)
+  gestor!: ResponseAlocacaoGestorDto;
 }
 
 export class ResponseAlocacaoPaginadaDto {

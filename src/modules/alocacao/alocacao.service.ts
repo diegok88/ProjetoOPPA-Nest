@@ -22,6 +22,7 @@ import {
 import {
   QueryAlocacaoOperacionalCounterDto,
   QueryAlocacaoOperacionalFilterDto,
+  QueryAlocacaoOperacionalSolicitacaoDto,
   QueryQuantidadeAlocacaoOperadorDto,
 } from './dto/query-alocacao.dto';
 import { QueryTagAtivoSetoresDto } from '../tag-ativo/dto/query-tag-ativo.dto';
@@ -443,6 +444,37 @@ export class AlocacaoService {
       this.logger.error(
         TYPES_NOTICES.SERVICE_FAILURE,
         ' - findOneAllocation()',
+      );
+      throw error;
+    }
+  }
+
+  async findOperatorRequest(
+    query: QueryAlocacaoOperacionalSolicitacaoDto,
+  ): Promise<AlocacaoOperacional> {
+    try {
+      const { gestorId, tagAtivoId, situacao } = query;
+
+      const condicao: Prisma.AlocacaoOperacionalWhereInput = {
+        situacao: situacao,
+        ...(gestorId !== undefined && { gestorId }),
+        ...(tagAtivoId !== undefined && { tagAtivoId }),
+      };
+
+      const operador = await this.prisma.client.alocacaoOperacional.findFirst({
+        where: condicao,
+        take: 1,
+        orderBy: { codigo: 'desc' },
+      });
+      if (!operador) {
+        this.logger.warn('Falha na busca do operador!');
+      }
+
+      return operador;
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - findOperatorSolicitacao()',
       );
       throw error;
     }

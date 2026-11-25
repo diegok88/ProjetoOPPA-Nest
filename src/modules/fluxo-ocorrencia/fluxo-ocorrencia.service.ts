@@ -10,10 +10,11 @@ import { PrismaService } from '@/prisma/prisma.service';
 import {
   FluxoOcorrencia,
   FluxoOcorrenciaListagem,
+  FluxoOcorrenciaRelacao,
 } from './entities/fluxo-ocorrencia.entity';
 import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
 import { QueryFluxoOcorrenciaFilterDto } from './dto/query-fluxo-ocorrencia.dto';
-import { Acao, Prisma } from '@/generated/prisma/client';
+import { Acao, CondicaoFluxo, Prisma } from '@/generated/prisma/client';
 import {
   ConsultaConfig,
   ConsultaFluxoOcorrencia,
@@ -21,6 +22,8 @@ import {
   DESVIOS,
 } from '@/constants/query-fluxo-ocorrencia.const';
 import { PaginatedResponse } from '@/interfaces/paginator.interface';
+import { PerfilService } from '../perfil/perfil.service';
+import { UsuarioService } from '../usuario/usuario.service';
 
 const LIMITE_LISTA_COMPLETA = 100;
 
@@ -28,7 +31,11 @@ const LIMITE_LISTA_COMPLETA = 100;
 export class FluxoOcorrenciaService {
   private logger = new Logger(FluxoOcorrenciaService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly perfilService: PerfilService,
+    private readonly usuarioService: UsuarioService,
+  ) {}
 
   async create(
     create: CreateFluxoOcorrenciaDto,
@@ -63,8 +70,9 @@ export class FluxoOcorrenciaService {
       if (filtros.dataInicial) periodo.gte = filtros.dataInicial;
       if (filtros.dataFinal) periodo.lte = filtros.dataFinal;
     }
-
+    if (filtros.dataFinal === undefined) condicao.dataFinal = null;
     if (filtros.duracao) condicao.duracao = filtros.duracao;
+    if (filtros.condicaoFluxo) condicao.condicaoFluxo = filtros.condicaoFluxo;
     if (filtros.status !== undefined) condicao.status = filtros.status;
 
     return condicao;
@@ -151,10 +159,10 @@ export class FluxoOcorrenciaService {
     try {
       const client = tx ?? this.prisma.client;
       const dados = this.toAssembleQuery(query);
-      this.logger.debug(dados);
+      //this.logger.debug(dados);
 
       const buscar = await client.fluxoOcorrencia.findFirst(dados);
-      this.logger.debug(buscar);
+      //this.logger.debug(buscar);
 
       if (!buscar) {
         this.logger.warn(TYPES_NOTICES.NOT_FOUND);
@@ -170,11 +178,16 @@ export class FluxoOcorrenciaService {
   async findOne(
     id: string,
     tx?: Prisma.TransactionClient,
-  ): Promise<FluxoOcorrencia> {
+  ): Promise<FluxoOcorrenciaRelacao> {
     try {
       const client = tx ?? this.prisma.client;
       const buscar = await client.fluxoOcorrencia.findUnique({
         where: { id: id },
+        include: {
+          ocorrencia: true,
+          usuario: true,
+          transferidoPerfil: true,
+        },
       });
 
       if (!buscar) {
@@ -191,17 +204,86 @@ export class FluxoOcorrenciaService {
 
   async update(
     id: string,
-    updateFluxoOcorrenciaDto: UpdateFluxoOcorrenciaDto,
+    update: UpdateFluxoOcorrenciaDto,
   ): Promise<FluxoOcorrencia> {
     try {
       const atualizarFluxoOcorrencia = await this.prisma.client.$transaction(
         async (tx: any) => {
-          await this.findOne(id, tx);
+          const fluxo = await this.findOne(id, tx);
+          const atualizarFluxo: Prisma.FluxoOcorrenciaUpdateInput = {};
 
+          if (!fluxo.dataInicial) {
+            atualizarFluxo.dataInicial = new Date();
+          }
+          if (!fluxo.usuarioId && update.usuarioId) {
+            const usuario = await this.usuarioService.findOne(
+              update.usuarioId!,
+            );
+            const perfilUsuario = usuario.perfilId!;
+            const perfilFluxo = fluxo.transferidoPerfilId;
+            if (
+              !perfilUsuario ||
+              !perfilFluxo ||
+              perfilUsuario !== perfilFluxo
+            ) {
+              this.logger.warn(
+                `Perfil não autorizado para o fluxo de ocorrência código ${fluxo.codigo}`,
+              );
+              throw new UnauthorizedException(
+                `Perfil não autorizado para o fluxo de ocorrência código ${fluxo.codigo}`,
+              );
+            }
+            atualizarFluxo.usuario = { connect: { id: update.usuarioId } };
+          }
+          if (
+            fluxo.condicaoFluxo === CondicaoFluxo.EXECUCAO &&
+            update.condicaoFluxo &&
+            fluxo.dataInicial
+          ) {
+            atualizarFluxo.dataFinal = new Date();
+            atualizarFluxo.duracao = Math.floor(
+              (Date.now() - fluxo.dataInicial.getTime()) / 1000,
+            );
+            atualizarFluxo.condicaoFluxo = CondicaoFluxo.FINALIZADO;
+          }
           const atualizar = await tx.fluxoOcorrencia.update({
             where: { id: id },
-            data: updateFluxoOcorrenciaDto,
+            data: atualizarFluxo,
           });
+
+          if (
+            atualizar.condicaoFluxo === CondicaoFluxo.FINALIZADO &&
+            atualizar.dataFinal &&
+            atualizar.transferidoPerfilId
+          ) {
+            this.logger.debug('Dentro da condicional criar novo fluxo');
+            const perfil = await this.perfilService.findOne(
+              atualizar.transferidoPerfilId,
+              tx,
+            );
+            let desPerfil: string;
+            if (perfil.descricao === 'OPERADOR') {
+              desPerfil = 'SUPERVISOR';
+            } else if (perfil.descricao === 'SUPERVISOR') {
+              desPerfil = 'MANUTENÇÃO';
+            } else if (perfil.descricao === 'MANUTENÇÃO') {
+              desPerfil = 'MANUTENÇÃO';
+            } else {
+              desPerfil = 'OPERADOR';
+            }
+
+            const perfilFluxo =
+              await this.perfilService.findDescription(desPerfil);
+            this.logger.debug(perfilFluxo);
+            if (perfilFluxo) {
+              const create = {
+                ocorrenciaId: atualizar.ocorrenciaId,
+                transferidoPerfilId: perfilFluxo.id,
+              } as CreateFluxoOcorrenciaDto;
+
+              await this.create(create, tx);
+            }
+          }
 
           return atualizar;
         },
@@ -211,6 +293,33 @@ export class FluxoOcorrenciaService {
       return atualizarFluxoOcorrencia;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
+      throw error;
+    }
+  }
+
+  async updateInternal(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<FluxoOcorrencia> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const fluxo = await this.findOne(id, client);
+      const atualizarFluxo: Prisma.FluxoOcorrenciaUpdateInput = {};
+      if (!fluxo.dataFinal && fluxo.dataInicial) {
+        atualizarFluxo.dataFinal = new Date();
+        atualizarFluxo.duracao = Math.floor(
+          (Date.now() - fluxo.dataInicial.getTime()) / 1000,
+        );
+        atualizarFluxo.condicaoFluxo = CondicaoFluxo.FINALIZADO;
+      }
+
+      const atualizar = await client.fluxoOcorrencia.update({
+        where: { id: id },
+        data: atualizarFluxo,
+      });
+      return atualizar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - updateInternal()');
       throw error;
     }
   }

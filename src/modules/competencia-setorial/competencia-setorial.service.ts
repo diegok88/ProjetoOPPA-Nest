@@ -1,3 +1,579 @@
+// import {
+//   Injectable,
+//   Logger,
+//   NotFoundException,
+//   UnauthorizedException,
+// } from '@nestjs/common';
+// import { CreateCompetenciaSetorialDto } from './dto/create-competencia-setorial.dto';
+// import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+// import { PrismaService } from '@/prisma/prisma.service';
+// import {
+//   CompetenciaSetorial,
+//   CompetenciaSetorialGestor,
+//   CompetenciaSetorialRelacao,
+// } from './entities/competencia-setorial.entity';
+// import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+// import { GestorService } from '../gestor/gestor.service';
+// import { Acao, Prisma, TipoTurno } from '@/generated/prisma/client';
+// import { QueryGestorFilterDto } from '../gestor/dto/query-gestor.dto';
+// import { QueryCompetenciaSetorialFilterDto } from './dto/query-competencia-setorial.dto';
+// import { Contador } from '@/interfaces/counter.interface';
+// import { SetoresCompetencia } from '../setores/entities/setores.entity';
+// import { UsuarioService } from '../usuario/usuario.service';
+// import { ResponseCompSetContadorSupDto } from './dto/response-competencia-setorial.dto';
+// import { TagAtivo } from '../tag-ativo/entities/tag-ativo.entity';
+
+// interface CompetenciaSetorialTags {
+//   id: string;
+//   codigo: number;
+//   descricao: string;
+//   desAtivo: string;
+// }
+
+// @Injectable()
+// export class CompetenciaSetorialService {
+//   private logger = new Logger(CompetenciaSetorialService.name);
+
+//   constructor(
+//     private readonly prisma: PrismaService,
+//     private readonly usuarioService: UsuarioService,
+//     private readonly gestorService: GestorService,
+//     private readonly tenantContext: TenantContextService,
+//   ) {}
+
+//   /*
+//     CRIAR COMPETÊNCIA SETORIAL:
+//     - create padrão para todos os registros do sistema.
+//   */
+//   async create(
+//     create: CreateCompetenciaSetorialDto,
+//   ): Promise<CompetenciaSetorial> {
+//     try {
+//       const criar = await this.prisma.client.$transaction(async (tx: any) => {
+//         const ctx = this.tenantContext.getStore()!;
+
+//         const usuario = await this.usuarioService.findOne(
+//           create.colaboradorId,
+//           tx,
+//         );
+//         /* verificação para não haver alocação de dois gestores do mesmo turno no setor */
+//         const queryCS: QueryCompetenciaSetorialFilterDto = {
+//           setorId: create.setorId,
+//           turno: usuario.turno!,
+//           status: true,
+//         };
+
+//         const alocacao = await this.findAll(queryCS, tx);
+//         if (alocacao.length > 0) {
+//           this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+//           throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+//         }
+
+//         /* busca o ultimo registro de competencia caso estiver ativo*/
+//         const ultimo = await this.findLast(
+//           usuario.id,
+//           create.setorId,
+//           true,
+//           tx,
+//         );
+
+//         /* inativa o registro de competencia */
+//         if (ultimo) {
+//           await this.deactive(ultimo.id, tx);
+//         }
+
+//         const gestorUltimo = await this.findLastDate(
+//           create.setorId,
+//           usuario.turno!,
+//           tx,
+//         );
+
+//         if (gestorUltimo) {
+//           /* query de consulta da lista de gestor */
+//           const queryU: QueryGestorFilterDto = {
+//             gestorId: gestorUltimo.colaboradorId,
+//             status: true,
+//           };
+
+//           /* busca a lista do gestor atual */
+//           const listaGestor = await this.gestorService.findAll(queryU, tx);
+//           /* lista somente dos ids do gestor atual */
+//           const ids = listaGestor
+//             .filter((lista) => lista.gestorId !== create.colaboradorId)
+//             .map((lista) => lista.colaboradorId);
+//           if (ids.length > 0) {
+//             /* inativa todos os colaboradores do gestor atual */
+//             await this.gestorService.deactiveAll(ids, tx);
+
+//             /* cria novo registro de gestor para os colaboradores cadastrador com gestor anterior */
+//             await this.gestorService.createAll(ids, create.colaboradorId, tx);
+//           }
+//         }
+
+//         /* verifica se o gestor alocado pertence a gestão do alocador */
+//         const gestor = await this.gestorService.findId(
+//           usuario.id,
+//           ctx.user,
+//           tx,
+//         );
+
+//         if (usuario.turno !== gestor.colaborador.turno) {
+//           this.logger.warn(TYPES_NOTICES.NOT_SHIFT);
+//           throw new UnauthorizedException(TYPES_NOTICES.NOT_SHIFT);
+//         }
+//         /* cria a nova competência */
+//         const criar = await tx.competenciaSetorial.create({
+//           data: { ...create, gestorId: ctx.user, turno: usuario.turno },
+//         });
+
+//         return criar;
+//       });
+//       this.logger.log(TYPES_NOTICES.CREATE);
+//       return criar;
+//     } catch (error) {
+//       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
+//       throw error;
+//     }
+//   }
+
+//   /*
+//   FUNÇÃO RETORNA AS COMPETÊNCIAS SETORIAIS:
+//   - retorna os competências alocadas.
+//   - sendo que possui um query para filtro.
+//   - variavel que determina os campos de retorno.
+//   - variavel que determina os dados que ira retornar da relação.
+//   */
+//   async findAll(
+//     query: QueryCompetenciaSetorialFilterDto,
+//     tx?: Prisma.TransactionClient,
+//   ): Promise<CompetenciaSetorialRelacao[]> {
+//     try {
+//       const ctx = this.tenantContext.getStore()!;
+//       this.logger.debug(query);
+
+//       let inclusao: boolean = false;
+
+//       const client = tx ?? this.prisma.client;
+
+//       const { campos, ...filtros } = query ?? {};
+
+//       const condicao: Prisma.CompetenciaSetorialWhereInput = {};
+//       if (filtros.colaboradorId) condicao.colaboradorId = filtros.colaboradorId;
+//       if (filtros.gestorId) condicao.gestorId = filtros.gestorId;
+//       if (filtros.setorId) condicao.setorId = filtros.setorId;
+//       if (filtros.turno) condicao.turno = filtros.turno;
+//       if (filtros.status !== undefined) condicao.status = filtros.status;
+//       // Validação separada para determinar o retorno de que tipo de dados
+//       if (filtros.gestor === true) condicao.colaboradorId = ctx.user;
+//       if (filtros.incluir) inclusao = true;
+
+//       const selecao = await this.buildSelect(campos);
+
+//       const opcoes: Prisma.CompetenciaSetorialFindManyArgs = {
+//         where: condicao,
+//         orderBy: { colaboradorId: 'asc' },
+//       };
+
+//       if (campos?.length) {
+//         opcoes.select = selecao;
+//       } else {
+//         opcoes.include =
+//           filtros.incluir === 'setores_parcial'
+//             ? { setor: { select: { id: true, codigo: true, descricao: true } } }
+//             : {
+//                 setor: {
+//                   include: {
+//                     ativoSetores: {
+//                       where: { status: true },
+//                       include: {
+//                         tagAtivo: true,
+//                       },
+//                     },
+//                   },
+//                 },
+//               };
+//       }
+
+//       const listar: CompetenciaSetorialRelacao[] =
+//         await client.competenciaSetorial.findMany(opcoes);
+
+//       return listar;
+//     } catch (error) {
+//       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+//       throw error;
+//     }
+//   }
+
+//   async findListTag(
+//     query: QueryCompetenciaSetorialFilterDto,
+//   ): Promise<CompetenciaSetorialTags[]> {
+//     try {
+//       const listar = await this.findAll(query);
+
+//       const listaTags: CompetenciaSetorialTags[] = listar.flatMap((comp) =>
+//         (comp.setor?.ativoSetores ?? []).flatMap((ativo) =>
+//           (ativo.tagAtivo ?? []).map((tag) => ({
+//             id: tag.id,
+//             codigo: tag.codigo,
+//             descricao: tag.descricao,
+//             desAtivo: ativo.descricao,
+//           })),
+//         ),
+//       );
+
+//       if (listar.length === 0) {
+//         this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+//       }
+
+//       this.logger.log(TYPES_NOTICES.FIND_ALL, listaTags);
+//       return listaTags;
+//     } catch (error) {
+//       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findListTag()');
+//       throw error;
+//     }
+//   }
+
+//   /*
+//   FUNÇÃO RETORNA OS SETORES QUE NÃO ESTÁ ALOCADOS:
+//   - retorna os setores que não possui alocação.
+//   - sendo parametro o id do colaborador que será alocado.
+//   - as condições possui o turno e o id do gestor.
+//   */
+//   async findSectionAvailable(id: string): Promise<SetoresCompetencia[]> {
+//     try {
+//       const ctx = this.tenantContext.getStore()!;
+
+//       const usuario = await this.usuarioService.findOne(id);
+
+//       const queryCS: QueryCompetenciaSetorialFilterDto = {
+//         gestorId: ctx.user,
+//         turno: usuario.turno!,
+//         status: true,
+//       };
+
+//       const competencia = await this.findAll(queryCS);
+//       const setoresOcupados = [
+//         ...new Set(
+//           competencia
+//             .filter((s) => s.gestorId === ctx.user)
+//             .map((s) => s.setorId),
+//         ),
+//       ];
+//       const condicao: Prisma.SetoresWhereInput = {
+//         ...(setoresOcupados.length ? { id: { notIn: setoresOcupados } } : {}),
+//         empresaId: ctx.empresa,
+//       };
+
+//       const setores = await this.prisma.setores.findMany({
+//         where: condicao,
+//         select: { id: true, codigo: true, descricao: true },
+//       });
+
+//       return setores;
+//     } catch (error) {
+//       this.logger.error(
+//         TYPES_NOTICES.SERVICE_FAILURE,
+//         ' - findSectionAvailable()',
+//       );
+//       throw error;
+//     }
+//   }
+
+//   /*
+//   FUNÇÃO CONTADOR DE COMPETENCIAS DE SETORIAL DO GESTOR LOGADO:
+//   - retorna a quantidade de competência setorial do gestor.
+//   - sendo parametro dentro da função.
+//   */
+//   async findCounterManager(): Promise<ResponseCompSetContadorSupDto> {
+//     try {
+//       const ctx = this.tenantContext.getStore()!;
+//       const condicao: Prisma.CompetenciaSetorialWhereInput = {
+//         colaboradorId: ctx.user,
+//         status: true,
+//       };
+//       const contador = await this.prisma.client.competenciaSetorial.count({
+//         where: condicao,
+//       });
+//       return { total: contador };
+//     } catch (error) {
+//       this.logger.error(
+//         TYPES_NOTICES.SERVICE_FAILURE,
+//         ' - findCounterManager()',
+//       );
+//       throw error;
+//     }
+//   }
+
+//   /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS */
+//   async counter(): Promise<Contador> {
+//     try {
+//       const ctx = this.tenantContext.getStore()?.user;
+
+//       const total = await this.prisma.competenciaSetorial.count({
+//         where: { gestorId: ctx },
+//       });
+//       const ativos = await this.prisma.competenciaSetorial.count({
+//         where: { gestorId: ctx, status: true },
+//       });
+//       const inativos = await this.prisma.competenciaSetorial.count({
+//         where: { gestorId: ctx, status: false },
+//       });
+
+//       this.logger.log(TYPES_NOTICES.COUNTER);
+//       return { total, ativos, inativos };
+//     } catch (error) {
+//       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+//       throw error;
+//     }
+//   }
+
+//   async findOne(
+//     id: string,
+//     tx?: Prisma.TransactionClient,
+//   ): Promise<CompetenciaSetorialRelacao> {
+//     try {
+//       const client = tx ?? this.prisma.client;
+//       const buscar = await client.competenciaSetorial.findUnique({
+//         where: { id: id },
+//         include: { setores: true },
+//       });
+//       if (!buscar) {
+//         this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+//         throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+//       }
+
+//       this.logger.log(TYPES_NOTICES.FIND_ONE);
+//       return buscar;
+//     } catch (error) {
+//       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
+//       throw error;
+//     }
+//   }
+
+//   async findLast(
+//     colaboradorId: string,
+//     setorId: string,
+//     status: boolean,
+//     tx?: Prisma.TransactionClient,
+//   ): Promise<CompetenciaSetorial> {
+//     try {
+//       const client = tx ?? this.prisma.client;
+
+//       const buscar = await client.competenciaSetorial.findFirst({
+//         where: {
+//           colaboradorId: colaboradorId,
+//           setorId: setorId,
+//           status: status,
+//         },
+//       });
+
+//       if (!buscar) {
+//         this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+//       }
+
+//       return buscar;
+//     } catch (error) {
+//       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDLAST');
+//       throw error;
+//     }
+//   }
+
+//   async findLastDate(
+//     setorId: string,
+//     turno: string,
+//     tx?: Prisma.TransactionClient,
+//   ): Promise<CompetenciaSetorial> {
+//     try {
+//       const client = tx ?? this.prisma.client;
+
+//       const ultimo = await client.competenciaSetorial.findFirst({
+//         where: { setorId: setorId, turno: turno, status: false },
+//         orderBy: { codigo: 'desc' },
+//       });
+
+//       return ultimo;
+//     } catch (error) {
+//       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDLASTDATE');
+//       throw error;
+//     }
+//   }
+
+//   async deactive(
+//     id: string,
+//     tx?: Prisma.TransactionClient,
+//   ): Promise<CompetenciaSetorial> {
+//     try {
+//       const client = tx ?? this.prisma.client;
+
+//       const inativar = await client.competenciaSetorial.update({
+//         where: { id: id },
+//         data: {
+//           inativadoEm: new Date(),
+//           status: false,
+//           _auditAction: Acao.DEACTIVATE,
+//         },
+//       });
+
+//       this.logger.log(TYPES_NOTICES.DEACTIVE);
+//       return inativar;
+//     } catch (error) {
+//       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE');
+//       throw error;
+//     }
+//   }
+
+//   async deactiveAll(
+//     ids: Array<string>,
+//     tx?: Prisma.TransactionClient,
+//   ): Promise<Prisma.BatchPayload> {
+//     try {
+//       const client = tx ?? this.prisma.client;
+
+//       const inativar = await client.competenciaSetorial.updateMany({
+//         where: { id: { in: ids } },
+//         data: {
+//           status: false,
+//           _auditAction: Acao.DEACTIVATE,
+//         },
+//       });
+
+//       this.logger.log(TYPES_NOTICES.ACTIVE_MANY);
+//       return inativar;
+//     } catch (error) {
+//       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE-ALL');
+//       throw error;
+//     }
+//   }
+
+//   async remove(id: string): Promise<CompetenciaSetorial> {
+//     try {
+//       const deletarSetores = await this.prisma.client.$transaction(
+//         async (tx: any) => {
+//           const verificar = await this.findOne(id, tx);
+
+//           if (verificar.status) {
+//             this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+//             throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+//           }
+
+//           const deletar = await tx.competenciaSetorial.delete({
+//             where: { id: id },
+//           });
+
+//           return deletar;
+//         },
+//       );
+
+//       this.logger.log(TYPES_NOTICES.DELETE);
+//       return deletarSetores;
+//     } catch (error) {
+//       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
+//       throw error;
+//     }
+//   }
+
+//   // METODO DE CONSULTA DINAMICA
+//   private readonly allowedCompetenciaSetorialFiels = [
+//     'id',
+//     'colaboradorId',
+//     'gestorId',
+//     'setorId',
+//     'setor',
+//     'turno',
+//     'status',
+//   ];
+
+//   private async buildSelect(
+//     campos?: string,
+//   ): Promise<Record<string, true> | undefined> {
+//     if (!campos) return undefined;
+
+//     const campoArray = campos.split(',').map((c) => c.trim());
+//     const selecaoObj = {};
+
+//     for (const campo of campoArray) {
+//       if (this.allowedCompetenciaSetorialFiels.includes(campo)) {
+//         selecaoObj[campo] = true;
+//       }
+//     }
+
+//     return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
+//   }
+
+//   async findSetoresDoGestor(): Promise<CompetenciaSetorialGestor[]> {
+//     try {
+//       const ctx = this.tenantContext.getStore()!;
+
+//       const competencias =
+//         await this.prisma.client.competenciaSetorial.findMany({
+//           where: { colaboradorId: ctx.user, status: true },
+//           orderBy: { codigo: 'desc' },
+//           select: {
+//             setorId: true,
+//             turno: true,
+//             setor: { select: { id: true, codigo: true, descricao: true } },
+//           },
+//         });
+
+//       const mapa = new Map<string, CompetenciaSetorialGestor>();
+//       for (const c of competencias) {
+//         if (!c.setor || mapa.has(c.setorId)) continue;
+//         mapa.set(c.setorId, {
+//           setorId: c.setorId,
+//           codigo: c.setor.codigo,
+//           descricao: c.setor.descricao,
+//           turno: c.turno as TipoTurno,
+//           totalAtivos: 0,
+//           produzindo: 0,
+//           parado: 0,
+//           falha: 0,
+//         });
+//       }
+
+//       const setores = [...mapa.values()];
+//       if (setores.length === 0) {
+//         this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+//         return [];
+//       }
+
+//       const abertos = await this.prisma.client.estadoAtivo.findMany({
+//         where: {
+//           status: true,
+//           tagAtivo: {
+//             ativo: { setorId: { in: setores.map((s) => s.setorId) } },
+//           },
+//         },
+//         select: {
+//           tipoEstado: true,
+//           tagAtivo: { select: { ativo: { select: { setorId: true } } } },
+//         },
+//       });
+
+//       for (const estado of abertos) {
+//         const setorId = estado.tagAtivo?.ativo?.setorId;
+//         if (!setorId) continue;
+//         const alvo = mapa.get(setorId);
+//         if (!alvo) continue;
+
+//         const tipo = String(estado.tipoEstado).toUpperCase();
+//         alvo.totalAtivos += 1;
+//         if (tipo === 'PRODUZINDO') alvo.produzindo += 1;
+//         if (tipo === 'PARADA') alvo.parado += 1;
+//         if (tipo === 'FALHA') alvo.falha += 1;
+//       }
+
+//       this.logger.log(TYPES_NOTICES.FIND_ALL);
+//       return setores.sort((a, b) => a.descricao.localeCompare(b.descricao));
+//     } catch (error) {
+//       this.logger.error(
+//         TYPES_NOTICES.SERVICE_FAILURE,
+//         ' - findSetoresDoGestor()',
+//       );
+//       throw error;
+//     }
+//   }
+// }
+
 import {
   Injectable,
   Logger,
@@ -19,7 +595,17 @@ import { QueryCompetenciaSetorialFilterDto } from './dto/query-competencia-setor
 import { Contador } from '@/interfaces/counter.interface';
 import { SetoresCompetencia } from '../setores/entities/setores.entity';
 import { UsuarioService } from '../usuario/usuario.service';
-import { ResponseCompSetContadorSupDto } from './dto/response-competencia-setorial.dto';
+import {
+  ResponseCompSetContadorSupDto,
+  ResponseSetorGestorDto,
+} from './dto/response-competencia-setorial.dto';
+
+interface CompetenciaSetorialTags {
+  id: string;
+  codigo: number;
+  descricao: string;
+  desAtivo: string;
+}
 
 @Injectable()
 export class CompetenciaSetorialService {
@@ -47,13 +633,13 @@ export class CompetenciaSetorialService {
           create.colaboradorId,
           tx,
         );
+
         /* verificação para não haver alocação de dois gestores do mesmo turno no setor */
         const queryCS: QueryCompetenciaSetorialFilterDto = {
           setorId: create.setorId,
           turno: usuario.turno!,
           status: true,
         };
-
         const alocacao = await this.findAll(queryCS, tx);
         if (alocacao.length > 0) {
           this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
@@ -85,17 +671,16 @@ export class CompetenciaSetorialService {
             gestorId: gestorUltimo.colaboradorId,
             status: true,
           };
-
           /* busca a lista do gestor atual */
           const listaGestor = await this.gestorService.findAll(queryU, tx);
           /* lista somente dos ids do gestor atual */
           const ids = listaGestor
             .filter((lista) => lista.gestorId !== create.colaboradorId)
             .map((lista) => lista.colaboradorId);
+
           if (ids.length > 0) {
             /* inativa todos os colaboradores do gestor atual */
             await this.gestorService.deactiveAll(ids, tx);
-
             /* cria novo registro de gestor para os colaboradores cadastrador com gestor anterior */
             await this.gestorService.createAll(ids, create.colaboradorId, tx);
           }
@@ -107,11 +692,11 @@ export class CompetenciaSetorialService {
           ctx.user,
           tx,
         );
-
         if (usuario.turno !== gestor.colaborador.turno) {
           this.logger.warn(TYPES_NOTICES.NOT_SHIFT);
           throw new UnauthorizedException(TYPES_NOTICES.NOT_SHIFT);
         }
+
         /* cria a nova competência */
         const criar = await tx.competenciaSetorial.create({
           data: { ...create, gestorId: ctx.user, turno: usuario.turno },
@@ -119,6 +704,7 @@ export class CompetenciaSetorialService {
 
         return criar;
       });
+
       this.logger.log(TYPES_NOTICES.CREATE);
       return criar;
     } catch (error) {
@@ -127,7 +713,7 @@ export class CompetenciaSetorialService {
     }
   }
 
-  /* 
+  /*
   FUNÇÃO RETORNA AS COMPETÊNCIAS SETORIAIS:
   - retorna os competências alocadas.
   - sendo que possui um query para filtro.
@@ -140,11 +726,10 @@ export class CompetenciaSetorialService {
   ): Promise<CompetenciaSetorialRelacao[]> {
     try {
       const ctx = this.tenantContext.getStore()!;
+      this.logger.debug(query);
 
       let inclusao: boolean = false;
-
       const client = tx ?? this.prisma.client;
-
       const { campos, ...filtros } = query ?? {};
 
       const condicao: Prisma.CompetenciaSetorialWhereInput = {};
@@ -170,17 +755,23 @@ export class CompetenciaSetorialService {
         opcoes.include =
           filtros.incluir === 'setores_parcial'
             ? { setor: { select: { id: true, codigo: true, descricao: true } } }
-            : { setor: inclusao };
+            : {
+                setor: {
+                  include: {
+                    ativoSetores: {
+                      where: { status: true },
+                      include: {
+                        tagAtivo: true,
+                      },
+                    },
+                  },
+                },
+              };
       }
 
       const listar: CompetenciaSetorialRelacao[] =
         await client.competenciaSetorial.findMany(opcoes);
 
-      if (listar.length === 0) {
-        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
-      }
-
-      this.logger.log(TYPES_NOTICES.FIND_ALL);
       return listar;
     } catch (error) {
       this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
@@ -188,7 +779,122 @@ export class CompetenciaSetorialService {
     }
   }
 
-  /* 
+  async findListTag(
+    query: QueryCompetenciaSetorialFilterDto,
+  ): Promise<CompetenciaSetorialTags[]> {
+    try {
+      const listar = await this.findAll(query);
+
+      const listaTags: CompetenciaSetorialTags[] = listar.flatMap((comp) =>
+        (comp.setor?.ativoSetores ?? []).flatMap((ativo) =>
+          (ativo.tagAtivo ?? []).map((tag) => ({
+            id: tag.id,
+            codigo: tag.codigo,
+            descricao: tag.descricao,
+            desAtivo: ativo.descricao,
+          })),
+        ),
+      );
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL, listaTags);
+      return listaTags;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findListTag()');
+      throw error;
+    }
+  }
+
+  /*
+    SETORES SOB COMPETÊNCIA DO GESTOR LOGADO (tela inicial do mobile):
+    - uma linha por setor (dedupe por setorId, preserva o turno mais recente)
+    - contadores de ativos em execução por setor
+    - caminho do setor no estado: estado.tagAtivo.ativo.setorId
+  */
+  async findSetoresDoGestor(): Promise<ResponseSetorGestorDto[]> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+
+      const competencias =
+        await this.prisma.client.competenciaSetorial.findMany({
+          where: { colaboradorId: ctx.user, status: true },
+          orderBy: { codigo: 'desc' },
+          select: {
+            setorId: true,
+            turno: true,
+            setor: { select: { id: true, codigo: true, descricao: true } },
+          },
+        });
+
+      const mapa = new Map<string, ResponseSetorGestorDto>();
+
+      for (const competencia of competencias) {
+        if (!competencia.setor) continue;
+        if (mapa.has(competencia.setorId)) continue;
+
+        mapa.set(competencia.setorId, {
+          setorId: competencia.setorId,
+          codigo: competencia.setor.codigo,
+          descricao: competencia.setor.descricao,
+          turno: String(competencia.turno),
+          totalAtivos: 0,
+          produzindo: 0,
+          parado: 0,
+          falha: 0,
+        });
+      }
+
+      const setores = [...mapa.values()];
+
+      if (setores.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+        return [];
+      }
+
+      /* Estados abertos dos setores — tagAtivo.ativo.setorId */
+      const abertos = await this.prisma.client.estadoAtivo.findMany({
+        where: {
+          status: true,
+          tagAtivo: {
+            ativo: { setorId: { in: setores.map((s) => s.setorId) } },
+          },
+        },
+        select: {
+          tipoEstado: true,
+          tagAtivo: { select: { ativo: { select: { setorId: true } } } },
+        },
+      });
+
+      for (const estado of abertos) {
+        const setorId = estado.tagAtivo?.ativo?.setorId;
+        if (!setorId) continue;
+
+        const alvo = mapa.get(setorId);
+        if (!alvo) continue;
+
+        const tipo = String(estado.tipoEstado).toUpperCase();
+        alvo.totalAtivos += 1;
+        if (tipo === 'PRODUZINDO') alvo.produzindo += 1;
+        if (tipo === 'PARADA') alvo.parado += 1;
+        if (tipo === 'FALHA') alvo.falha += 1;
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+
+      return setores.sort((a, b) => a.descricao.localeCompare(b.descricao));
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - findSetoresDoGestor()',
+      );
+      throw error;
+    }
+  }
+
+  /*
   FUNÇÃO RETORNA OS SETORES QUE NÃO ESTÁ ALOCADOS:
   - retorna os setores que não possui alocação.
   - sendo parametro o id do colaborador que será alocado.
@@ -197,7 +903,6 @@ export class CompetenciaSetorialService {
   async findSectionAvailable(id: string): Promise<SetoresCompetencia[]> {
     try {
       const ctx = this.tenantContext.getStore()!;
-
       const usuario = await this.usuarioService.findOne(id);
 
       const queryCS: QueryCompetenciaSetorialFilterDto = {
@@ -207,6 +912,7 @@ export class CompetenciaSetorialService {
       };
 
       const competencia = await this.findAll(queryCS);
+
       const setoresOcupados = [
         ...new Set(
           competencia
@@ -214,12 +920,13 @@ export class CompetenciaSetorialService {
             .map((s) => s.setorId),
         ),
       ];
+
       const condicao: Prisma.SetoresWhereInput = {
         ...(setoresOcupados.length ? { id: { notIn: setoresOcupados } } : {}),
         empresaId: ctx.empresa,
       };
 
-      const setores = await this.prisma.setores.findMany({
+      const setores = await this.prisma.client.setores.findMany({
         where: condicao,
         select: { id: true, codigo: true, descricao: true },
       });
@@ -234,7 +941,7 @@ export class CompetenciaSetorialService {
     }
   }
 
-  /* 
+  /*
   FUNÇÃO CONTADOR DE COMPETENCIAS DE SETORIAL DO GESTOR LOGADO:
   - retorna a quantidade de competência setorial do gestor.
   - sendo parametro dentro da função.
@@ -242,13 +949,16 @@ export class CompetenciaSetorialService {
   async findCounterManager(): Promise<ResponseCompSetContadorSupDto> {
     try {
       const ctx = this.tenantContext.getStore()!;
+
       const condicao: Prisma.CompetenciaSetorialWhereInput = {
         colaboradorId: ctx.user,
         status: true,
       };
+
       const contador = await this.prisma.client.competenciaSetorial.count({
         where: condicao,
       });
+
       return { total: contador };
     } catch (error) {
       this.logger.error(
@@ -264,13 +974,13 @@ export class CompetenciaSetorialService {
     try {
       const ctx = this.tenantContext.getStore()?.user;
 
-      const total = await this.prisma.competenciaSetorial.count({
+      const total = await this.prisma.client.competenciaSetorial.count({
         where: { gestorId: ctx },
       });
-      const ativos = await this.prisma.competenciaSetorial.count({
+      const ativos = await this.prisma.client.competenciaSetorial.count({
         where: { gestorId: ctx, status: true },
       });
-      const inativos = await this.prisma.competenciaSetorial.count({
+      const inativos = await this.prisma.client.competenciaSetorial.count({
         where: { gestorId: ctx, status: false },
       });
 
@@ -288,10 +998,12 @@ export class CompetenciaSetorialService {
   ): Promise<CompetenciaSetorialRelacao> {
     try {
       const client = tx ?? this.prisma.client;
+
       const buscar = await client.competenciaSetorial.findUnique({
         where: { id: id },
         include: { setores: true },
       });
+
       if (!buscar) {
         this.logger.warn(TYPES_NOTICES.NOT_FOUND);
         throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);

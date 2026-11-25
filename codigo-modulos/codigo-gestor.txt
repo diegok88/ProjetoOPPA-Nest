@@ -1,0 +1,798 @@
+
+===== src/modules/gestor/dto/create-gestor.dto.ts =====
+
+export class CreateGestorDto {}
+
+===== src/modules/gestor/dto/query-gestor.dto.ts =====
+
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsOptional, IsString, IsUUID } from 'class-validator';
+
+export class QueryGestorFilterDto {
+  @IsOptional()
+  @IsUUID('all', { message: 'Colaborador id não é do tipo UUID!' })
+  colaboradorId?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Gestor id não é do tipo UUID!' })
+  gestorId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
+  status?: boolean;
+
+  @IsOptional()
+  @IsString({ message: 'Campos não é do tipo String.' })
+  campos?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Include não é do tipo String.' })
+  incluir?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'Gestor não é do tipo Boolean!' })
+  gestor?: boolean;
+}
+
+===== src/modules/gestor/dto/response-gestor.dto.ts =====
+
+import { TipoTurno } from '@/generated/prisma/enums';
+import {
+  ResponseUsuarioDto,
+  ResponseUsuarioGestorParcialDto,
+} from '@/modules/usuario/dto/response-usuario.dto';
+import { Expose, Type } from 'class-transformer';
+
+/* RETORNO DOS DADOS DO GESTOR */
+export class ResponseGestorDto {
+  @Expose()
+  id!: string;
+
+  @Expose()
+  colaboradorId!: string;
+
+  @Expose()
+  gestorId!: string;
+
+  @Expose()
+  status!: boolean;
+}
+
+/* RETORNO DOS DADOS DO USUARIO ATRAVES DA RELAÇÃO DOS IDS gestorId E colaboradorId */
+export class ResponseGestorRelacoesDto extends ResponseGestorDto {
+  @Expose()
+  @Type(() => ResponseUsuarioDto)
+  colaborador?: ResponseUsuarioDto;
+
+  @Expose()
+  @Type(() => ResponseUsuarioDto)
+  gestor?: ResponseUsuarioDto;
+}
+
+/* AS DUAS RELAÇÕES PARCIAIS (corrigi o typo "Pacial" para "Parcial") */
+export class ResponseGestorRelacoesParcialDto extends ResponseGestorDto {
+  @Expose()
+  @Type(() => ResponseUsuarioGestorParcialDto)
+  colaborador?: ResponseUsuarioGestorParcialDto;
+
+  @Expose()
+  @Type(() => ResponseUsuarioGestorParcialDto)
+  gestor?: ResponseUsuarioGestorParcialDto;
+}
+
+/* A ROTA findOneUser: colaborador completo, gestor parcial */
+export class ResponseGestorUsuarioDto extends ResponseGestorDto {
+  @Expose()
+  @Type(() => ResponseUsuarioDto)
+  colaborador?: ResponseUsuarioDto;
+
+  @Expose()
+  @Type(() => ResponseUsuarioGestorParcialDto)
+  gestor?: ResponseUsuarioGestorParcialDto;
+}
+
+/* DTO DO CONTADOR: retorna total, ativos e inativos */
+export class ResponseGestorContadorDto {
+  @Expose()
+  total!: number;
+
+  @Expose()
+  ativos!: number;
+
+  @Expose()
+  inativos!: number;
+}
+
+/* RETORNO PARA A LISTAGEM DE USUARIOS POR GESTOR - competencia setoial */
+export class ResponseUsuarioGestorCompetenciaDto {
+  @Expose()
+  cracha!: number | null;
+
+  @Expose()
+  nome!: string | null;
+
+  @Expose()
+  turno!: TipoTurno;
+}
+
+export class ResponseGestorCompetenciaRelacaoDto extends ResponseGestorDto {
+  @Expose()
+  @Type(() => ResponseUsuarioGestorCompetenciaDto)
+  colaborador?: ResponseUsuarioGestorCompetenciaDto;
+}
+
+export class ResponseGestorManagerContadorDto {
+  @Expose() total!: number;
+  @Expose() penalidades!: number;
+  @Expose() dispensas!: number;
+}
+
+===== src/modules/gestor/dto/update-gestor.dto.ts =====
+
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateGestorDto } from './create-gestor.dto';
+
+export class UpdateGestorDto extends PartialType(CreateGestorDto) {}
+
+===== src/modules/gestor/entities/gestor.entity.ts =====
+
+import { Gestor as GestorModel, Prisma } from '@/generated/prisma/client';
+
+export type Gestor = GestorModel;
+
+export type GestorRelacoes = Prisma.GestorGetPayload<{
+  include: {
+    colaborador: true;
+    gestor: true;
+  };
+}>;
+
+export type GestorComRelacoes = Prisma.GestorGetPayload<{
+  include: {
+    colaborador: { select: { id: true; cracha: true; nome: true } };
+    gestor: { select: { id: true; cracha: true; nome: true } };
+  };
+}>;
+
+export type GestorUsuario = Prisma.GestorGetPayload<{
+  include: {
+    colaborador: {
+      include: {
+        perfil: { select: { descricao: true; nivel: true } };
+        empresa: { select: { razaoSocial: true } };
+      };
+    };
+    gestor: { select: { cracha: true; nome: true } };
+  };
+}>;
+
+export type GestorColaborador = Prisma.GestorGetPayload<{
+  include: {
+    colaborador: { select: { id: true; cracha: true; nome: true } };
+  };
+}>;
+
+export type GestorListagem = Gestor | GestorComRelacoes | GestorUsuario;
+
+===== src/modules/gestor/gestor.controller.ts =====
+
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { GestorService } from './gestor.service';
+import { QueryGestorFilterDto } from './dto/query-gestor.dto';
+import {
+  ResponseGestorCompetenciaRelacaoDto,
+  ResponseGestorContadorDto,
+  ResponseGestorDto,
+  ResponseGestorManagerContadorDto,
+  ResponseGestorRelacoesDto,
+  ResponseGestorRelacoesParcialDto,
+  ResponseGestorUsuarioDto,
+} from './dto/response-gestor.dto';
+import { plainToInstance } from 'class-transformer';
+import { ROLES } from '@/auth/guards/roles.const';
+import { Roles } from '@/auth/guards/roles.decorator';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
+
+@Controller('gestor')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
+export class GestorController {
+  constructor(private readonly gestorService: GestorService) {}
+
+  @Get()
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async findAll(
+    @Query() query: QueryGestorFilterDto,
+  ): Promise<ResponseGestorRelacoesParcialDto[]> {
+    const dados = await this.gestorService.findAll(query);
+    return plainToInstance(ResponseGestorRelacoesParcialDto, dados);
+  }
+
+  @Get('gestor_colaborador')
+  @Roles(ROLES.ASN1)
+  async findAllGestor(
+    @Query() query: QueryGestorFilterDto,
+  ): Promise<ResponseGestorRelacoesDto[]> {
+    const dados = await this.gestorService.findAllGestor(query);
+    return plainToInstance(ResponseGestorRelacoesDto, dados);
+  }
+
+  @Get('list')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async findAllGestorParcial(
+    @Query() query: QueryGestorFilterDto,
+  ): Promise<ResponseGestorRelacoesParcialDto[]> {
+    const dados = await this.gestorService.findAllGestorParcial(query);
+    return plainToInstance(ResponseGestorRelacoesParcialDto, dados);
+  }
+
+  @Get('list_competencia')
+  @Roles(ROLES.ASN1, ROLES.GER1)
+  async findAllGestorCompetencia(
+    @Query() query: QueryGestorFilterDto,
+  ): Promise<ResponseGestorCompetenciaRelacaoDto[]> {
+    const dados = await this.gestorService.findAllGestor(query);
+    return plainToInstance(ResponseGestorCompetenciaRelacaoDto, dados);
+  }
+
+  @Get('counter')
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async counter(): Promise<ResponseGestorContadorDto> {
+    const contador = await this.gestorService.counter();
+    return plainToInstance(ResponseGestorContadorDto, contador);
+  }
+
+  @Get('counter_manager')
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async counterManager(): Promise<ResponseGestorManagerContadorDto> {
+    const contador = await this.gestorService.counterManager();
+    return plainToInstance(ResponseGestorManagerContadorDto, contador);
+  }
+
+  @Get(':id')
+  @Roles(ROLES.ASN1)
+  async findOne(@Param('id') id: string): Promise<ResponseGestorDto> {
+    const dado = this.gestorService.findOne(id);
+    return plainToInstance(ResponseGestorDto, dado);
+  }
+
+  @Get('findOneUser/:id')
+  @Roles(ROLES.ASN1)
+  async findOneUser(
+    @Param('id') id: string,
+  ): Promise<ResponseGestorUsuarioDto> {
+    const dado = this.gestorService.findOneUser(id);
+    return plainToInstance(ResponseGestorUsuarioDto, dado);
+  }
+}
+
+===== src/modules/gestor/gestor.module.ts =====
+
+import { forwardRef, Module } from '@nestjs/common';
+import { GestorService } from './gestor.service';
+import { GestorController } from './gestor.controller';
+import { PerfilModule } from '../perfil/perfil.module';
+
+@Module({
+  imports: [forwardRef(() => PerfilModule)],
+  controllers: [GestorController],
+  providers: [GestorService],
+  exports: [GestorService],
+})
+export class GestorModule {}
+
+===== src/modules/gestor/gestor.service.ts =====
+
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { Prisma } from '@/generated/prisma/client';
+import { Acao } from '@/generated/prisma/enums';
+import { PrismaService } from '@/prisma/prisma.service';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { QueryGestorFilterDto } from './dto/query-gestor.dto';
+import {
+  Gestor,
+  GestorListagem,
+  GestorRelacoes,
+  GestorUsuario,
+} from './entities/gestor.entity';
+import {
+  ResponseGestorManagerContadorDto,
+  ResponseGestorRelacoesParcialDto,
+} from './dto/response-gestor.dto';
+import { Contador } from '@/interfaces/counter.interface';
+import { PerfilService } from '../perfil/perfil.service';
+import { ROLES } from '@/auth/guards/roles.const';
+
+export interface IntervaloMesAtual {
+  primeiroDia: Date;
+  ultimoDia: Date;
+}
+
+@Injectable()
+export class GestorService {
+  private logger = new Logger(GestorService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly perfilService: PerfilService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
+
+  /* 
+    CRIAR GESTOR ATRAVES DE UMA LISTA:
+    - função interna em conjunto com a competencia setorial.
+    - somente autorizado para gestores de equipe
+  */
+
+  async createAll(
+    ids: Array<string>,
+    gestorId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Prisma.BatchPayload> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const criar = await client.gestor.createMany({
+        data: ids.map((colaboradorId) => ({ colaboradorId, gestorId })),
+        skipDuplicates: true,
+      });
+
+      return criar;
+    } catch (error) {
+      this.logger.log(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATEALL');
+      throw error;
+    }
+  }
+
+  /* 
+    LISTAR GESTORES: 
+    - lista todos os registros.
+    - possui um filtro se necessario.
+  */
+  async findAll(
+    query: QueryGestorFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<GestorListagem[]> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+
+      const buscarPerfil = await this.perfilService.findOne(ctx.perfil, tx);
+      const perfil = `${buscarPerfil.descricao} - ${buscarPerfil.nivel}`;
+
+      const client = tx ?? this.prisma.client;
+
+      const { campos, ...filtros } = query ?? {};
+
+      this.logger.debug(query);
+
+      const condicao: Prisma.GestorWhereInput = {};
+      if (filtros.colaboradorId) condicao.colaboradorId = filtros.colaboradorId;
+      if (filtros.gestorId) condicao.gestorId = filtros.gestorId;
+      if (filtros.status) condicao.status = filtros.status;
+      if (filtros.gestor === true) condicao.gestorId = ctx.user;
+      else if (filtros.gestor === false) {
+        if (perfil === ROLES.ADN1) {
+          const filtroUsuario: Prisma.GestorWhereInput['gestor'] = {};
+          if (!filtroUsuario.empresaId) filtroUsuario.empresaId = ctx.empresa;
+          if (Object.keys(filtroUsuario).length > 0)
+            condicao.gestor = filtroUsuario;
+        }
+      }
+
+      this.logger.debug(condicao);
+
+      const selecao = await this.buildSelect(campos);
+
+      const INCLUDES: Record<string, Prisma.GestorInclude> = {
+        todos_relacoes: { colaborador: true, gestor: true },
+        todos_parcial: {
+          colaborador: { select: { id: true, cracha: true, nome: true } },
+          gestor: { select: { id: true, cracha: true, nome: true } },
+        },
+        colaborador_parcial: {
+          colaborador: { select: { id: true, cracha: true, nome: true } },
+        },
+        gestor_usuario: {
+          colaborador: {
+            include: {
+              perfil: { select: { descricao: true, nivel: true } },
+              empresa: { select: { razaoSocial: true } },
+            },
+          },
+          gestor: { select: { cracha: true, nome: true } },
+        },
+      };
+
+      const opcoes: Prisma.GestorFindManyArgs = {
+        where: condicao,
+        orderBy: { colaborador: { cracha: 'asc' } },
+      };
+
+      if (campos?.length) {
+        opcoes.select = selecao;
+      } else {
+        const incluir =
+          filtros.incluir && INCLUDES[filtros.incluir]
+            ? INCLUDES[filtros.incluir]
+            : undefined;
+
+        if (incluir) opcoes.include = incluir;
+      }
+
+      const listar: Gestor[] = await client.gestor.findMany(opcoes);
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findall');
+      throw error;
+    }
+  }
+
+  /* 
+    LISTAR GESTORES APENAS TESTE: 
+    - lista todos os registro de colaboradores e seus gestores com relação de entidades.
+    - possui um filtro se necessario.
+  */
+  async findAllGestor(query: QueryGestorFilterDto): Promise<GestorRelacoes[]> {
+    try {
+      const condicao: Prisma.GestorWhereInput = {};
+      if (query.colaboradorId) condicao.colaboradorId = query.colaboradorId;
+      if (query.gestorId) condicao.gestorId = query.gestorId;
+      if (query.status) condicao.status = query.status;
+
+      condicao.gestorId = this.tenantContext.getStore()?.user;
+
+      const listar = await this.prisma.gestor.findMany({
+        where: condicao,
+        include: {
+          colaborador: true,
+          gestor: true,
+        },
+      });
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findall');
+      throw error;
+    }
+  }
+
+  /* 
+    LISTAR GESTORES APENAS TESTE: 
+    - lista todos os registro de colaboradores e seus gestores com relação de entidades.
+    - possui um filtro se necessario.
+    - apenas retorna os dados escolhidos
+  */
+  async findAllGestorParcial(
+    query: QueryGestorFilterDto,
+  ): Promise<ResponseGestorRelacoesParcialDto[]> {
+    try {
+      const condicao: Prisma.GestorWhereInput = {};
+      if (query.colaboradorId) condicao.colaboradorId = query.colaboradorId;
+      if (query.gestorId) condicao.gestorId = query.gestorId;
+      if (query.status !== undefined) condicao.status = query.status;
+
+      condicao.gestorId = this.tenantContext.getStore()?.user;
+
+      const listar = await this.prisma.gestor.findMany({
+        where: condicao,
+        include: {
+          colaborador: { select: { id: true, cracha: true, nome: true } },
+          gestor: { select: { id: true, cracha: true, nome: true } },
+        },
+        orderBy: { colaborador: { nome: 'asc' } },
+      });
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findall');
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS */
+  async counter(): Promise<Contador> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+
+      const grupos = await this.prisma.gestor.groupBy({
+        by: ['status'],
+        where: { gestorId: ctx.user },
+        _count: { _all: true },
+      });
+
+      const ativos = grupos.find((g) => g.status === true)?._count._all ?? 0;
+      const inativos = grupos.find((g) => g.status === false)?._count._all ?? 0;
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return { total: ativos + inativos, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - counter()');
+      throw error;
+    }
+  }
+
+  /* 
+  FUNÇÃO CONTADOR DE REGISTROS PARA DASHBOARD DO GESTOR 
+  - Retorna total de colaboradores.
+  - Retorna penalidades e dispensas em execução.
+  */
+  async counterManager(): Promise<ResponseGestorManagerContadorDto> {
+    try {
+      const ctx = this.tenantContext.getStore()!;
+      const datas = await this.obterIntervaloMesAtual();
+
+      const condicaoT: Prisma.GestorWhereInput = {
+        gestorId: ctx.user,
+        status: true,
+      };
+
+      const condicaoP: Prisma.GestorWhereInput = {
+        gestorId: ctx.user,
+        status: true,
+        colaborador: {
+          status: true,
+          penalidadeComoColaborador: {
+            some: {
+              status: true,
+              dataInicial: { lte: datas.ultimoDia },
+              dataFinal: { gte: datas.primeiroDia },
+            },
+          },
+        },
+      };
+
+      const condicaoD: Prisma.GestorWhereInput = {
+        gestorId: ctx.user,
+        status: true,
+        colaborador: {
+          status: true,
+          dispensaComoColaborador: {
+            some: {
+              status: true,
+              dataInicial: { lte: datas.ultimoDia },
+              dataFinal: { gte: datas.primeiroDia },
+            },
+          },
+        },
+      };
+
+      const [totalColaboradores, penalidades, dispensas] = await Promise.all([
+        await this.prisma.client.gestor.count({ where: condicaoT }),
+        await this.prisma.client.gestor.count({ where: condicaoP }),
+        await this.prisma.client.gestor.count({ where: condicaoD }),
+      ]);
+
+      return {
+        total: totalColaboradores,
+        penalidades,
+        dispensas,
+      };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - counterManager()');
+      throw error;
+    }
+  }
+
+  /* 
+  FUNÇÃO QUE RETORNA DATAS: 
+  - Retorna datas baseados no dia atual.
+  - Retorna o primeiro e ultimo dia do mês atual.
+  */
+  private async obterIntervaloMesAtual(): Promise<IntervaloMesAtual> {
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = hoje.getMonth();
+
+    return {
+      primeiroDia: new Date(ano, mes, 1, 0, 0, 0, 0),
+      ultimoDia: new Date(ano, mes + 1, 0, 23, 59, 59, 999),
+    };
+  }
+
+  /* 
+    BUSCAR GESTOR POR ID:
+    - busca o registro do gestor atraves do id.
+  */
+  async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Gestor> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const buscar = await client.gestor.findUnique({
+        where: { id: id },
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ONE);
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.FIND_ONE, ' - findone');
+      throw error;
+    }
+  }
+
+  async findOneUser(id: string): Promise<GestorUsuario> {
+    try {
+      const buscar = await this.prisma.gestor.findUnique({
+        where: { id: id },
+        include: {
+          colaborador: {
+            include: {
+              perfil: { select: { descricao: true, nivel: true } },
+              empresa: { select: { razaoSocial: true } },
+            },
+          },
+          gestor: { select: { id: true, cracha: true, nome: true } },
+        },
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      return buscar as GestorUsuario;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.FIND_ONE, ' - FindOneUser');
+      throw error;
+    }
+  }
+  /* 
+    BUSCA ID: 
+    - função que busca o id do registro atraves de parametros.
+    - função interna
+  */
+  async findId(
+    colId: string,
+    gesId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<GestorRelacoes> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const buscar = await client.gestor.findFirst({
+        where: {
+          colaboradorId: colId,
+          gestorId: gesId,
+        },
+        include: {
+          colaborador: true,
+          gestor: true,
+        },
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ONE);
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findid');
+      throw error;
+    }
+  }
+
+  /* 
+    ATIVAR GESTORES:
+    - ativa todos os gestores de acordo com a empresa que os mesmos pertencem.
+  */
+  async activeAll(
+    ids: Array<string>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Prisma.BatchPayload> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const ativar = await client.gestor.updateMany({
+        where: { colaboradorId: { in: ids } },
+        data: { status: true, _auditAction: Acao.ACTIVE },
+      });
+
+      this.logger.log(TYPES_NOTICES.ACTIVE_MANY);
+      return ativar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - activeall');
+      throw error;
+    }
+  }
+
+  /* 
+    INATIVAR GESTORES:
+    - inativa todos os gestores de acordo com a empresa que os mesmos pertencem.
+  */
+  async deactiveAll(
+    ids: Array<string>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Prisma.BatchPayload> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const inativar = await client.gestor.updateMany({
+        where: { colaboradorId: { in: ids } },
+        data: { status: false, _auditAction: Acao.DEACTIVATE },
+      });
+
+      this.logger.log(TYPES_NOTICES.DEACTIVE_MANY);
+      return inativar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - deactiveall');
+      throw error;
+    }
+  }
+
+  /* 
+    REMOVER TODOS OS GESTORES:
+    - função interna.
+    - usada em conjunto com a função de remoção de usuario, de acordo com a remoção da empresa.
+  */
+  async removeAll(
+    ids: Array<string>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Prisma.BatchPayload> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const remover = await client.gestor.deleteMany({
+        where: { colaboradorId: { in: ids } },
+      });
+
+      this.logger.log(TYPES_NOTICES.DELETE_MANY);
+      return remover;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - removeall');
+      throw error;
+    }
+  }
+
+  private readonly allowedGestorFiels = [
+    'id',
+    'colaboradorId',
+    'gestorId',
+    'status',
+  ];
+
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedGestorFiels.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
+  }
+}

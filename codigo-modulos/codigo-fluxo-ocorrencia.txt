@@ -1,0 +1,578 @@
+
+===== src/modules/fluxo-ocorrencia/dto/create-fluxo-ocorrencia.dto.ts =====
+
+import { IsUUID, IsNotEmpty, IsDate, IsInt, Min } from 'class-validator';
+
+export class CreateFluxoOcorrenciaDto {
+  @IsUUID('all', { message: 'Ocorrência id inválida.' })
+  @IsNotEmpty({ message: 'A ocorrência é um campo obrigatório.' })
+  ocorrenciaId!: string;
+
+  @IsUUID('all', { message: 'O transferidoPerfilId é inválido.' })
+  @IsNotEmpty({ message: 'O transferidoPerfilId é um campo obrigatório.' })
+  transferidoPerfilId!: string;
+}
+
+===== src/modules/fluxo-ocorrencia/dto/query-fluxo-ocorrencia.dto.ts =====
+
+import {
+  IsBoolean,
+  IsDate,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  fimDoDiaBrasilia,
+  inicioDoDiaBrasilia,
+} from '@/utils/data-brasilia.util';
+import {
+  CONSULTAS,
+  DESVIOS,
+  type ConsultaFluxoOcorrencia,
+  type RecorteFluxoOcorrencia,
+} from '@/constants/query-fluxo-ocorrencia.const';
+
+export class QueryFluxoOcorrenciaFilterDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Código deve ser um número inteiro.' })
+  @Min(1, { message: 'Código deve ser maior que zero.' })
+  codigo?: number;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Ocorrência id inválida.' })
+  ocorrenciaId?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Usuário perfil id inválida.' })
+  usuarioId?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Tansferido perfil id inválida.' })
+  transferidoPerfilId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => inicioDoDiaBrasilia(value))
+  @IsDate({ message: 'DataInicial não está em formato de data válido!' })
+  dataInicial?: Date;
+
+  @IsOptional()
+  @Transform(({ value }) => fimDoDiaBrasilia(value))
+  @IsDate({ message: 'DataFinal não está em formato de data válido!' })
+  dataFinal?: Date;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Código deve ser um número inteiro.' })
+  @Min(1, { message: 'Código deve ser maior que zero.' })
+  duracao?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return value;
+  })
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
+  status?: boolean;
+
+  /* Condições de retorno dos dados */
+  @IsOptional()
+  @IsIn(Object.keys(CONSULTAS), { message: 'Consulta não reconhecida.' })
+  consulta?: ConsultaFluxoOcorrencia;
+
+  @IsOptional()
+  @IsIn(Object.keys(DESVIOS), { message: 'Desvio não reconhecida.' })
+  desvios?: RecorteFluxoOcorrencia;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Página deve ser um número inteiro.' })
+  @Min(1, { message: 'Página deve ser maior que zero.' })
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Tamanho deve ser um número inteiro.' })
+  @Min(1)
+  @Max(100, { message: 'Tamanho máximo é 100.' })
+  size?: number = 10;
+}
+
+===== src/modules/fluxo-ocorrencia/dto/response-fluxo-ocorrencia.dto.ts =====
+
+import { Expose, Type } from 'class-transformer';
+
+export class ResponseFluxoOcorrenciaPerfilDto {
+  @Expose() id!: string;
+  @Expose() descricao!: string;
+  @Expose() nivel!: string;
+}
+
+export class ResponseFluxoOcorrenciaDto {
+  @Expose() id!: string;
+  @Expose() codigo!: number;
+  @Expose() ocorrenciaId!: string;
+  @Expose() usuarioId!: string;
+  @Expose() transferidoPerfilId!: string;
+  @Expose() dataInicial!: Date;
+  @Expose() dataFinal!: Date;
+  @Expose() duracao!: number;
+  @Expose() status!: boolean;
+}
+
+export class ResponseFluxoOcorrenciaRelacaoDto extends ResponseFluxoOcorrenciaDto {
+  @Expose()
+  @Type(() => ResponseFluxoOcorrenciaPerfilDto)
+  transferidoPerfil!: ResponseFluxoOcorrenciaPerfilDto;
+}
+
+export class ResponseFluxoOcorrenciaPaginadaDto {
+  @Expose()
+  @Type(() => ResponseFluxoOcorrenciaRelacaoDto)
+  dados!: ResponseFluxoOcorrenciaRelacaoDto[];
+
+  @Expose() total!: number;
+  @Expose() pagina!: number;
+  @Expose() tamanho!: number;
+}
+
+===== src/modules/fluxo-ocorrencia/dto/update-fluxo-ocorrencia.dto.ts =====
+
+import { IsOptional, IsUUID } from 'class-validator';
+
+export class UpdateFluxoOcorrenciaDto {
+  @IsOptional()
+  @IsUUID('all', { message: 'Usuário id inválido.' })
+  usuarioId?: string;
+}
+
+===== src/modules/fluxo-ocorrencia/entities/fluxo-ocorrencia.entity.ts =====
+
+import {
+  FluxoOcorrencia as FluxoOcorrenciaModel,
+  Prisma,
+} from '@/generated/prisma/client';
+
+export type FluxoOcorrencia = FluxoOcorrenciaModel;
+
+export type FluxoOcorrenciaRelacao = Prisma.FluxoOcorrenciaGetPayload<{
+  include: {
+    ocorrencia: true;
+    usuario: true;
+    transferidoPerfil: true;
+  };
+}>;
+
+export type FluxoOcorrenciaListagem = FluxoOcorrencia | FluxoOcorrenciaRelacao;
+
+===== src/modules/fluxo-ocorrencia/fluxo-ocorrencia.controller.ts =====
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import { FluxoOcorrenciaService } from './fluxo-ocorrencia.service';
+import { CreateFluxoOcorrenciaDto } from './dto/create-fluxo-ocorrencia.dto';
+import { UpdateFluxoOcorrenciaDto } from './dto/update-fluxo-ocorrencia.dto';
+import {
+  ResponseFluxoOcorrenciaDto,
+  ResponseFluxoOcorrenciaPaginadaDto,
+  ResponseFluxoOcorrenciaRelacaoDto,
+} from './dto/response-fluxo-ocorrencia.dto';
+import { plainToInstance } from 'class-transformer';
+import { ROLES } from '@/auth/guards/roles.const';
+import { Roles } from '@/auth/guards/roles.decorator';
+import { QueryFluxoOcorrenciaFilterDto } from './dto/query-fluxo-ocorrencia.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
+
+@Controller('fluxo-ocorrencia')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
+export class FluxoOcorrenciaController {
+  constructor(
+    private readonly fluxoOcorrenciaService: FluxoOcorrenciaService,
+  ) {}
+
+  @Post()
+  @Roles(ROLES.ASN1)
+  async create(
+    @Body() createFluxoOcorrenciaDto: CreateFluxoOcorrenciaDto,
+  ): Promise<ResponseFluxoOcorrenciaDto> {
+    const dado = await this.fluxoOcorrenciaService.create(
+      createFluxoOcorrenciaDto,
+    );
+    return plainToInstance(ResponseFluxoOcorrenciaDto, dado);
+  }
+
+  @Get()
+  @Roles(ROLES.ASN1, ROLES.TER1)
+  async findAllPagination(
+    @Query() query: QueryFluxoOcorrenciaFilterDto,
+  ): Promise<ResponseFluxoOcorrenciaPaginadaDto> {
+    const resultado =
+      await this.fluxoOcorrenciaService.findAllPagination(query);
+    return plainToInstance(ResponseFluxoOcorrenciaPaginadaDto, resultado);
+  }
+
+  @Get('listar')
+  @Roles(ROLES.ASN1, ROLES.TER1)
+  async findAllList(
+    @Query() query: QueryFluxoOcorrenciaFilterDto,
+  ): Promise<ResponseFluxoOcorrenciaRelacaoDto[]> {
+    const resultado = await this.fluxoOcorrenciaService.findAllList(query);
+    return plainToInstance(ResponseFluxoOcorrenciaRelacaoDto, resultado);
+  }
+
+  @Get('unico')
+  @Roles(ROLES.ASN1, ROLES.TER1)
+  async findOneFirst(
+    @Query() query: QueryFluxoOcorrenciaFilterDto,
+  ): Promise<ResponseFluxoOcorrenciaRelacaoDto> {
+    const registro = await this.fluxoOcorrenciaService.findOneFirst(query);
+    return plainToInstance(ResponseFluxoOcorrenciaRelacaoDto, registro);
+  }
+
+  @Get(':id')
+  @Roles(ROLES.ASN1)
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseFluxoOcorrenciaRelacaoDto> {
+    const dado = await this.fluxoOcorrenciaService.findOne(id);
+    return plainToInstance(ResponseFluxoOcorrenciaRelacaoDto, dado);
+  }
+
+  @Patch(':id')
+  @Roles(ROLES.ASN1, ROLES.TER1)
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateFluxoOcorrenciaDto: UpdateFluxoOcorrenciaDto,
+  ): Promise<ResponseFluxoOcorrenciaDto> {
+    const dado = await this.fluxoOcorrenciaService.update(
+      id,
+      updateFluxoOcorrenciaDto,
+    );
+    return plainToInstance(ResponseFluxoOcorrenciaDto, dado);
+  }
+
+  @Patch('deactive/:id')
+  @Roles(ROLES.ASN1)
+  async deactive(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseFluxoOcorrenciaDto> {
+    const dado = await this.fluxoOcorrenciaService.deactive(id);
+    return plainToInstance(ResponseFluxoOcorrenciaDto, dado);
+  }
+
+  @Delete(':id')
+  @Roles(ROLES.ASN1)
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseFluxoOcorrenciaDto> {
+    const dado = await this.fluxoOcorrenciaService.remove(id);
+    return plainToInstance(ResponseFluxoOcorrenciaDto, dado);
+  }
+}
+
+===== src/modules/fluxo-ocorrencia/fluxo-ocorrencia.module.ts =====
+
+import { forwardRef, Module } from '@nestjs/common';
+import { FluxoOcorrenciaService } from './fluxo-ocorrencia.service';
+import { FluxoOcorrenciaController } from './fluxo-ocorrencia.controller';
+import { PerfilModule } from '../perfil/perfil.module';
+
+@Module({
+  imports: [forwardRef(() => PerfilModule)],
+  controllers: [FluxoOcorrenciaController],
+  providers: [FluxoOcorrenciaService],
+  exports: [FluxoOcorrenciaService],
+})
+export class FluxoOcorrenciaModule {}
+
+===== src/modules/fluxo-ocorrencia/fluxo-ocorrencia.service.ts =====
+
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { CreateFluxoOcorrenciaDto } from './dto/create-fluxo-ocorrencia.dto';
+import { UpdateFluxoOcorrenciaDto } from './dto/update-fluxo-ocorrencia.dto';
+import { PrismaService } from '@/prisma/prisma.service';
+import {
+  FluxoOcorrencia,
+  FluxoOcorrenciaListagem,
+} from './entities/fluxo-ocorrencia.entity';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+import { QueryFluxoOcorrenciaFilterDto } from './dto/query-fluxo-ocorrencia.dto';
+import { Acao, Prisma } from '@/generated/prisma/client';
+import {
+  ConsultaConfig,
+  ConsultaFluxoOcorrencia,
+  CONSULTAS,
+  DESVIOS,
+} from '@/constants/query-fluxo-ocorrencia.const';
+import { PaginatedResponse } from '@/interfaces/paginator.interface';
+
+const LIMITE_LISTA_COMPLETA = 100;
+
+@Injectable()
+export class FluxoOcorrenciaService {
+  private logger = new Logger(FluxoOcorrenciaService.name);
+
+  constructor(private prisma: PrismaService) {}
+
+  async create(
+    create: CreateFluxoOcorrenciaDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<FluxoOcorrencia> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const criar = await client.fluxoOcorrencia.create({
+        data: create,
+      });
+      this.logger.log(TYPES_NOTICES.CREATE);
+      return criar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
+      throw error;
+    }
+  }
+
+  private toAssembleCondicao(
+    filtros: QueryFluxoOcorrenciaFilterDto,
+  ): Prisma.FluxoOcorrenciaWhereInput {
+    const condicao: Prisma.FluxoOcorrenciaWhereInput = {};
+
+    if (filtros.codigo) condicao.ocorrencia = { codigo: filtros.codigo };
+    if (filtros.ocorrenciaId) condicao.ocorrenciaId = filtros.ocorrenciaId;
+    if (filtros.usuarioId) condicao.usuarioId = filtros.usuarioId;
+    if (filtros.transferidoPerfilId)
+      condicao.transferidoPerfilId = filtros.transferidoPerfilId;
+
+    if (filtros.dataInicial || filtros.dataFinal) {
+      const periodo: Prisma.DateTimeNullableFilter = {};
+      if (filtros.dataInicial) periodo.gte = filtros.dataInicial;
+      if (filtros.dataFinal) periodo.lte = filtros.dataFinal;
+    }
+
+    if (filtros.duracao) condicao.duracao = filtros.duracao;
+    if (filtros.status !== undefined) condicao.status = filtros.status;
+
+    return condicao;
+  }
+
+  private resolverConfig(consulta?: ConsultaFluxoOcorrencia): ConsultaConfig {
+    return consulta ? CONSULTAS[consulta] : CONSULTAS.fluxo_padrao;
+  }
+
+  private toAssembleQuery(
+    query: QueryFluxoOcorrenciaFilterDto,
+  ): Prisma.FluxoOcorrenciaFindManyArgs {
+    const desvios = query.desvios ? DESVIOS[query.desvios]() : undefined;
+    const filtros = this.toAssembleCondicao(query);
+
+    return {
+      ...this.resolverConfig(query.consulta),
+      where: desvios ? { AND: [desvios, filtros] } : filtros,
+    };
+  }
+
+  async findAllPagination(
+    query: QueryFluxoOcorrenciaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<PaginatedResponse<FluxoOcorrenciaListagem>> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const pagina = query.page ?? 1;
+      const tamanho = query.size ?? 10;
+      const base = this.toAssembleQuery(query);
+
+      const [listar, total] = await client.$transaction([
+        client.fluxoOcorrencia.findMany({
+          ...base,
+          skip: (pagina - 1) * tamanho,
+          take: tamanho,
+        }),
+        client.fluxoOcorrencia.count({ where: base.where }),
+      ]);
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return { dados: listar, total, pagina, tamanho };
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - findAllPagination()',
+      );
+      throw error;
+    }
+  }
+
+  async findAllList(
+    query: QueryFluxoOcorrenciaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<FluxoOcorrenciaListagem[]> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const listar = await client.fluxoOcorrencia.findMany({
+        ...this.toAssembleQuery(query),
+        take: LIMITE_LISTA_COMPLETA,
+      });
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+
+      return listar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findAllList()');
+      throw error;
+    }
+  }
+
+  async findOneFirst(
+    query: QueryFluxoOcorrenciaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<FluxoOcorrenciaListagem | null> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const dados = this.toAssembleQuery(query);
+      this.logger.debug(dados);
+
+      const buscar = await client.fluxoOcorrencia.findFirst(dados);
+      this.logger.debug(buscar);
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findOneFirst()');
+      throw error;
+    }
+  }
+
+  async findOne(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<FluxoOcorrencia> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const buscar = await client.fluxoOcorrencia.findUnique({
+        where: { id: id },
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
+      throw error;
+    }
+  }
+
+  async update(
+    id: string,
+    updateFluxoOcorrenciaDto: UpdateFluxoOcorrenciaDto,
+  ): Promise<FluxoOcorrencia> {
+    try {
+      const atualizarFluxoOcorrencia = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          await this.findOne(id, tx);
+
+          const atualizar = await tx.fluxoOcorrencia.update({
+            where: { id: id },
+            data: updateFluxoOcorrenciaDto,
+          });
+
+          return atualizar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.UPDATE);
+      return atualizarFluxoOcorrencia;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
+      throw error;
+    }
+  }
+
+  async deactive(id: string): Promise<FluxoOcorrencia> {
+    try {
+      const inativarFluxoOcorrencia = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (!verificar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_DEACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_DEACTIVE);
+          }
+
+          const inativar = await tx.fluxoOcorrencia.update({
+            where: { id: id },
+            data: { status: false, _auditAction: Acao.DEACTIVATE },
+          });
+
+          return inativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
+      return inativarFluxoOcorrencia;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE');
+      throw error;
+    }
+  }
+
+  async remove(id: string): Promise<FluxoOcorrencia> {
+    try {
+      const removerFluxoOcorrencia = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (verificar.status) {
+            this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+            throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+          }
+
+          const remover = await tx.fluxoOcorrencia.delete({
+            where: { id: id },
+          });
+
+          return remover;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return removerFluxoOcorrencia;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
+      throw error;
+    }
+  }
+}

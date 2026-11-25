@@ -9,6 +9,12 @@ export const CONSULTAS = {
   ocorrencia_padrao: {
     orderBy: [{ dataInicial: 'desc' }],
   },
+  ocorrencia_falhas: {
+    orderBy: [{ dataInicial: 'desc' }],
+    include: {
+      falhas: true,
+    },
+  },
   ocorrencia_completo: {
     orderBy: [{ dataInicial: 'desc' }],
     include: {

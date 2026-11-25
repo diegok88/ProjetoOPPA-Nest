@@ -7,9 +7,9 @@ import {
   ResponseAuthDto,
   ResponseAuthMessageDto,
   ResponseLoginDto,
+  ResponseUsuarioAutenticar,
 } from './dto/response-auth.dto';
 import { Public } from './guards/public.decorator';
-import { TenantContextService } from './tenant-context/tenant-context.service';
 import {
   AutenticarAcaoDto,
   LoginColaboradorDto,
@@ -70,9 +70,9 @@ export class AuthController {
   @Post('autenticar')
   async AutenticarAcao(
     @Body() autenticar: AutenticarAcaoDto,
-  ): Promise<boolean> {
+  ): Promise<ResponseUsuarioAutenticar> {
     const autenticado = await this.authService.authenticateAction(autenticar);
-    return autenticado;
+    return plainToInstance(ResponseUsuarioAutenticar, autenticado);
   }
 
   @Get('profile')

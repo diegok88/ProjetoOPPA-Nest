@@ -136,6 +136,7 @@ export class PerfilService {
   // BUSCAR PERFIL PELO ID
   async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Perfil> {
     try {
+      this.logger.debug(id);
       const client = tx ?? this.prisma.client;
       const buscar = await client.perfil.findUnique({
         where: { id: id },
@@ -161,6 +162,7 @@ export class PerfilService {
     try {
       const buscar = await this.prisma.perfil.findFirst({
         where: { descricao: descricao },
+        take: 1,
       });
 
       if (!buscar) {

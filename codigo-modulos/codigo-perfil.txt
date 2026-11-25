@@ -1,0 +1,607 @@
+
+===== src/modules/perfil/dto/create-perfil.dto.ts =====
+
+import { Transform } from 'class-transformer';
+import { IsNotEmpty, IsString, Length, Matches } from 'class-validator';
+
+export class CreatePerfilDto {
+  @IsString({ message: 'A descrição deve ser do tipo string.' })
+  @IsNotEmpty({ message: 'A descrição não deve estar vazio.' })
+  @Length(5, 100, {
+    message:
+      'A descrição deve conter no minimo 5 caracteres e no maximo 100 caracteres.',
+  })
+  @Matches(/^[a-zA-ZÀ-ÿ\s]+$/, {
+    message:
+      'A descrição deve conter letras maisculas e minusculas, sem numeros e caracteres especiais.',
+  })
+  @Transform(({ value }) => value.toUpperCase())
+  descricao!: string;
+
+  @IsString({ message: 'O nivel deve ser do tipo string.' })
+  @IsNotEmpty({ message: 'O nivel não deve estar vazio.' })
+  @Matches(/^[a-zA-Z0-9\s]+$/, {
+    message: 'O nivel deve conter apenas letras e números',
+  })
+  @Transform(({ value }) => value.toUpperCase())
+  nivel!: string;
+}
+
+===== src/modules/perfil/dto/query-perfil.dto.ts =====
+
+import {
+  IsBoolean,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+
+export class QueryPerfilFilterDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Código não é do tipo Inteiro!' })
+  @IsNumber({}, { message: 'Código não é do tipo Number!' })
+  codigo?: number;
+
+  @IsOptional()
+  @IsString({ message: 'A descrição deve ser do tipo string.' })
+  @Transform(({ value }) => value.toUpperCase())
+  descricao?: string;
+
+  @IsOptional()
+  @IsString({ message: 'O nivel deve ser do tipo string.' })
+  @Transform(({ value }) => value.toUpperCase())
+  nivel?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined ? undefined : value === 'true' || value === true,
+  )
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
+  status?: boolean;
+
+  @IsOptional()
+  @IsString({ message: 'O campo deve ser do tipo string.' })
+  campos?: string;
+}
+
+===== src/modules/perfil/dto/response-perfil.dto.ts =====
+
+import { OmitType } from '@nestjs/mapped-types';
+import { Expose } from 'class-transformer';
+
+export class ResponsePerfilDto {
+  @Expose()
+  id!: string;
+
+  @Expose()
+  codigo!: number;
+
+  @Expose()
+  descricao!: string;
+
+  @Expose()
+  nivel!: string;
+
+  @Expose()
+  status!: boolean;
+}
+
+export class ResponsePerfilListDto extends OmitType(ResponsePerfilDto, [
+  'status',
+] as const) {}
+
+export class ResponsePerfilContadorDto {
+  @Expose()
+  total!: number;
+
+  @Expose()
+  ativos!: number;
+
+  @Expose()
+  inativos!: number;
+}
+
+===== src/modules/perfil/dto/update-perfil.dto.ts =====
+
+import { PartialType } from '@nestjs/mapped-types';
+import { CreatePerfilDto } from './create-perfil.dto';
+
+export class UpdatePerfilDto extends PartialType(CreatePerfilDto) {}
+
+===== src/modules/perfil/entities/perfil.entity.ts =====
+
+import { Perfil as PerfilModel } from '@/generated/prisma/client';
+
+export type Perfil = PerfilModel;
+
+/* CONSTANTE QUE DETERMINA A RESTRIÇÃO DE RETORNO DOS DADOS */
+export const MAPA_VISIBILIDADE: Record<string, string[]> = {
+  ASSISTENCIA: [
+    'ASSISTENCIA',
+    'ADMINISTRADOR',
+    'GERENTE',
+    'SUPERVISOR',
+    'OPERADOR',
+  ],
+  ADMINISTRADOR: ['ADMINISTRADOR', 'GERENTE'],
+  GERENTE: ['SUPERVISOR'],
+  SUPERVISOR: ['OPERADOR'],
+};
+
+===== src/modules/perfil/perfil.controller.ts =====
+
+import { ROLES } from '@/auth/guards/roles.const';
+import { Roles } from '@/auth/guards/roles.decorator';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { CreatePerfilDto } from './dto/create-perfil.dto';
+import { QueryPerfilFilterDto } from './dto/query-perfil.dto';
+import {
+  ResponsePerfilContadorDto,
+  ResponsePerfilDto,
+  ResponsePerfilListDto,
+} from './dto/response-perfil.dto';
+import { UpdatePerfilDto } from './dto/update-perfil.dto';
+import { PerfilService } from './perfil.service';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
+
+@Controller('perfil')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
+export class PerfilController {
+  constructor(private readonly perfilService: PerfilService) {}
+
+  // CRIAR PERFIL
+  @Post()
+  @Roles(ROLES.ASN1)
+  async create(
+    @Body() createPerfilDto: CreatePerfilDto,
+  ): Promise<ResponsePerfilDto> {
+    const dado = await this.perfilService.create(createPerfilDto);
+    return plainToInstance(ResponsePerfilDto, dado);
+  }
+
+  // LISTAR TODOS OS PERFIS
+  @Get()
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async findAll(
+    @Query() query: QueryPerfilFilterDto,
+  ): Promise<ResponsePerfilDto[]> {
+    const dados = await this.perfilService.findAll(query);
+    return plainToInstance(ResponsePerfilDto, dados);
+  }
+
+  // LISTAR TODOS OS DADOS PARA TABELA LIST - RETORNA APENAS id, descrição e nivel
+  @Get('list')
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async findAllList(
+    @Query() query: QueryPerfilFilterDto,
+  ): Promise<ResponsePerfilListDto[]> {
+    const dados = await this.perfilService.findAll(query);
+    return plainToInstance(ResponsePerfilListDto, dados);
+  }
+
+  // CONTADOR DE REGISTROS TOTAIS, ATIVOS E INATIVOS
+  @Get('counter')
+  @Roles(ROLES.ASN1)
+  async counter(): Promise<ResponsePerfilContadorDto> {
+    const contador = await this.perfilService.counter();
+    return plainToInstance(ResponsePerfilContadorDto, contador);
+  }
+
+  // BUSCAR PERFIL PELO ID
+  @Get(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponsePerfilDto> {
+    const dado = await this.perfilService.findOne(id);
+    return plainToInstance(ResponsePerfilDto, dado);
+  }
+
+  // ATUALIZAÇÃO DO PERFIL PELO ID
+  @Patch(':id')
+  @Roles(ROLES.ASN1)
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updatePerfilDto: UpdatePerfilDto,
+  ): Promise<ResponsePerfilDto> {
+    const dado = await this.perfilService.update(id, updatePerfilDto);
+    return plainToInstance(ResponsePerfilDto, dado);
+  }
+
+  // ATIVAÇÃO DO PERFIL PELO ID
+  @Patch('active/:id')
+  @Roles(ROLES.ASN1)
+  async active(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponsePerfilDto> {
+    const dado = await this.perfilService.active(id);
+    return plainToInstance(ResponsePerfilDto, dado);
+  }
+
+  // INATIVAÇÃO DO PERFIL PELO ID
+  @Patch('deactive/:id')
+  @Roles(ROLES.ASN1)
+  async deactive(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponsePerfilDto> {
+    const dado = await this.perfilService.deactive(id);
+    return plainToInstance(ResponsePerfilDto, dado);
+  }
+
+  // DELETE DO PERFIL PELO ID
+  @Delete(':id')
+  @Roles(ROLES.ASN1)
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponsePerfilDto> {
+    const dado = await this.perfilService.remove(id);
+    return plainToInstance(ResponsePerfilDto, dado);
+  }
+}
+
+===== src/modules/perfil/perfil.module.ts =====
+
+import { forwardRef, Module } from '@nestjs/common';
+import { PerfilService } from './perfil.service';
+import { PerfilController } from './perfil.controller';
+import { UsuarioOrquestradorModule } from '@/services-orchestrator/usuario/usuario-orquestrador.module';
+
+@Module({
+  imports: [UsuarioOrquestradorModule],
+  controllers: [PerfilController],
+  providers: [PerfilService],
+  exports: [PerfilService],
+})
+export class PerfilModule {}
+
+===== src/modules/perfil/perfil.service.ts =====
+
+import { Prisma } from '@/generated/prisma/client';
+import { Acao } from '@/generated/prisma/enums';
+import { PrismaService } from '@/prisma/prisma.service';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { CreatePerfilDto } from './dto/create-perfil.dto';
+import { UpdatePerfilDto } from './dto/update-perfil.dto';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+import { MAPA_VISIBILIDADE, Perfil } from './entities/perfil.entity';
+import { QueryPerfilFilterDto } from './dto/query-perfil.dto';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import { Contador } from '@/interfaces/counter.interface';
+import { QueryUsuarioFilterDto } from '../usuario/dto/query-usuario.dto';
+import { UsuarioOrquestradorService } from '@/services-orchestrator/usuario/usuario-orquestrador.service';
+
+@Injectable()
+export class PerfilService {
+  private logger = new Logger(PerfilService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly usuarioOrq: UsuarioOrquestradorService,
+    private readonly tennant: TenantContextService,
+  ) {}
+
+  // CRIAR PERFIL
+  async create(createPerfilDto: CreatePerfilDto): Promise<Perfil> {
+    try {
+      const criar = await this.prisma.client.perfil.create({
+        data: createPerfilDto,
+      });
+
+      this.logger.log(TYPES_NOTICES.CREATE);
+      return criar;
+    } catch (error) {
+      this.logger.log(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
+      throw error;
+    }
+  }
+
+  // LISTAR PERFIS
+  async findAll(
+    query: QueryPerfilFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Perfil[]> {
+    try {
+      const ctx = this.tennant.getStore()!;
+      const client = tx ?? this.prisma.client;
+
+      const { campos, ...filtros } = query ?? {};
+
+      const desPerfil = await this.findOne(ctx.perfil);
+      const permitidos = desPerfil
+        ? MAPA_VISIBILIDADE[desPerfil.descricao]
+        : undefined;
+
+      this.logger.log(permitidos);
+      const condicao: Prisma.PerfilWhereInput = {
+        AND: [
+          { descricao: { in: permitidos } },
+          filtros.codigo ? { codigo: filtros.codigo } : {},
+          filtros.descricao
+            ? { descricao: { contains: filtros.descricao } }
+            : {},
+          filtros.status !== undefined ? { status: filtros.status } : {},
+        ],
+      };
+
+      const selecao = await this.buildSelect(campos);
+
+      const listar = await client.perfil.findMany({
+        where: condicao,
+        select: selecao,
+        orderBy: { descricao: 'asc' },
+      });
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO DE BUSCA DO ID DO PERFIL:
+  - Paramentros: descrição, nivel, status.
+  - Usado na entidade TagAtivoService.
+  */
+  async findOneProfile(
+    descricao: string,
+    nivel: string,
+    status: boolean,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Perfil> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const buscar = await client.perfil.findFirst({
+        where: { descricao: descricao, nivel: nivel, status: status },
+      });
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findOneProfile()');
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO CONTADOR DE REGISTROS SENDO O TOTAL, ATIVOS E INATIVOS */
+  async counter(): Promise<Contador> {
+    try {
+      const grupos = await this.prisma.perfil.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      });
+
+      const ativos = grupos.find((g) => g.status === true)?._count._all ?? 0;
+      const inativos = grupos.find((g) => g.status === false)?._count._all ?? 0;
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return { total: ativos + inativos, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
+  // BUSCAR PERFIL PELO ID
+  async findOne(id: string, tx?: Prisma.TransactionClient): Promise<Perfil> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const buscar = await client.perfil.findUnique({
+        where: { id: id },
+      });
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+      this.logger.log(TYPES_NOTICES.FIND_ONE);
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
+      throw error;
+    }
+  }
+
+  /*
+    BUSCA PERFIL PELA DESCRIÇÃO:
+    - busca da informações do perfil pela descrição retornando todos os dados.
+    - metodo interno 
+  */
+  async findDescription(descricao: string): Promise<Perfil> {
+    try {
+      const buscar = await this.prisma.perfil.findFirst({
+        where: { descricao: descricao },
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ONE);
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
+      throw error;
+    }
+  }
+
+  // ATUALIZAÇÃO DO PERFIL PELO ID
+  async update(id: string, updatePerfilDto: UpdatePerfilDto): Promise<Perfil> {
+    try {
+      const atualizarPerfil = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          await this.findOne(id, tx);
+
+          const atualizar = await tx.perfil.update({
+            where: { id: id },
+            data: updatePerfilDto,
+          });
+
+          return atualizar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.UPDATE);
+      return atualizarPerfil;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
+      throw error;
+    }
+  }
+
+  /* ATIVAÇÃO DO PERFIL PELO ID
+  - perfil faz uma busca para identificar se possui usuário cadastrado.
+  - somente aceita ativação se não há usuário cadastrado.
+  - se possui alteração somente diretamente no banco de dados.
+ */
+  async active(id: string): Promise<Perfil> {
+    try {
+      const ativarPerfil = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const buscar = await this.findOne(id, tx);
+
+          if (buscar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_ACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_ACTIVE);
+          }
+
+          const queryUsuario: QueryUsuarioFilterDto = { perfilId: buscar.id };
+          const verificar = await this.usuarioOrq.findAll(queryUsuario, tx);
+
+          if (verificar.length > 0) {
+            this.logger.warn(TYPES_NOTICES.EMPTY_NOT);
+            throw new UnauthorizedException(TYPES_NOTICES.EMPTY_NOT);
+          }
+
+          const ativar = await tx.perfil.update({
+            where: { id: id },
+            data: { status: true, _auditAction: Acao.ACTIVE },
+          });
+
+          return ativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.ACTIVE);
+      return ativarPerfil;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - ACTIVE');
+      throw error;
+    }
+  }
+
+  // INATIVAÇÃO DO PERFIL PELO ID
+  async deactive(id: string): Promise<Perfil> {
+    try {
+      const inativarPerfil = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const buscar = await this.findOne(id, tx);
+
+          if (!buscar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_DEACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_DEACTIVE);
+          }
+
+          const queryUsuario: QueryUsuarioFilterDto = { perfilId: buscar.id };
+          const verificar = await this.usuarioOrq.findAll(queryUsuario, tx);
+
+          if (verificar.length > 0) {
+            this.logger.warn(TYPES_NOTICES.EMPTY_NOT);
+            throw new UnauthorizedException(TYPES_NOTICES.EMPTY_NOT);
+          }
+
+          const inativar = await tx.perfil.update({
+            where: { id: id },
+            data: { status: false, _auditAction: Acao.DEACTIVATE },
+          });
+
+          return inativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
+      return inativarPerfil;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE');
+      throw error;
+    }
+  }
+
+  // DELETE DO PERFIL PELO ID
+  async remove(id: string): Promise<Perfil> {
+    try {
+      const deletarPerfil = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (verificar.status) {
+            this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+            throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+          }
+
+          const deletar = await tx.perfil.delete({
+            where: { id: id },
+          });
+
+          return deletar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return deletarPerfil;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
+      throw error;
+    }
+  }
+
+  // METODO DE CONSULTA DINAMICA
+  private readonly allowedPerfilFiels = [
+    'id',
+    'codigo',
+    'descricao',
+    'nivel',
+    'status',
+  ];
+
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedPerfilFiels.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
+  }
+}

@@ -24,6 +24,7 @@ import { Roles } from '@/auth/guards/roles.decorator';
 import {
   QueryAlocacaoOperacionalCounterDto,
   QueryAlocacaoOperacionalFilterDto,
+  QueryAlocacaoOperacionalSolicitacaoDto,
   QueryQuantidadeAlocacaoOperadorDto,
 } from './dto/query-alocacao.dto';
 import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
@@ -33,6 +34,15 @@ import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
 @UseGuards(HttpJwtGuard, HttpRolesGuard)
 export class AlocacaoController {
   constructor(private readonly alocacaoService: AlocacaoService) {}
+
+  @Get('solicitacao')
+  @Roles(ROLES.ASN1, ROLES.SUP1)
+  async findOperatorRequest(
+    @Query() query: QueryAlocacaoOperacionalSolicitacaoDto,
+  ): Promise<ResponseAlocacaoDto> {
+    const resultado = await this.alocacaoService.findOperatorRequest(query);
+    return plainToInstance(ResponseAlocacaoDto, resultado);
+  }
 
   @Get()
   @Roles(ROLES.ASN1, ROLES.SUP1)

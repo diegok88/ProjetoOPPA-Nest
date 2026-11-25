@@ -1,0 +1,764 @@
+
+===== src/modules/falhas/dto/create-falha.dto.ts =====
+
+import { Transform } from 'class-transformer';
+import { IsUUID, IsString, IsNotEmpty, Length, Matches } from 'class-validator';
+
+export class CreateFalhaDto {
+  @IsString({ message: 'A código não é do tipo String.' })
+  @IsNotEmpty({ message: 'O código é um campo obrigatório.' })
+  @Transform(({ value }) => value.toUpperCase())
+  codigo!: string;
+
+  @IsString({ message: 'A descrição não é do tipo String.' })
+  @IsNotEmpty({ message: 'A descrição é um campo obrigatório.' })
+  @Length(10, 100, {
+    message:
+      'A descrição deve conter no minimo 10 caracteres e no maximo 100 caracteres.',
+  })
+  @Matches(/^[a-zA-ZÀ-ÿ\s]+$/, {
+    message:
+      'A descrição deve conter letras maisculas e minusculas, sem numeros e caracteres especiais.',
+  })
+  @Transform(({ value }) => value.toUpperCase())
+  descricao!: string;
+
+  @IsUUID('all', { message: 'Ativo id inválido.' })
+  @IsNotEmpty({ message: 'O ativo é um campo obrigatório.' })
+  ativoId!: string;
+
+  @IsUUID('all', { message: 'Direcionamento id inválido.' })
+  @IsNotEmpty({ message: 'O direcionamento é um campo obrigatório.' })
+  direcionamentoId!: string;
+}
+
+===== src/modules/falhas/dto/query-falhas.dto.ts =====
+
+import {
+  type ConsultaFalhas,
+  CONSULTAS,
+  DESVIOS,
+  type RecorteFalhas,
+} from '@/constants/query-falha.const';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  Matches,
+  Max,
+  Min,
+} from 'class-validator';
+
+export class QueryFalhasFilterDto {
+  @IsOptional()
+  @IsString({ message: 'A código não é do tipo String.' })
+  codigo?: string;
+
+  @IsOptional()
+  @IsString({ message: 'A descrição não é do tipo String.' })
+  @Length(10, 100, {
+    message:
+      'A descrição deve conter no minimo 10 caracteres e no maximo 100 caracteres.',
+  })
+  @Matches(/^[a-zA-ZÀ-ÿ\s]+$/, {
+    message:
+      'A descrição deve conter letras maisculas e minusculas, sem numeros e caracteres especiais.',
+  })
+  descricao?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Ativo id inválido.' })
+  ativoId?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Ativo id inválido.' })
+  empresaId?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Direcionamento id inválido.' })
+  direcionamentoId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
+  status?: boolean;
+
+  @IsOptional()
+  @IsString({ message: 'Campos não é do tipo String.' })
+  campos?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Include não é do tipo String.' })
+  incluir?: string;
+}
+
+export class QueryFalhaFilterDto {
+  @IsOptional()
+  @IsString({ message: 'A código não é do tipo String.' })
+  codigo?: string;
+
+  @IsOptional()
+  @IsString({ message: 'A descrição não é do tipo String.' })
+  @Length(10, 100, {
+    message:
+      'A descrição deve conter no minimo 10 caracteres e no maximo 100 caracteres.',
+  })
+  @Matches(/^[a-zA-ZÀ-ÿ\s]+$/, {
+    message:
+      'A descrição deve conter letras maisculas e minusculas, sem numeros e caracteres especiais.',
+  })
+  descricao?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Ativo id inválido.' })
+  ativoId?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Ativo id inválido.' })
+  empresaId?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Direcionamento id inválido.' })
+  direcionamentoId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'Status não é do tipo Boolean!' })
+  status?: boolean;
+
+  @IsOptional()
+  @IsIn(Object.keys(CONSULTAS), { message: 'Consulta não reconhecida.' })
+  consulta?: ConsultaFalhas;
+
+  @IsOptional()
+  @IsIn(Object.keys(DESVIOS), { message: 'Desvio não reconhecida.' })
+  desvios?: RecorteFalhas;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Página deve ser um número inteiro.' })
+  @Min(1, { message: 'Página deve ser maior que zero.' })
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Tamanho deve ser um número inteiro.' })
+  @Min(1)
+  @Max(100, { message: 'Tamanho máximo é 100.' })
+  size?: number = 10;
+}
+
+===== src/modules/falhas/dto/response-falhas.dto.ts =====
+
+import { Expose, Type } from 'class-transformer';
+
+export class ResponseFalhasAtivoDto {
+  @Expose() descricao!: string;
+  @Expose() modelo!: string;
+}
+
+export class ResponseFalhasPerfilDto {
+  @Expose() descricao!: string;
+  @Expose() nivel!: string;
+}
+
+export class ResponseFalhasDto {
+  @Expose() id!: string;
+  @Expose() codigo!: string;
+  @Expose() descricao!: string;
+  @Expose() ativoId!: string;
+  @Expose() direcionamentoId!: string;
+  @Expose() status!: boolean;
+}
+
+export class ResponseTagAtivoRelacaoDto extends ResponseFalhasDto {
+  @Expose()
+  @Type(() => ResponseFalhasAtivoDto)
+  ativo!: ResponseFalhasAtivoDto;
+
+  @Expose()
+  @Type(() => ResponseFalhasPerfilDto)
+  perfil!: ResponseFalhasPerfilDto;
+}
+
+export class ResponseFalhasContadorDto {
+  @Expose()
+  total!: number;
+
+  @Expose()
+  inativos!: number;
+
+  @Expose()
+  ativos!: number;
+}
+
+===== src/modules/falhas/dto/update-falha.dto.ts =====
+
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateFalhaDto } from './create-falha.dto';
+
+export class UpdateFalhaDto extends PartialType(CreateFalhaDto) {}
+
+===== src/modules/falhas/entities/falha.entity.ts =====
+
+import { Falhas as FalhasModel, Prisma } from '@/generated/prisma/client';
+
+export type Falhas = FalhasModel;
+
+export type FalhasRelacoes = Prisma.FalhasGetPayload<{
+  include: {
+    ativo: true;
+    perfil: true;
+    solucaoFalha: true;
+    ocorrenciaFalha: true;
+  };
+}>;
+
+export type FalhasListagem = Falhas | FalhasRelacoes;
+
+===== src/modules/falhas/falhas.controller.ts =====
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import { FalhasService } from './falhas.service';
+import { CreateFalhaDto } from './dto/create-falha.dto';
+import { UpdateFalhaDto } from './dto/update-falha.dto';
+import {
+  ResponseFalhasContadorDto,
+  ResponseFalhasDto,
+  ResponseTagAtivoRelacaoDto,
+} from './dto/response-falhas.dto';
+import { plainToInstance } from 'class-transformer';
+import { ROLES } from '@/auth/guards/roles.const';
+import { Roles } from '@/auth/guards/roles.decorator';
+import {
+  QueryFalhaFilterDto,
+  QueryFalhasFilterDto,
+} from './dto/query-falhas.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
+
+@Controller('falhas')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
+export class FalhasController {
+  constructor(private readonly falhasService: FalhasService) {}
+
+  @Post()
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async create(
+    @Body() createFalhaDto: CreateFalhaDto,
+  ): Promise<ResponseFalhasDto> {
+    const dado = await this.falhasService.create(createFalhaDto);
+    return plainToInstance(ResponseFalhasDto, dado);
+  }
+
+  @Get()
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async findAll(
+    @Query() query: QueryFalhasFilterDto,
+  ): Promise<ResponseFalhasDto[]> {
+    const dados = await this.falhasService.findAll(query);
+    return plainToInstance(ResponseFalhasDto, dados);
+  }
+
+  @Get('counter')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async counter(): Promise<ResponseFalhasContadorDto> {
+    const contador = await this.falhasService.counter();
+    return plainToInstance(ResponseFalhasContadorDto, contador);
+  }
+
+  @Get('unico')
+  @Roles(ROLES.ASN1, ROLES.TER1)
+  async findOneFirst(
+    @Query() query: QueryFalhaFilterDto,
+  ): Promise<ResponseFalhasDto> {
+    const registro = await this.falhasService.findOneFirst(query);
+    return plainToInstance(ResponseFalhasDto, registro);
+  }
+
+  @Get(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseTagAtivoRelacaoDto> {
+    const dado = await this.falhasService.findOne(id);
+    return plainToInstance(ResponseTagAtivoRelacaoDto, dado);
+  }
+
+  @Patch(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateFalhaDto: UpdateFalhaDto,
+  ): Promise<ResponseFalhasDto> {
+    const dado = await this.falhasService.update(id, updateFalhaDto);
+    return plainToInstance(ResponseFalhasDto, dado);
+  }
+
+  @Patch('active/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async active(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseFalhasDto> {
+    const dado = await this.falhasService.active(id);
+    return plainToInstance(ResponseFalhasDto, dado);
+  }
+
+  @Patch('deactive/:id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async deactive(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseFalhasDto> {
+    const dado = await this.falhasService.deactive(id);
+    return plainToInstance(ResponseFalhasDto, dado);
+  }
+
+  @Delete(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1)
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ResponseFalhasDto> {
+    const dado = await this.falhasService.remove(id);
+    return plainToInstance(ResponseFalhasDto, dado);
+  }
+}
+
+===== src/modules/falhas/falhas.module.ts =====
+
+import { forwardRef, Module } from '@nestjs/common';
+import { FalhasService } from './falhas.service';
+import { FalhasController } from './falhas.controller';
+import { PerfilModule } from '../perfil/perfil.module';
+
+@Module({
+  imports: [forwardRef(() => PerfilModule)],
+  controllers: [FalhasController],
+  providers: [FalhasService],
+})
+export class FalhasModule {}
+
+===== src/modules/falhas/falhas.service.ts =====
+
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { CreateFalhaDto } from './dto/create-falha.dto';
+import { UpdateFalhaDto } from './dto/update-falha.dto';
+import { PrismaService } from '@/prisma/prisma.service';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+
+import { Acao, Prisma } from '@/generated/prisma/client';
+import {
+  QueryFalhaFilterDto,
+  QueryFalhasFilterDto,
+} from './dto/query-falhas.dto';
+import {
+  Falhas,
+  FalhasListagem,
+  FalhasRelacoes,
+} from './entities/falha.entity';
+import { Contador } from '@/interfaces/counter.interface';
+import { TenantContextService } from '@/auth/tenant-context/tenant-context.service';
+import {
+  ConsultaConfig,
+  ConsultaFalhas,
+  CONSULTAS,
+  DESVIOS,
+} from '@/constants/query-falha.const';
+import { PaginatedResponse } from '@/interfaces/paginator.interface';
+
+const LIMITE_LISTA_COMPLETA = 100;
+
+@Injectable()
+export class FalhasService {
+  private logger = new Logger(FalhasService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private tenantContext: TenantContextService,
+  ) {}
+
+  async create(create: CreateFalhaDto): Promise<Falhas> {
+    try {
+      const criar = await this.prisma.client.falhas.create({
+        data: create,
+      });
+      this.logger.log(TYPES_NOTICES.CREATE);
+      return criar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
+      throw error;
+    }
+  }
+
+  /* FUNÇÃO CONTADOR DE REGISTROS: TOTAL, ATIVOS E INATIVOS EM UMA ÚNICA QUERY */
+  async counter(): Promise<Contador> {
+    try {
+      const ctx = this.tenantContext.getStore()?.empresa;
+
+      const grupos = await this.prisma.falhas.groupBy({
+        by: ['status'],
+        where: { ativo: { empresaId: ctx } },
+        _count: { _all: true },
+      });
+
+      const ativos = grupos.find((g) => g.status === true)?._count._all ?? 0;
+      const inativos = grupos.find((g) => g.status === false)?._count._all ?? 0;
+
+      this.logger.log(TYPES_NOTICES.COUNTER);
+      return { total: ativos + inativos, ativos, inativos };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - COUNTER');
+      throw error;
+    }
+  }
+
+  async findAll(
+    query: QueryFalhasFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Falhas[]> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const { campos, ...filtros } = query ?? {};
+
+      const condicao: Prisma.FalhasWhereInput = {};
+      if (filtros.codigo) condicao.codigo = filtros.codigo;
+      if (filtros.descricao) condicao.descricao = filtros.descricao;
+      if (filtros.ativoId) condicao.ativoId = filtros.ativoId;
+      if (filtros.direcionamentoId)
+        condicao.direcionamentoId = filtros.direcionamentoId;
+      if (filtros.status !== undefined) condicao.status = filtros.status;
+
+      // filtros por colunas da relação Ativo
+      const filtroAtivo: Prisma.FalhasWhereInput['ativo'] = {};
+      if (filtros.empresaId) filtroAtivo.empresaId = filtros.empresaId;
+      if (Object.keys(filtroAtivo).length > 0) condicao.ativo = filtroAtivo;
+
+      const selecao = await this.buildSelect(campos);
+
+      const opcoes: Prisma.FalhasFindManyArgs = {
+        where: condicao,
+        orderBy: { codigo: 'asc' },
+      };
+
+      if (campos?.length) {
+        opcoes.select = selecao;
+      } else {
+        opcoes.include =
+          filtros.incluir === 'todos_relacoes'
+            ? {
+                ativo: true,
+                perfil: true,
+              }
+            : filtros.incluir === 'perfil'
+              ? { perfil: true }
+              : { ativo: true };
+      }
+
+      const listar: Falhas[] = await client.falhas.findMany(opcoes);
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  private toAssembleCondicao(
+    filtros: QueryFalhaFilterDto,
+  ): Prisma.FalhasWhereInput {
+    const condicao: Prisma.FalhasWhereInput = {};
+
+    if (filtros.codigo) condicao.codigo = filtros.codigo;
+    if (filtros.descricao) condicao.descricao = filtros.descricao;
+    if (filtros.ativoId) condicao.ativoId = filtros.ativoId;
+    if (filtros.direcionamentoId)
+      condicao.direcionamentoId = filtros.direcionamentoId;
+    if (filtros.status !== undefined) condicao.status = filtros.status;
+
+    return condicao;
+  }
+
+  private resolverConfig(consulta?: ConsultaFalhas): ConsultaConfig {
+    return consulta ? CONSULTAS[consulta] : CONSULTAS.falhas_padrao;
+  }
+
+  private toAssembleQuery(
+    query: QueryFalhaFilterDto,
+  ): Prisma.FalhasFindManyArgs {
+    const desvios = query.desvios ? DESVIOS[query.desvios]() : undefined;
+    const filtros = this.toAssembleCondicao(query);
+
+    return {
+      ...this.resolverConfig(query.consulta),
+      where: desvios ? { AND: [desvios, filtros] } : filtros,
+    };
+  }
+
+  async findAllPagination(
+    query: QueryFalhaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<PaginatedResponse<FalhasListagem>> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const pagina = query.page ?? 1;
+      const tamanho = query.size ?? 10;
+      const base = this.toAssembleQuery(query);
+
+      const [listar, total] = await client.$transaction([
+        client.falhas.findMany({
+          ...base,
+          skip: (pagina - 1) * tamanho,
+          take: tamanho,
+        }),
+        client.falhas.count({ where: base.where }),
+      ]);
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+
+      return { dados: listar, total, pagina, tamanho };
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  async findAllList(
+    query: QueryFalhaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<FalhasListagem[]> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const listar = await client.falhas.findMany({
+        ...this.toAssembleQuery(query),
+        take: LIMITE_LISTA_COMPLETA,
+      });
+
+      if (listar.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+
+      return listar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - findAllList()');
+      throw error;
+    }
+  }
+
+  async findOneFirst(
+    query: QueryFalhaFilterDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<FalhasListagem | null> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const dados = this.toAssembleQuery(query);
+      this.logger.debug(dados);
+
+      const buscar = await client.falhas.findFirst(this.toAssembleQuery(query));
+
+      this.logger.debug(buscar);
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(
+        TYPES_NOTICES.SERVICE_FAILURE,
+        ' - async findOneFirst()',
+      );
+      throw error;
+    }
+  }
+
+  async findOne(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<FalhasRelacoes> {
+    try {
+      const client = tx ?? this.prisma.client;
+      const buscar = await client.falhas.findUnique({
+        where: { id: id },
+        include: { ativo: true, perfil: true },
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException(TYPES_NOTICES.NOT_FOUND);
+      }
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
+      throw error;
+    }
+  }
+
+  async update(id: string, updateFalhaDto: UpdateFalhaDto): Promise<Falhas> {
+    try {
+      const atualizarFalha = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          await this.findOne(id, tx);
+
+          const atualizar = await tx.falhas.update({
+            where: { id: id },
+            data: updateFalhaDto,
+          });
+
+          return atualizar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.UPDATE);
+      return atualizarFalha;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
+      throw error;
+    }
+  }
+
+  async active(id: string): Promise<Falhas> {
+    try {
+      const ativarFalha = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (verificar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_ACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_ACTIVE);
+          }
+
+          const ativar = await tx.falhas.update({
+            where: { id: id },
+            data: { status: true, _auditAction: Acao.ACTIVE },
+          });
+
+          return ativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
+      return ativarFalha;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE');
+      throw error;
+    }
+  }
+
+  async deactive(id: string): Promise<Falhas> {
+    try {
+      const inativarFalha = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (!verificar.status) {
+            this.logger.warn(TYPES_NOTICES.IS_DEACTIVE);
+            throw new UnauthorizedException(TYPES_NOTICES.IS_DEACTIVE);
+          }
+
+          const inativar = await tx.falhas.update({
+            where: { id: id },
+            data: { status: false, _auditAction: Acao.DEACTIVATE },
+          });
+
+          return inativar;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DEACTIVE);
+      return inativarFalha;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - DEACTIVE');
+      throw error;
+    }
+  }
+
+  async remove(id: string): Promise<Falhas> {
+    try {
+      const removerFalha = await this.prisma.client.$transaction(
+        async (tx: any) => {
+          const verificar = await this.findOne(id, tx);
+
+          if (verificar.status) {
+            this.logger.warn(TYPES_NOTICES.UNAUTHORIZED);
+            throw new UnauthorizedException(TYPES_NOTICES.UNAUTHORIZED);
+          }
+
+          const remover = await tx.falhas.delete({
+            where: { id: id },
+          });
+
+          return remover;
+        },
+      );
+
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return removerFalha;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
+      throw error;
+    }
+  }
+
+  // METODO DE CONSULTA DINAMICA
+  private readonly allowedFalhasFiels = [
+    'id',
+    'codigo',
+    'descricao',
+    'ativoId',
+    'direcionamentoId',
+    'status',
+  ];
+
+  private async buildSelect(
+    campos?: string,
+  ): Promise<Record<string, true> | undefined> {
+    if (!campos) return undefined;
+
+    const campoArray = campos.split(',').map((c) => c.trim());
+    const selecaoObj = {};
+
+    for (const campo of campoArray) {
+      if (this.allowedFalhasFiels.includes(campo)) {
+        selecaoObj[campo] = true;
+      }
+    }
+
+    return Object.keys(selecaoObj).length > 0 ? selecaoObj : undefined;
+  }
+}

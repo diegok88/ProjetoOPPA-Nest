@@ -1,13 +1,5 @@
-import {
-  IsUUID,
-  IsString,
-  IsEnum,
-  IsOptional,
-  IsDate,
-  IsBoolean,
-} from 'class-validator';
+import { IsUUID, IsString, IsEnum, IsOptional } from 'class-validator';
 import { TipoOcorrencia } from '@/generated/prisma/enums';
-import { Type } from 'class-transformer';
 
 export class UpdateOcorrenciaDto {
   @IsOptional()
@@ -29,4 +21,3 @@ export class UpdateOcorrenciaDto {
   @IsUUID('all', { message: 'Usuário id inválido.' })
   solucionadoId?: string;
 }
-

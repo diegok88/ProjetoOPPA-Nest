@@ -71,6 +71,7 @@ model Usuario {
   competenciaComoOperador     CompetenciaOperacional[] @relation("operador")
   alocacaoComoOperador        AlocacaoOperacional[]    @relation("operador")
   alocacaoComoGestor          AlocacaoOperacional[]    @relation("gestor")
+  eficienciaComoOperador      EficienciaOperacional[]  @relation("usuario")
 
   @@map("usuario")
 }
@@ -250,7 +251,7 @@ model Setores {
   @@map("setores")
 }
 
-model CompetenciaSetorial {
+model CompetenciaSetorial { 
   id            String    @id @default(uuid())
   codigo        Int       @default(autoincrement())
   colaboradorId String
@@ -267,23 +268,36 @@ model CompetenciaSetorial {
   @@map("competencia_setorial")
 }
 
-/**
- * WEBSOCKETS
- */
 model Solicitacoes {
-  id                String          @id @default(uuid())
-  solicitanteId     String
-  solicitante       Usuario         @relation("solicitante", fields: [solicitanteId], references: [id])
+  id                String            @id @default(uuid())
+  codigo            Int               @default(autoincrement())
+  solicitanteId     String?
+  solicitante       Usuario?          @relation("solicitante", fields: [solicitanteId], references: [id])
   solicitadoId      String
-  solicitado        Usuario         @relation("solicitado", fields: [solicitadoId], references: [id])
-  tipoSolicitacaoId String
-  tipoSolicitacao   TipoSolicitacao @relation("solicitacoes", fields: [tipoSolicitacaoId], references: [id])
+  solicitado        Usuario           @relation("solicitado", fields: [solicitadoId], references: [id])
+  tagAtivoId        String?
+  tagAtivo          TagAtivo?         @relation("solicitacao", fields: [tagAtivoId], references: [id])
+  tipoSolicitacaoId String?
+  tipoSolicitacao   TipoSolicitacao?  @relation("solicitacoes", fields: [tipoSolicitacaoId], references: [id])
+  situacao          StatusSolicitacao @default(PENDENTE)
   observacao        String?
-  dataEnvio         DateTime
+  dataEnvio         DateTime          @default(now())
   dataVisualizacao  DateTime?
-  status            Boolean         @default(true)
+  dataResposta      DateTime?
+  status            Boolean           @default(true)
 
+  @@index([solicitadoId, situacao])
+  @@index([solicitanteId, situacao])
+  @@index([solicitadoId, situacao, dataVisualizacao])
+  @@index([tagAtivoId, situacao])
   @@map("solicitacoes")
+}
+
+enum StatusSolicitacao {
+  PENDENTE
+  ACEITA
+  RECUSADA
+  CANCELADA
 }
 
 model TipoSolicitacao {
@@ -312,7 +326,7 @@ model AlocacaoOperacional {
   situacao     SituacaoAlocacao @default(DISPONIVEL)
   status       Boolean          @default(true)
 
-  estadoAtivo EstadoAtivo[] @relation("estado_ativo")
+  estadoAtivo EstadoAtivo[] @relation("estado_ativo") 
 
   @@map("alocacao_operacional")
 }
@@ -332,9 +346,6 @@ enum SituacaoAlocacao {
   FINALIZADO
 }
 
-/**
- * WEBSOCKETS
- */
 model EstadoAtivo {
   id                  String              @id @default(uuid())
   codigo              Int                 @default(autoincrement())
@@ -360,23 +371,24 @@ enum TipoEstadoAtivo {
 }
 
 model Ocorrencia {
-  id                  String             @id @default(uuid())
-  codigo              Int                @default(autoincrement())
-  estadoAtivoId       String             @unique
-  estadoAtivo         EstadoAtivo        @relation("ocorrencia", fields: [estadoAtivoId], references: [id])
-  falhaId             String?
-  falhas              Falhas?            @relation("falhas", fields: [falhaId], references: [id])
-  solucaoId           String?
-  solucoes            Solucoes?          @relation("solucoes", fields: [solucaoId], references: [id])
-  tipoOcorrencia      TipoOcorrencia?
-  condicaoOcorrencia  CondicaoOcorrencia @default(EXECUCAO)
-  solucionadoId       String?
-  solucionado         Usuario?           @relation("usuario", fields: [solucionadoId], references: [id])
-  dataInicial         DateTime           @default(now())
-  dataFalhaRegistrado DateTime?
-  dataFinal           DateTime?
-  statusFalha         Boolean            @default(false)
-  status              Boolean            @default(true)
+  id                     String             @id @default(uuid())
+  codigo                 Int                @default(autoincrement())
+  estadoAtivoId          String             @unique
+  estadoAtivo            EstadoAtivo        @relation("ocorrencia", fields: [estadoAtivoId], references: [id])
+  falhaId                String?
+  falhas                 Falhas?            @relation("falhas", fields: [falhaId], references: [id])
+  solucaoId              String?
+  solucoes               Solucoes?          @relation("solucoes", fields: [solucaoId], references: [id])
+  tipoOcorrencia         TipoOcorrencia?
+  condicaoOcorrencia     CondicaoOcorrencia @default(EXECUCAO)
+  solucionadoId          String?
+  solucionado            Usuario?           @relation("usuario", fields: [solucionadoId], references: [id])
+  dataInicial            DateTime           @default(now())
+  dataFalhaRegistrado    DateTime?
+  duracaoFalhaRegistrado Int?
+  dataFinal              DateTime?
+  statusFalha            Boolean            @default(false)
+  status                 Boolean            @default(true)
 
   fluxoOcorrencia FluxoOcorrencia[] @relation("ocorrencia")
 
@@ -395,20 +407,26 @@ enum TipoOcorrencia {
 }
 
 model FluxoOcorrencia {
-  id                  String     @id @default(uuid())
-  codigo              Int        @default(autoincrement())
+  id                  String        @id @default(uuid())
+  codigo              Int           @default(autoincrement())
   ocorrenciaId        String
-  ocorrencia          Ocorrencia @relation("ocorrencia", fields: [ocorrenciaId], references: [id])
+  ocorrencia          Ocorrencia    @relation("ocorrencia", fields: [ocorrenciaId], references: [id])
   usuarioId           String?
-  usuario             Usuario?   @relation("usuario", fields: [usuarioId], references: [id])
+  usuario             Usuario?      @relation("usuario", fields: [usuarioId], references: [id])
   transferidoPerfilId String
-  transferidoPerfil   Perfil     @relation("perfil", fields: [transferidoPerfilId], references: [id])
-  dataInicial         DateTime   @default(now())
+  transferidoPerfil   Perfil        @relation("perfil", fields: [transferidoPerfilId], references: [id])
+  dataInicial         DateTime?
   dataFinal           DateTime?
   duracao             Int?
-  status              Boolean    @default(true)
+  condicaoFluxo       CondicaoFluxo @default(EXECUCAO)
+  status              Boolean       @default(true)
 
   @@map("fluxo_ocorrencia")
+}
+
+enum CondicaoFluxo {
+  EXECUCAO
+  FINALIZADO
 }
 
 model Ativo {
@@ -443,6 +461,7 @@ model TagAtivo {
   alocacaoTagAtivo    AlocacaoOperacional[] @relation("tag-ativo")
   estadoAtivoTagAtivo EstadoAtivo[]         @relation("tag_ativo")
   usuarioTagAtivo     Usuario[]             @relation("tag_ativo")
+  solicitacaoTagAtivo Solicitacoes[]        @relation("solicitacao")
 
   @@map("tag_ativo")
 }
@@ -490,4 +509,39 @@ model Solucoes {
   ocorrenciaSolucoes Ocorrencia[] @relation("solucoes")
 
   @@map("solucoes")
+}
+
+model EficienciaOperacional {
+  id                   String   @id @default(uuid())
+  codigo               Int      @unique @default(autoincrement())
+  operadorId           String
+  operador             Usuario  @relation("usuario", fields: [operadorId], references: [id])
+  dataRegistro         DateTime @default(now())
+  eficProduzindo       Int?
+  eficFalha            Int?
+  eficParada           Int?
+  eficFalta            Int?
+  eficAtraso           Int?
+  eficAntecipado       Int?
+  eficSuspensao        Int?
+  eficAdvertencia      Int?
+  eficOrientacao       Int?
+  eficRecusado         Int?
+  eficAceito           Int?
+  eficErroFalha        Int?
+  eficTempoFalha       Int?
+  eficTempoAtividade   Int?
+  eficOcorCausaOperRes Int?
+  eficOcorCausaMantRes Int?
+  eficOcorCausaQualRes Int?
+  eficOcorOper         Int?
+  eficOcorSup          Int?
+  eficOcorMan          Int?
+  eficCompOper         Int?
+  eficTempEmp          Int?
+  eficTotal            Decimal? @db.Decimal(5, 2)
+  statusDispFolg       Boolean  @default(false)
+  status               Boolean  @default(true)
+
+  @@map("eficiencia_operacional")
 }

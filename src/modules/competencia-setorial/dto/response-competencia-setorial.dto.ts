@@ -1,5 +1,4 @@
 import { TipoTurno } from '@/generated/prisma/enums';
-import { PickType } from '@nestjs/mapped-types';
 import { Expose, Type } from 'class-transformer';
 
 export class ResponseCompSetSetorDto {
@@ -36,13 +35,17 @@ export class ResponseCompetenciaSetorialDto {
   status!: string;
 }
 
-export class ResponseCompetenciaRelacaoDto extends PickType(
-  ResponseCompetenciaSetorialDto,
-  ['id', 'codigo', 'status'],
-) {
+export class ResponseCompetenciaRelacaoDto extends ResponseCompetenciaSetorialDto {
   @Expose()
   @Type(() => ResponseCompSetSetorDto)
   setor!: ResponseCompSetSetorDto;
+}
+
+export class ResponseCompetenciaSetorialTagsDto {
+  @Expose() id!: string;
+  @Expose() codigo!: number;
+  @Expose() descricao!: string;
+  @Expose() desAtivo!: string;
 }
 
 /* DTO DO CONTADOR: retorna total, ativos e inativos */
@@ -71,4 +74,15 @@ export class ResponseCompSetSectionSelectDto {
 
   @Expose()
   descricao?: string;
+}
+
+export class ResponseSetorGestorDto {
+  @Expose() setorId!: string;
+  @Expose() codigo!: number;
+  @Expose() descricao!: string;
+  @Expose() turno!: string;
+  @Expose() totalAtivos!: number;
+  @Expose() produzindo!: number;
+  @Expose() parado!: number;
+  @Expose() falha!: number;
 }

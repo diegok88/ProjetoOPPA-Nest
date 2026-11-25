@@ -1,0 +1,479 @@
+
+===== src/modules/auditoria/auditoria.controller.ts =====
+
+import { HttpRolesGuard } from '@/auth/guards/http-roles.guard';
+import { ROLES } from '@/auth/guards/roles.const';
+import { Roles } from '@/auth/guards/roles.decorator';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+import {
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { AuditoriaService } from './auditoria.service';
+import { QueryAuditoriaFilterDto } from './dto/query-auditoria.dto';
+import {
+  ResponseAuditoriaDto,
+  ResponseAuditoriaMessageDto,
+} from './dto/response-auditoria.dto';
+import { HttpJwtGuard } from '@/auth/guards/http-jwt.guard';
+
+@Controller('auditoria')
+@UseGuards(HttpJwtGuard, HttpRolesGuard)
+export class AuditoriaController {
+  constructor(private readonly auditoriaService: AuditoriaService) {}
+
+  @Get()
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async findAll(
+    @Query() query: QueryAuditoriaFilterDto,
+  ): Promise<ResponseAuditoriaDto[]> {
+    const dados = await this.auditoriaService.findAll(query);
+    return plainToInstance(ResponseAuditoriaDto, dados);
+  }
+
+  @Get(':id')
+  @Roles(ROLES.ASN1, ROLES.ADN1, ROLES.GER1, ROLES.SUP1)
+  async findOne(@Param('id') id: string): Promise<ResponseAuditoriaDto> {
+    const dado = await this.auditoriaService.findOne(id);
+    return plainToInstance(ResponseAuditoriaDto, dado);
+  }
+
+  @Delete(':id')
+  @Roles(ROLES.ASN1)
+  async remove(@Param('id') id: string): Promise<ResponseAuditoriaMessageDto> {
+    const dado = await this.auditoriaService.remove(id);
+    return plainToInstance(ResponseAuditoriaMessageDto, {
+      message: TYPES_NOTICES.DELETE,
+    });
+  }
+}
+
+===== src/modules/auditoria/auditoria.module.ts =====
+
+import { forwardRef, Module } from '@nestjs/common';
+import { AuditoriaController } from './auditoria.controller';
+import { AuditoriaService } from './auditoria.service';
+import { PerfilModule } from '../perfil/perfil.module';
+
+@Module({
+  imports: [forwardRef(() => PerfilModule)],
+  controllers: [AuditoriaController],
+  providers: [AuditoriaService],
+  exports: [AuditoriaService],
+})
+export class AuditoriaModule {}
+
+===== src/modules/auditoria/auditoria.service.ts =====
+
+import { Auditoria, Prisma } from '@/generated/prisma/client';
+import { Acao } from '@/generated/prisma/enums';
+import { PrismaService } from '@/prisma/prisma.service';
+import { TYPES_NOTICES } from '@/utils/types-notices.cosnt';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { CreateAuditoriaDto } from './dto/create-auditoria.dto';
+import { QueryAuditoriaFilterDto } from './dto/query-auditoria.dto';
+import { UpdateAuditoriaDto } from './dto/update-auditoria.dto';
+
+@Injectable()
+export class AuditoriaService {
+  private logger = new Logger(AuditoriaService.name);
+
+  constructor(
+    @Inject(forwardRef(() => PrismaService))
+    private readonly prisma: PrismaService,
+  ) {}
+
+  // SERVIÇO DE CALCULAR DIFERENÇAS ENTRE DOIS DADOS
+  private calculateDifference<T extends Record<string, any>>(
+    antes: T,
+    depois: T,
+  ): Record<string, { antes: any; depois: any }> {
+    const mudancas: Record<string, { antes: any; depois: any }> = {};
+    const todasChaves = new Set([
+      ...Object.keys(antes || {}),
+      ...Object.keys(depois || {}),
+    ]);
+    for (const chave of todasChaves) {
+      const valorAntes = antes?.[chave];
+      const valorDepois = depois?.[chave];
+
+      if (JSON.stringify(valorAntes) !== JSON.stringify(valorDepois)) {
+        mudancas[chave] = {
+          antes: valorAntes,
+          depois: valorDepois,
+        };
+      }
+    }
+    return mudancas;
+  }
+
+  // SERVIÇO DE CRIAÇÃO DO OBJETO AUDITORIA PARA DADOS DA AÇÃO CREATE
+  async create(
+    createAuditoriaDto: CreateAuditoriaDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Auditoria> {
+    try {
+      const client = tx ?? this.prisma.client;
+
+      const criar = await client.auditoria.create({
+        data: createAuditoriaDto,
+      });
+
+      this.logger.log(TYPES_NOTICES.CREATE);
+      return criar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATE');
+      throw error;
+    }
+  }
+
+  // SERVIÇO DE CRIAÇÃO DE OBJETOS PARA AÇÃO DE DELETE
+  // Os creates possuem transformação de json para string de formas diferentes
+  async createAll(
+    items: Array<CreateAuditoriaDto>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Prisma.BatchPayload> {
+    // Prisma.BatchPayload: retorna apenas {{ count: number }}
+    try {
+      const client = tx || this.prisma;
+
+      const criar = await client.auditoria.createMany({
+        data: items,
+      });
+
+      this.logger.log(TYPES_NOTICES.CREATE_MANY);
+      return criar;
+    } catch (error) {
+      this.logger.log(TYPES_NOTICES.SERVICE_FAILURE, ' - CREATEALL');
+      throw error;
+    }
+  }
+
+  // SERVIÇO DE CRIAÇÃO DO OBJETO AUDITORIA PARA DADOS DA AÇÃO UPDATE
+  async update(
+    updateAuditoriaDto: UpdateAuditoriaDto,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Auditoria> {
+    try {
+      const client = tx ?? this.prisma;
+
+      this.logger.debug(updateAuditoriaDto.empresaId);
+
+      const { antes, depois, ...dados } = updateAuditoriaDto;
+
+      const mudancas = this.calculateDifference(antes, depois);
+      const camposAlterados = Object.keys(mudancas);
+
+      const dadosAuditoria = {
+        mudancas: mudancas,
+        camposAlterados: camposAlterados,
+        totalMudancas: camposAlterados.length,
+      };
+
+      const dadosAtualizados = JSON.stringify(dadosAuditoria);
+
+      const atualizar = await client.auditoria.create({
+        data: {
+          ...dados,
+          dadosRegistrados: dadosAtualizados,
+        },
+      });
+
+      this.logger.log(TYPES_NOTICES.UPDATE);
+      return atualizar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATE');
+      throw error;
+    }
+  }
+
+  // SERVIÇO DE CRIAÇÃO DE UMA LISTA DE DADOS ATUALIZADOS PARA CADASTRO DE AUDITORIA
+  async updateAll(
+    items: Array<UpdateAuditoriaDto>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Prisma.BatchPayload> {
+    try {
+      const client = tx || this.prisma.client;
+
+      this.logger.debug('items: ', items);
+      const dadosAtualizados = items.map((item) => {
+        const mudancas = this.calculateDifference(item.antes, item.depois);
+        const camposAlterados = Object.keys(mudancas);
+        const dados = {
+          mudancas,
+          camposAlterados,
+          totalMudancas: camposAlterados.length,
+        };
+        return {
+          entidade: item.entidade,
+          registroId: item.registroId,
+          acao: item.acao,
+          dadosRegistrados: JSON.stringify(dados),
+          empresaId: item.empresaId,
+          registradoPorId: item.registradoPorId,
+        };
+      });
+      this.logger.debug(dadosAtualizados);
+      const atualizar = await client.auditoria.createMany({
+        data: dadosAtualizados,
+      });
+
+      this.logger.log(TYPES_NOTICES.UPDATE_MANY);
+      return atualizar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - UPDATEALL');
+      throw error;
+    }
+  }
+
+  // SERVIÇO DE LISTAGEM DE AUDITORIAS CADASTRADAS - SOMENTE PERFIL MASTER
+  async findAll(query: QueryAuditoriaFilterDto): Promise<Auditoria[]> {
+    try {
+      const condicao: Prisma.AuditoriaWhereInput = {}; 
+
+      if (query.acao) condicao.acao = query.acao;
+      if (query.dataHora) condicao.dataHora = query.dataHora;
+      if (query.empresaId) condicao.empresaId = query.empresaId;
+      if (query.entidade) condicao.entidade = query.entidade;
+      if (query.registradoPorId)
+        condicao.registradoPorId = query.registradoPorId;
+      if (query.registroId) condicao.registroId = query.registroId;
+
+      const listarRegistros = await this.prisma.auditoria.findMany({
+        where: condicao,
+      });
+
+      if (listarRegistros.length === 0) {
+        this.logger.warn(TYPES_NOTICES.EMPTY_LIST);
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ALL);
+      return listarRegistros;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDALL');
+      throw error;
+    }
+  }
+
+  // SERVIÇO DE BUSCA DE AUDITORIA POR ID - SOMENTE PERFIL MASTER
+  async findOne(id: string): Promise<Auditoria> {
+    try {
+      const buscar = await this.prisma.auditoria.findUnique({
+        where: { id: id },
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException();
+      }
+
+      this.logger.log(TYPES_NOTICES.FIND_ONE);
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONE');
+      throw error;
+    }
+  }
+
+  // SERVIÇO DE BUSCA DE DADOS SEM ID - função interna sem CONTROLLER
+  async findOneLast(query: QueryAuditoriaFilterDto): Promise<Auditoria> {
+    try {
+      const condicao: Prisma.AuditoriaWhereInput = {};
+      condicao.acao = query.acao;
+      condicao.empresaId = query.empresaId;
+      condicao.registradoPorId = query.registradoPorId;
+
+      const buscar = await this.prisma.auditoria.findFirst({
+        where: condicao,
+        orderBy: { dataHora: 'desc' },
+        take: 1,
+      });
+
+      if (!buscar) {
+        this.logger.warn(TYPES_NOTICES.NOT_FOUND);
+        throw new NotFoundException();
+      }
+
+      return buscar;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - FINDONELAST');
+      throw error;
+    }
+  }
+
+  // SERVIÇO DE ELIMINAÇÃO DE AUDITORIA POR ID
+  async remove(id: string): Promise<Auditoria> {
+    try {
+      const remover = await this.prisma.auditoria.delete({
+        where: { id: id },
+      });
+
+      this.logger.log(TYPES_NOTICES.DELETE);
+      return remover;
+    } catch (error) {
+      this.logger.error(TYPES_NOTICES.SERVICE_FAILURE, ' - REMOVE');
+      throw error;
+    }
+  }
+}
+
+===== src/modules/auditoria/dto/create-auditoria.dto.ts =====
+
+import { Acao } from '@/generated/prisma/enums';
+import { IsEnum, IsNotEmpty, IsString, IsUUID } from 'class-validator';
+
+export class CreateAuditoriaDto {
+  @IsString()
+  @IsNotEmpty()
+  entidade!: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  registroId!: string;
+
+  @IsEnum(Acao)
+  @IsNotEmpty()
+  acao!: Acao;
+
+  @IsNotEmpty()
+  dadosRegistrados!: any;
+
+  @IsUUID()
+  @IsNotEmpty()
+  empresaId!: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  registradoPorId!: string;
+}
+
+===== src/modules/auditoria/dto/query-auditoria.dto.ts =====
+
+import { Acao } from '@/generated/prisma/enums';
+import { OmitType, PickType } from '@nestjs/mapped-types';
+import { Type } from 'class-transformer';
+import { IsDate, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { CreateAuditoriaDto } from './create-auditoria.dto';
+
+export class QueryAuditoriaRegisteredByIdDto extends OmitType(
+  CreateAuditoriaDto,
+  ['acao', 'entidade', 'registroId', 'dadosRegistrados'],
+) {
+  @IsOptional()
+  @IsUUID()
+  registroId?: string;
+}
+
+export class QueryAuditoriaFindOneLastDto extends PickType(CreateAuditoriaDto, [
+  'acao',
+  'empresaId',
+  'registradoPorId',
+]) {}
+
+export class QueryAuditoriaFilterDto { 
+  @IsOptional()
+  @IsString()
+  entidade?: string;
+
+  @IsOptional()
+  @IsString()
+  registroId?: string;
+
+  @IsOptional()
+  @IsEnum(Acao)
+  acao?: Acao;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  dataHora?: Date;
+
+  @IsOptional()
+  @IsString()
+  empresaId?: string;
+
+  @IsOptional()
+  @IsString()
+  registradoPorId?: string;
+}
+
+===== src/modules/auditoria/dto/response-auditoria.dto.ts =====
+
+import { FormatDataAuditoria } from '@/utils/format-data-auditoria.util';
+import { FormatDate } from '@/utils/fromat-date.util';
+import { Expose } from 'class-transformer';
+
+export class ResponseAuditoriaDto {
+  @Expose()
+  id!: string;
+
+  @Expose()
+  entidade!: string;
+
+  @Expose()
+  registroId!: string;
+
+  @Expose()
+  acao!: string;
+
+  @Expose()
+  @FormatDataAuditoria()
+  dadosRegistrados!: string;
+
+  @Expose()
+  @FormatDate()
+  dataHora!: Date;
+
+  @Expose()
+  empresaId!: string;
+
+  @Expose()
+  registradoPorId!: string;
+}
+
+export class ResponseAuditoriaMessageDto {
+  @Expose()
+  message!: string;
+}
+
+===== src/modules/auditoria/dto/update-auditoria.dto.ts =====
+
+import { OmitType } from '@nestjs/mapped-types';
+import { IsEnum, IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import { CreateAuditoriaDto } from './create-auditoria.dto';
+
+export class UpdateAuditoriaDto extends OmitType(CreateAuditoriaDto, [
+  'dadosRegistrados',
+]) {
+  @IsNotEmpty()
+  antes!: any;
+
+  @IsNotEmpty()
+  depois!: any;
+}
+
+===== src/modules/auditoria/entities/auditoria.entity.ts =====
+
+import { Acao } from '@/generated/prisma/enums';
+
+export class Auditoria {
+  id!: string;
+  entidade!: string;
+  registroId!: string;
+  acao!: Acao;
+  dadosRegistrados!: string;
+  dataHora!: Date;
+  empresaId!: string;
+  registradoPorId!: string;
+}

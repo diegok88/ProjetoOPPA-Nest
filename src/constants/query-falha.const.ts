@@ -10,7 +10,7 @@ export const CONSULTAS = {
     orderBy: [{ codigo: 'asc' }],
   },
   falhas_completo: {
-    orderBy: [{ codigo: 'desc' }],
+    orderBy: [{ codigo: 'desc' }], 
     include: {
       ativo: true,
       perfil: true,

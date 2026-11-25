@@ -13,7 +13,7 @@ import {
   CondicaoAlocacao,
   SituacaoAlocacao,
   TipoTurno,
-} from '@/generated/prisma/enums'; 
+} from '@/generated/prisma/enums';
 
 export class QueryAlocacaoOperacionalFilterDto {
   @IsOptional()
@@ -135,4 +135,20 @@ export class QueryAlocacaoOperacionalCounterDto {
   )
   @IsBoolean({ message: 'Gestor não é do tipo Boolean!' })
   gestor?: boolean;
+}
+
+export class QueryAlocacaoOperacionalSolicitacaoDto {
+  @IsOptional()
+  @IsUUID('all', { message: 'Gestor id inválido.' })
+  gestorId?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Tag ativo id inválido.' })
+  tagAtivoId?: string;
+
+  @IsOptional()
+  @IsEnum(SituacaoAlocacao, {
+    message: 'Situação não pertence ao enum SituacaoAlocacao.',
+  })
+  situacao?: SituacaoAlocacao;
 }
